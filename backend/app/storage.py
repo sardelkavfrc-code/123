@@ -27,20 +27,27 @@ def _path() -> Path:
 
 
 def load() -> Session | None:
+    """Read the session file or return None.
+
+    If the file is unreadable, malformed JSON, missing required fields, or has a
+    non-integer ``expires_at`` (e.g. ``null``), the file is removed so the next
+    call starts from a clean slate.
+    """
     path = _path()
     if not path.exists():
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(data, dict) or "access_token" not in data or "user_id" not in data:
-        return None
-    return Session(
-        access_token=str(data["access_token"]),
-        user_id=int(data["user_id"]),
-        expires_at=int(data.get("expires_at", 0)),
-    )
+        if isinstance(data, dict) and "access_token" in data and "user_id" in data:
+            return Session(
+                access_token=str(data["access_token"]),
+                user_id=int(data["user_id"]),
+                expires_at=int(data.get("expires_at") or 0),
+            )
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        pass
+    path.unlink(missing_ok=True)
+    return None
 
 
 def save(session: Session) -> None:
