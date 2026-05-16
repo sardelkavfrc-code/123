@@ -1,0 +1,118 @@
+/*
+ * Theming. Each theme is selected by setting `data-theme="..."` on <html>.
+ * Accent color (gradient) is controlled separately via --accent-* CSS vars,
+ * driven by the settings store.
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-0: #0b0c10;
+  --bg-1: #111319;
+  --bg-2: #161922;
+  --bg-3: #1c2030;
+  --bg-elev: rgba(28, 32, 48, 0.72);
+  --bg-overlay: rgba(8, 9, 14, 0.78);
+
+  --text-0: #f4f5f9;
+  --text-1: #b8bcd0;
+  --text-2: #7d8298;
+  --text-3: #565a6f;
+
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --divider: rgba(255, 255, 255, 0.04);
+
+  --danger: #ff5e7e;
+  --success: #2bc48a;
+  --warning: #ffb648;
+
+  --titlebar-height: 36px;
+  --sidebar-width: 240px;
+  --player-height: 92px;
+
+  --accent-1: #1a8cff;
+  --accent-2: #6d3cff;
+  --accent-3: #c930ff;
+  --accent-text: #ffffff;
+
+  --shadow-lg: 0 30px 60px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 12px 28px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.28);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 28px;
+}
+
+[data-theme="amoled"] {
+  color-scheme: dark;
+
+  --bg-0: #000000;
+  --bg-1: #050507;
+  --bg-2: #0a0b0e;
+  --bg-3: #111218;
+  --bg-elev: rgba(15, 16, 22, 0.85);
+  --bg-overlay: rgba(0, 0, 0, 0.85);
+
+  --text-0: #f6f6fa;
+  --text-1: #b0b3c3;
+  --text-2: #757990;
+  --text-3: #4f5269;
+
+  --border: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-0: #f4f5f9;
+  --bg-1: #ffffff;
+  --bg-2: #eef0f6;
+  --bg-3: #e3e6ef;
+  --bg-elev: rgba(255, 255, 255, 0.78);
+  --bg-overlay: rgba(244, 245, 249, 0.82);
+
+  --text-0: #111319;
+  --text-1: #3d4257;
+  --text-2: #6a6f86;
+  --text-3: #9499ab;
+
+  --border: rgba(15, 18, 28, 0.08);
+  --border-strong: rgba(15, 18, 28, 0.16);
+  --divider: rgba(15, 18, 28, 0.05);
+
+  --shadow-lg: 0 30px 60px rgba(15, 18, 28, 0.12);
+  --shadow-md: 0 12px 28px rgba(15, 18, 28, 0.08);
+  --shadow-sm: 0 4px 14px rgba(15, 18, 28, 0.06);
+}
+
+[data-accent="blue"] {
+  --accent-1: #1a8cff;
+  --accent-2: #2a4eff;
+  --accent-3: #6d3cff;
+}
+[data-accent="magenta"] {
+  --accent-1: #c930ff;
+  --accent-2: #ff2fa7;
+  --accent-3: #ff5e7e;
+}
+[data-accent="cyan"] {
+  --accent-1: #16d1cf;
+  --accent-2: #1e90ff;
+  --accent-3: #6d3cff;
+}
+[data-accent="green"] {
+  --accent-1: #2bc48a;
+  --accent-2: #0090ff;
+  --accent-3: #6d3cff;
+}
+[data-accent="orange"] {
+  --accent-1: #ff8c1a;
+  --accent-2: #ff4f5e;
+  --accent-3: #c930ff;
+}
