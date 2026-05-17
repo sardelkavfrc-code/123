@@ -144,3 +144,93 @@ def test_parse_recommendation_feed_extracts_playlists() -> None:
     assert "Для вас" in titles
     assert "Открытия" in titles
     assert feed.blocks[0].accent is not None
+    assert feed.blocks[0].cover == "https://cdn/1.jpg"
+    # No cover available for playlist 2 — must be None, not crash.
+    second = next(b for b in feed.blocks if b.title == "Открытия")
+    assert second.cover is None
+
+
+def test_parse_recommendation_feed_handles_inline_playlists_in_block() -> None:
+    """Some VK catalog payloads inline the playlist object inside the section
+    block instead of referencing it by id from a top-level `playlists` array."""
+    feed = parse_recommendation_feed(
+        {
+            "catalog": {
+                "sections": [
+                    {
+                        "blocks": [
+                            {
+                                "data_type": "music_playlists",
+                                "playlists": [
+                                    {
+                                        "id": 99,
+                                        "owner_id": -2000000007,
+                                        "title": "Микс дня",
+                                        "thumbs": [{"photo_300": "https://cdn/99.jpg"}],
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    )
+    assert len(feed.blocks) == 1
+    block = feed.blocks[0]
+    assert block.title == "Микс дня"
+    assert block.cover == "https://cdn/99.jpg"
+    assert block.owner_id == -2000000007
+
+
+def test_parse_recommendation_feed_falls_back_to_flat_playlists() -> None:
+    """If the catalog has no sections we still want cards rendered, not an
+    empty home screen."""
+    feed = parse_recommendation_feed(
+        {
+            "playlists": [
+                {"id": 7, "owner_id": -1, "title": "Старое"},
+                {"id": 8, "owner_id": -1, "title": "Новое"},
+            ]
+        }
+    )
+    assert {b.title for b in feed.blocks} == {"Старое", "Новое"}
+
+
+def test_parse_recommendation_feed_tolerates_garbage_and_nulls() -> None:
+    """Junk input must not raise. A non-dict response → empty feed; mixed
+    valid+invalid → only valid cards surface."""
+    assert parse_recommendation_feed(None).blocks == []
+    assert parse_recommendation_feed([]).blocks == []
+    feed = parse_recommendation_feed(
+        {
+            "playlists": [
+                None,  # ignored
+                {"title": "no id"},  # ignored — no id
+                {"id": 42, "owner_id": "not a number", "title": "Артист"},  # owner coerces to None
+                "string",  # ignored — wrong type
+            ]
+        }
+    )
+    assert len(feed.blocks) == 1
+    assert feed.blocks[0].title == "Артист"
+    assert feed.blocks[0].owner_id is None
+    assert feed.blocks[0].playlist_id == "42"
+
+
+def test_parse_recommendation_feed_dedups_when_referenced_twice() -> None:
+    feed = parse_recommendation_feed(
+        {
+            "catalog": {
+                "sections": [
+                    {
+                        "blocks": [
+                            {"data_type": "music_playlists", "playlists_ids": ["-1_1", "-1_1"]}
+                        ]
+                    }
+                ]
+            },
+            "playlists": [{"id": 1, "owner_id": -1, "title": "Один"}],
+        }
+    )
+    assert len(feed.blocks) == 1

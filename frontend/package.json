@@ -21,6 +21,7 @@
     "auto-launch": "^5.0.6",
     "axios": "^1.7.7",
     "electron-store": "^8.2.0",
+    "hls.js": "^1.6.16",
     "howler": "^2.2.4",
     "pinia": "^2.2.4",
     "vue": "^3.5.10",

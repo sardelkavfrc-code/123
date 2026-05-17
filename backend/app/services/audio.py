@@ -79,85 +79,160 @@ _ACCENT_PALETTE: list[str] = [
 ]
 
 
+def _playlist_cover(item: dict[str, Any]) -> str | None:
+    """Pick the largest reasonable cover from a playlist dict.
+
+    VK exposes covers in three shapes depending on the endpoint:
+    ``item.photo.photo_{600,300,135}`` (the most common), ``item.thumbs[0].photo_*``
+    (newer catalog responses), and ``item.photo.sizes[]`` (audio-search responses).
+    """
+
+    photo = item.get("photo")
+    if isinstance(photo, dict):
+        for key in ("photo_1200", "photo_600", "photo_300", "photo_270", "photo_135", "photo_68"):
+            if photo.get(key):
+                return str(photo[key])
+        sizes = photo.get("sizes")
+        if isinstance(sizes, list) and sizes:
+            last = sizes[-1]
+            if isinstance(last, dict) and last.get("url"):
+                return str(last["url"])
+
+    thumbs = item.get("thumbs")
+    if isinstance(thumbs, list) and thumbs:
+        first = thumbs[0]
+        if isinstance(first, dict):
+            for key in ("photo_1200", "photo_600", "photo_300", "photo_270", "photo_135", "photo_68"):
+                if first.get(key):
+                    return str(first[key])
+
+    return None
+
+
+def _playlist_id_keys(item: dict[str, Any]) -> set[str]:
+    """All identifier shapes a playlist might be referenced by elsewhere."""
+    pid = item.get("id")
+    owner = item.get("owner_id")
+    keys: set[str] = set()
+    if pid is not None:
+        keys.add(str(pid))
+    if pid is not None and owner is not None:
+        keys.add(f"{owner}_{pid}")
+    if item.get("playlist_id") is not None:
+        keys.add(str(item["playlist_id"]))
+    return keys
+
+
+_PLAYLIST_BLOCK_TYPES = {
+    "music_playlists",
+    "music_playlist",
+    "catalog_banners",
+    "music_recommended_playlists",
+    "music_editorial_playlists",
+}
+
+
 def parse_recommendation_feed(response: Any) -> RecommendationFeed:
     """Parse audio.getCatalog response into card blocks for the home screen.
 
-    The catalog response is deeply nested. We extract any section that smells
-    like "made by algorithms" — sections with subtype 'recoms' / 'editorial'
-    that contain playlist blocks. We then build cards out of the inner items.
+    The catalog payload is deeply nested and the shape varies across VK API
+    versions: sometimes the playlists are pre-listed under ``response.playlists``
+    with cards in ``response.catalog.sections[].blocks[].playlists_ids``,
+    sometimes they are inlined into ``response.audios``, sometimes ``response``
+    *is* the catalog and there is no outer envelope at all. We try all known
+    layouts and return whichever yielded the most cards.
     """
 
     blocks: list[RecommendationBlock] = []
     if not isinstance(response, dict):
         return RecommendationFeed(blocks=blocks)
 
-    catalog = response.get("catalog") or response
-    sections = catalog.get("sections") or []
+    catalog = response.get("catalog") if isinstance(response.get("catalog"), dict) else response
+    sections = catalog.get("sections") if isinstance(catalog.get("sections"), list) else []
 
-    raw_playlists: list[dict[str, Any]] = list(response.get("playlists") or [])
-    raw_blocks: list[dict[str, Any]] = list(response.get("blocks") or catalog.get("blocks") or [])
+    raw_playlists: list[dict[str, Any]] = []
+    for source in (response.get("playlists"), catalog.get("playlists"), response.get("audios")):
+        if isinstance(source, list):
+            raw_playlists.extend(p for p in source if isinstance(p, dict))
 
-    def push(item: dict[str, Any]) -> None:
-        if not isinstance(item, dict):
-            return
+    raw_blocks: list[dict[str, Any]] = []
+    for source in (response.get("blocks"), catalog.get("blocks")):
+        if isinstance(source, list):
+            raw_blocks.extend(b for b in source if isinstance(b, dict))
+
+    def card_from_playlist(item: dict[str, Any]) -> RecommendationBlock | None:
         pid = item.get("id") or item.get("playlist_id")
         if pid is None:
-            return
-        owner_id = item.get("owner_id")
-        photo = (
-            (item.get("photo") or {}).get("photo_600")
-            or (item.get("photo") or {}).get("photo_300")
-            or (item.get("photo") or {}).get("photo_135")
-            or (item.get("thumbs") or [{}])[0].get("photo_600")
-            if item.get("thumbs")
-            else None
-        )
+            return None
+        owner_id_raw = item.get("owner_id")
+        try:
+            owner_id = int(owner_id_raw) if owner_id_raw is not None else None
+        except (TypeError, ValueError):
+            owner_id = None
         accent = _ACCENT_PALETTE[len(blocks) % len(_ACCENT_PALETTE)]
-        blocks.append(
-            RecommendationBlock(
-                id=f"{owner_id}_{pid}" if owner_id is not None else str(pid),
-                title=str(item.get("title") or "Плейлист"),
-                subtitle=str(item.get("subtitle") or item.get("description") or "") or None,
-                cover=photo,
-                accent=accent,
-                playlist_id=str(pid),
-                owner_id=int(owner_id) if owner_id is not None else None,
-                track_count=int(item.get("count") or 0) or None,
-            )
+        try:
+            track_count: int | None = int(item.get("count") or 0) or None
+        except (TypeError, ValueError):
+            track_count = None
+        return RecommendationBlock(
+            id=f"{owner_id}_{pid}" if owner_id is not None else str(pid),
+            title=str(item.get("title") or "Плейлист"),
+            subtitle=str(item.get("subtitle") or item.get("description") or "") or None,
+            cover=_playlist_cover(item),
+            accent=accent,
+            playlist_id=str(pid),
+            owner_id=owner_id,
+            track_count=track_count,
         )
 
-    for pl in raw_playlists:
-        push(pl)
+    def push(item: Any) -> None:
+        if not isinstance(item, dict):
+            return
+        card = card_from_playlist(item)
+        if card is not None:
+            blocks.append(card)
 
+    def find_match(pid: Any) -> dict[str, Any] | None:
+        needle = str(pid)
+        for p in raw_playlists:
+            if needle in _playlist_id_keys(p):
+                return p
+        return None
+
+    # 1. Walk every block in every section and resolve referenced playlists.
     for sec in sections:
-        for b in sec.get("blocks") or []:
-            if isinstance(b, dict) and b.get("data_type") in {"music_playlists", "music_playlist"}:
+        if not isinstance(sec, dict):
+            continue
+        section_blocks = sec.get("blocks") if isinstance(sec.get("blocks"), list) else []
+        for b in section_blocks:
+            if not isinstance(b, dict):
+                continue
+            data_type = str(b.get("data_type") or "")
+            if data_type in _PLAYLIST_BLOCK_TYPES:
                 for pid in b.get("playlists_ids") or []:
-                    match = next(
-                        (
-                            p
-                            for p in raw_playlists
-                            if str(p.get("id")) == str(pid)
-                            or f"{p.get('owner_id')}_{p.get('id')}" == str(pid)
-                        ),
-                        None,
-                    )
-                    if match:
+                    match = find_match(pid)
+                    if match is not None:
                         push(match)
-        for b in raw_blocks:
-            if isinstance(b, dict) and b.get("data_type") in {"music_playlists", "music_playlist"}:
-                for pid in b.get("playlists_ids") or []:
-                    match = next(
-                        (
-                            p
-                            for p in raw_playlists
-                            if str(p.get("id")) == str(pid)
-                            or f"{p.get('owner_id')}_{p.get('id')}" == str(pid)
-                        ),
-                        None,
-                    )
-                    if match:
-                        push(match)
+            # Some catalog versions inline the playlist payload directly.
+            for inline in b.get("playlists") or []:
+                push(inline)
+
+    # 2. Top-level / catalog-level blocks (older shape).
+    for b in raw_blocks:
+        data_type = str(b.get("data_type") or "")
+        if data_type in _PLAYLIST_BLOCK_TYPES:
+            for pid in b.get("playlists_ids") or []:
+                match = find_match(pid)
+                if match is not None:
+                    push(match)
+        for inline in b.get("playlists") or []:
+            push(inline)
+
+    # 3. Fallback: if no section/block referenced anything, just surface the
+    #    flat list of playlists. Better an unsorted set of cards than empty.
+    if not blocks:
+        for pl in raw_playlists:
+            push(pl)
 
     # Deduplicate while preserving order.
     seen: set[str] = set()

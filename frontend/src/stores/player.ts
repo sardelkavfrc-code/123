@@ -1,10 +1,151 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { Howl } from "howler";
+import Hls from "hls.js";
 import type { Track } from "@/api/types";
 import { useSettingsStore } from "./settings";
 
 export type RepeatMode = "off" | "all" | "one";
+
+/** Pluggable playback backend so HLS and progressive audio share one interface. */
+interface PlaybackBackend {
+  play(): void;
+  pause(): void;
+  isPlaying(): boolean;
+  seek(seconds: number): void;
+  position(): number;
+  duration(): number;
+  setVolume(volume: number): void;
+  destroy(): void;
+}
+
+interface BackendCallbacks {
+  onLoad: (duration: number) => void;
+  onLoadError: () => void;
+  onPlay: () => void;
+  onPause: () => void;
+  onEnd: () => void;
+}
+
+export function isHlsUrl(url: string): boolean {
+  // VK sometimes returns chunked HLS streams (master.m3u8 / index.m3u8) instead
+  // of a single-file MP3. Howler.js cannot decode HLS on its own.
+  const lower = url.toLowerCase();
+  return lower.includes(".m3u8") || lower.includes("/hls/");
+}
+
+function createHowlerBackend(
+  url: string,
+  initialVolume: number,
+  cb: BackendCallbacks,
+): PlaybackBackend {
+  const sound = new Howl({
+    src: [url],
+    html5: true,
+    volume: initialVolume,
+    onload: () => cb.onLoad(sound.duration()),
+    onloaderror: () => cb.onLoadError(),
+    onplayerror: () => cb.onLoadError(),
+    onplay: () => cb.onPlay(),
+    onpause: () => cb.onPause(),
+    onstop: () => cb.onPause(),
+    onend: () => cb.onEnd(),
+  });
+  return {
+    play: () => {
+      sound.play();
+    },
+    pause: () => sound.pause(),
+    isPlaying: () => sound.playing(),
+    seek: (s) => {
+      sound.seek(s);
+    },
+    position: () => (sound.seek() as number) || 0,
+    duration: () => sound.duration(),
+    setVolume: (v) => sound.volume(v),
+    destroy: () => {
+      sound.off();
+      sound.stop();
+      sound.unload();
+    },
+  };
+}
+
+function createHlsBackend(
+  url: string,
+  initialVolume: number,
+  cb: BackendCallbacks,
+): PlaybackBackend {
+  const audio = new Audio();
+  audio.preload = "auto";
+  audio.volume = initialVolume;
+  audio.crossOrigin = "anonymous";
+
+  let hls: Hls | null = null;
+  let loaded = false;
+
+  const markLoaded = () => {
+    if (loaded) return;
+    loaded = true;
+    cb.onLoad(Number.isFinite(audio.duration) ? audio.duration : 0);
+  };
+
+  audio.addEventListener("loadedmetadata", markLoaded);
+  audio.addEventListener("canplay", markLoaded);
+  audio.addEventListener("play", () => cb.onPlay());
+  audio.addEventListener("pause", () => {
+    if (audio.ended) return; // onEnd handles this
+    cb.onPause();
+  });
+  audio.addEventListener("ended", () => cb.onEnd());
+  audio.addEventListener("error", () => cb.onLoadError());
+
+  // Safari handles HLS natively. For Chromium/Electron we need Hls.js → MSE.
+  if (Hls.isSupported()) {
+    hls = new Hls({ enableWorker: true });
+    hls.loadSource(url);
+    hls.attachMedia(audio);
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (data.fatal) {
+        cb.onLoadError();
+      }
+    });
+  } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
+    audio.src = url;
+  } else {
+    // Last-ditch attempt: let the browser try anyway. Will most likely fire `error`.
+    audio.src = url;
+  }
+
+  return {
+    play: () => {
+      void audio.play().catch(() => cb.onLoadError());
+    },
+    pause: () => audio.pause(),
+    isPlaying: () => !audio.paused && !audio.ended,
+    seek: (s) => {
+      try {
+        audio.currentTime = s;
+      } catch {
+        /* seeking before metadata is loaded — ignore */
+      }
+    },
+    position: () => audio.currentTime || 0,
+    duration: () => (Number.isFinite(audio.duration) ? audio.duration : 0),
+    setVolume: (v) => {
+      audio.volume = Math.max(0, Math.min(1, v));
+    },
+    destroy: () => {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+    },
+  };
+}
 
 export const usePlayerStore = defineStore("player", () => {
   const settings = useSettingsStore();
@@ -21,7 +162,7 @@ export const usePlayerStore = defineStore("player", () => {
   const muted = ref(false);
   const loadingTrack = ref(false);
 
-  let sound: Howl | null = null;
+  let backend: PlaybackBackend | null = null;
   let tickHandle: number | null = null;
 
   const current = computed<Track | null>(() => {
@@ -34,17 +175,17 @@ export const usePlayerStore = defineStore("player", () => {
 
   watch(volume, (v) => {
     settings.volume = v;
-    if (sound) sound.volume(muted.value ? 0 : v);
+    if (backend) backend.setVolume(muted.value ? 0 : v);
   });
   watch(muted, (m) => {
-    if (sound) sound.volume(m ? 0 : volume.value);
+    if (backend) backend.setVolume(m ? 0 : volume.value);
   });
 
   function startTick() {
     stopTick();
     tickHandle = window.setInterval(() => {
-      if (sound && sound.playing()) {
-        currentTime.value = sound.seek() as number;
+      if (backend && backend.isPlaying()) {
+        currentTime.value = backend.position();
       }
     }, 250);
   }
@@ -56,18 +197,16 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function destroySound() {
+  function destroyBackend() {
     stopTick();
-    if (sound) {
-      sound.off();
-      sound.stop();
-      sound.unload();
-      sound = null;
+    if (backend) {
+      backend.destroy();
+      backend = null;
     }
   }
 
   function loadCurrent(autoPlay: boolean) {
-    destroySound();
+    destroyBackend();
     const track = current.value;
     if (!track || !track.url) {
       isPlaying.value = false;
@@ -76,42 +215,41 @@ export const usePlayerStore = defineStore("player", () => {
     loadingTrack.value = true;
     currentTime.value = 0;
     duration.value = track.duration;
-    sound = new Howl({
-      src: [track.url],
-      html5: true,
-      volume: muted.value ? 0 : volume.value,
-      onload: () => {
+
+    const initialVolume = muted.value ? 0 : volume.value;
+    const callbacks: BackendCallbacks = {
+      onLoad: (d) => {
         loadingTrack.value = false;
-        if (sound) duration.value = sound.duration();
+        if (d > 0) duration.value = d;
       },
-      onloaderror: () => {
+      onLoadError: () => {
         loadingTrack.value = false;
         isPlaying.value = false;
       },
-      onplay: () => {
+      onPlay: () => {
         isPlaying.value = true;
         startTick();
       },
-      onpause: () => {
+      onPause: () => {
         isPlaying.value = false;
       },
-      onstop: () => {
-        isPlaying.value = false;
-        currentTime.value = 0;
-        stopTick();
-      },
-      onend: () => {
+      onEnd: () => {
         handleEnd();
       },
-    });
-    if (autoPlay) sound.play();
+    };
+
+    backend = isHlsUrl(track.url)
+      ? createHlsBackend(track.url, initialVolume, callbacks)
+      : createHowlerBackend(track.url, initialVolume, callbacks);
+
+    if (autoPlay) backend.play();
   }
 
   function handleEnd() {
     if (repeat.value === "one") {
-      if (sound) {
-        sound.seek(0);
-        sound.play();
+      if (backend) {
+        backend.seek(0);
+        backend.play();
       }
       return;
     }
@@ -152,24 +290,24 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function togglePlay() {
-    if (!sound) {
+    if (!backend) {
       if (current.value) loadCurrent(true);
       return;
     }
-    if (sound.playing()) {
-      sound.pause();
+    if (backend.isPlaying()) {
+      backend.pause();
     } else {
-      sound.play();
+      backend.play();
     }
   }
 
   function play() {
-    if (!sound && current.value) loadCurrent(true);
-    sound?.play();
+    if (!backend && current.value) loadCurrent(true);
+    backend?.play();
   }
 
   function pause() {
-    sound?.pause();
+    backend?.pause();
   }
 
   function next() {
@@ -183,8 +321,8 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function prev() {
-    if (sound && (sound.seek() as number) > 3) {
-      sound.seek(0);
+    if (backend && backend.position() > 3) {
+      backend.seek(0);
       return;
     }
     if (index.value > 0) {
@@ -197,8 +335,8 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function seek(seconds: number) {
-    if (sound) {
-      sound.seek(seconds);
+    if (backend) {
+      backend.seek(seconds);
       currentTime.value = seconds;
     }
   }
@@ -207,7 +345,9 @@ export const usePlayerStore = defineStore("player", () => {
     shuffle.value = !shuffle.value;
     const playing = current.value;
     if (shuffle.value) {
-      const reordered = playing ? shuffleArray(originalQueue.value, originalQueue.value.indexOf(playing)) : shuffleArray(originalQueue.value, 0);
+      const reordered = playing
+        ? shuffleArray(originalQueue.value, originalQueue.value.indexOf(playing))
+        : shuffleArray(originalQueue.value, 0);
       queue.value = reordered;
       index.value = playing ? reordered.indexOf(playing) : 0;
     } else {
@@ -230,7 +370,7 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function clear() {
-    destroySound();
+    destroyBackend();
     queue.value = [];
     originalQueue.value = [];
     index.value = -1;
