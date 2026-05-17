@@ -2,6 +2,7 @@
 node_modules/
 backend/.venv/
 backend/dist/
+backend/build/
 
 # build output
 frontend/dist/

@@ -20,6 +20,7 @@ declare global {
     vkmp?: {
       platform: string;
       version: string;
+      getBackendUrl: () => Promise<string>;
       minimize: () => void;
       maximize: () => void;
       close: () => void;

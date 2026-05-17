@@ -9,12 +9,17 @@ import type {
   User,
 } from "./types";
 
-const baseURL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8765";
+const defaultBaseURL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8765";
 
 export const http: AxiosInstance = axios.create({
-  baseURL,
+  baseURL: defaultBaseURL,
   timeout: 30_000,
 });
+
+/** Switches axios baseURL to whatever port the embedded backend bound to. */
+export function setBackendUrl(url: string): void {
+  http.defaults.baseURL = url;
+}
 
 export interface APIErrorDetail {
   kind: string;
