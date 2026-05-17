@@ -6,15 +6,17 @@ from .audio import (
     TrackArtist,
     TrackList,
 )
-from .auth import AuthStatus, TokenLoginRequest
+from .auth import AuthChallenge, AuthStatus, LoginRequest, TokenLoginRequest
 from .common import APIModel
 from .user import FriendList, User
 
 __all__ = [
     "APIModel",
     "Artist",
+    "AuthChallenge",
     "AuthStatus",
     "FriendList",
+    "LoginRequest",
     "RecommendationBlock",
     "RecommendationFeed",
     "TokenLoginRequest",
