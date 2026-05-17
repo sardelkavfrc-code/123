@@ -22,6 +22,7 @@ for pkg in (
     "uvicorn.lifespan.on",
 ):
     hidden.extend(collect_submodules(pkg))
+hidden.extend(collect_submodules("vkaudiotoken"))
 hidden.extend([
     "anyio._backends._asyncio",
     "httpcore",
@@ -29,6 +30,12 @@ hidden.extend([
     "httpx",
     "orjson",
     "pydantic.deprecated.decorator",
+    # vkaudiotoken's runtime deps (auth.refreshToken + Google FCM checkin).
+    "requests",
+    "urllib3",
+    "charset_normalizer",
+    "idna",
+    "certifi",
 ])
 
 a = Analysis(

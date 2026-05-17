@@ -15,6 +15,7 @@ pydantic = "^2.9.0"
 pydantic-settings = "^2.5.0"
 python-dotenv = "^1.0.1"
 orjson = "^3.10.7"
+vkaudiotoken = "^0.5.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

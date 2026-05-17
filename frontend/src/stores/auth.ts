@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
-import type { AuthChallenge, AuthStatus } from "@/api/types";
+import type { AuthStatus } from "@/api/types";
 
 const emptyStatus = (): AuthStatus => ({
   authenticated: false,
@@ -17,7 +17,6 @@ export const useAuthStore = defineStore("auth", () => {
   const checked = ref(false);
   const loading = ref(false);
   const lastError = ref<string | null>(null);
-  const challenge = ref<AuthChallenge | null>(null);
 
   const isAuthenticated = computed(() => status.value.authenticated);
   const hasAudio = computed(() => status.value.has_audio);
@@ -39,70 +38,16 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function login(payload: {
-    username: string;
-    password: string;
-    code?: string;
-    captcha_sid?: string;
-    captcha_key?: string;
-    remember?: boolean;
-  }) {
-    loading.value = true;
-    lastError.value = null;
-    challenge.value = null;
-    try {
-      status.value = await api.login(payload);
-      return true;
-    } catch (err) {
-      if (err instanceof APIError && err.status === 401) {
-        const detail = err.detail;
-        if (detail.kind === "need_validation" || detail.kind === "need_captcha") {
-          challenge.value = {
-            kind: detail.kind,
-            message: detail.message ?? "",
-            validation_sid: detail.validation_sid ?? null,
-            captcha_sid: detail.captcha_sid ?? null,
-            captcha_img: detail.captcha_img ?? null,
-            phone_mask: detail.phone_mask ?? null,
-          };
-          return false;
-        }
-      }
-      lastError.value =
-        err instanceof APIError ? err.detail.message || err.message : (err as Error).message;
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function loginWithToken(payload: { access_token: string; remember: boolean }) {
-    loading.value = true;
-    lastError.value = null;
-    try {
-      status.value = await api.loginWithToken(payload);
-      return true;
-    } catch (err) {
-      lastError.value =
-        err instanceof APIError ? err.detail.message || err.message : (err as Error).message;
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
   async function logout() {
     try {
       await api.logout();
     } finally {
       status.value = emptyStatus();
-      challenge.value = null;
     }
   }
 
   async function loginViaOAuth() {
     lastError.value = null;
-    challenge.value = null;
     if (!window.vkmp?.openVKAuth) {
       lastError.value = "VK вход доступен только в десктоп-версии (Electron).";
       return false;
@@ -116,6 +61,8 @@ export const useAuthStore = defineStore("auth", () => {
         }
         return false;
       }
+      // Backend will run the Kate Mobile receipt refresh on this token
+      // before saving it, so the persisted session has audio access.
       status.value = await api.loginWithToken({
         access_token: result.access_token,
         remember: true,
@@ -135,13 +82,10 @@ export const useAuthStore = defineStore("auth", () => {
     checked,
     loading,
     lastError,
-    challenge,
     isAuthenticated,
     hasAudio,
     displayName,
     refresh,
-    login,
-    loginWithToken,
     loginViaOAuth,
     logout,
   };
