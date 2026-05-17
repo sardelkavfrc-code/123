@@ -1,0 +1,159 @@
+import { defineStore } from "pinia";
+import { computed, ref, watch } from "vue";
+
+export type ThemeName = "dark" | "amoled" | "light";
+export type AccentName = "blue" | "magenta" | "cyan" | "green" | "orange";
+
+interface PersistedSettings {
+  theme: ThemeName;
+  accent: AccentName;
+  performanceMode: boolean;
+  reduceMotion: boolean;
+  closeToTray: boolean;
+  startMinimized: boolean;
+  hardwareAcceleration: boolean;
+  autoStart: boolean;
+  volume: number;
+  cacheSize: number; // in MB
+}
+
+const STORAGE_KEY = "vkmp:settings";
+
+const defaults: PersistedSettings = {
+  theme: "dark",
+  accent: "blue",
+  performanceMode: false,
+  reduceMotion: false,
+  closeToTray: true,
+  startMinimized: false,
+  hardwareAcceleration: true,
+  autoStart: false,
+  volume: 0.6,
+  cacheSize: 250,
+};
+
+function load(): PersistedSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { ...defaults };
+    const parsed = JSON.parse(raw) as Partial<PersistedSettings>;
+    return { ...defaults, ...parsed };
+  } catch {
+    return { ...defaults };
+  }
+}
+
+export const useSettingsStore = defineStore("settings", () => {
+  const initial = load();
+
+  const theme = ref<ThemeName>(initial.theme);
+  const accent = ref<AccentName>(initial.accent);
+  const performanceMode = ref(initial.performanceMode);
+  const reduceMotion = ref(initial.reduceMotion);
+  const closeToTray = ref(initial.closeToTray);
+  const startMinimized = ref(initial.startMinimized);
+  const hardwareAcceleration = ref(initial.hardwareAcceleration);
+  const autoStart = ref(initial.autoStart);
+  const volume = ref(initial.volume);
+  const cacheSize = ref(initial.cacheSize);
+
+  const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
+
+  function applyToDocument() {
+    const html = document.documentElement;
+    html.dataset.theme = theme.value;
+    html.dataset.accent = accent.value;
+    html.dataset.perf = performanceMode.value ? "on" : "off";
+    html.dataset.reduceMotion = reduceMotion.value ? "on" : "off";
+  }
+
+  function persist() {
+    const data: PersistedSettings = {
+      theme: theme.value,
+      accent: accent.value,
+      performanceMode: performanceMode.value,
+      reduceMotion: reduceMotion.value,
+      closeToTray: closeToTray.value,
+      startMinimized: startMinimized.value,
+      hardwareAcceleration: hardwareAcceleration.value,
+      autoStart: autoStart.value,
+      volume: volume.value,
+      cacheSize: cacheSize.value,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {
+      // ignore quota errors
+    }
+  }
+
+  watch(
+    [
+      theme,
+      accent,
+      performanceMode,
+      reduceMotion,
+      closeToTray,
+      startMinimized,
+      hardwareAcceleration,
+      autoStart,
+      volume,
+      cacheSize,
+    ],
+    () => {
+      applyToDocument();
+      persist();
+    },
+    { immediate: true, flush: "post" }
+  );
+
+  async function syncAutoStartWithOS() {
+    if (!window.vkmp) return;
+    try {
+      const current = await window.vkmp.getAutoStart();
+      autoStart.value = current;
+    } catch {
+      // ignore
+    }
+  }
+
+  async function setAutoStart(enabled: boolean) {
+    if (!window.vkmp) {
+      autoStart.value = enabled;
+      return;
+    }
+    const ok = await window.vkmp.setAutoStart(enabled);
+    if (ok) autoStart.value = enabled;
+  }
+
+  function reset() {
+    theme.value = defaults.theme;
+    accent.value = defaults.accent;
+    performanceMode.value = defaults.performanceMode;
+    reduceMotion.value = defaults.reduceMotion;
+    closeToTray.value = defaults.closeToTray;
+    startMinimized.value = defaults.startMinimized;
+    hardwareAcceleration.value = defaults.hardwareAcceleration;
+    autoStart.value = defaults.autoStart;
+    volume.value = defaults.volume;
+    cacheSize.value = defaults.cacheSize;
+  }
+
+  return {
+    theme,
+    accent,
+    performanceMode,
+    reduceMotion,
+    closeToTray,
+    startMinimized,
+    hardwareAcceleration,
+    autoStart,
+    volume,
+    cacheSize,
+    motionDisabled,
+    applyToDocument,
+    syncAutoStartWithOS,
+    setAutoStart,
+    reset,
+  };
+});

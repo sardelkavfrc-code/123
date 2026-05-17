@@ -1,0 +1,98 @@
+/*
+ * Performance mode toggles the CSS variables below. When perf mode is ON,
+ * we collapse most timings to 0ms and disable hover-scale transforms so the
+ * UI feels instant. Spring-based animations driven by JS check the store
+ * directly and fall back to instant set / linear ease.
+ */
+
+:root,
+[data-perf="off"] {
+  --motion-duration-fast: 140ms;
+  --motion-duration-base: 220ms;
+  --motion-duration-slow: 360ms;
+
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --motion-scale-hover: 1.025;
+}
+
+[data-perf="on"] {
+  --motion-duration-fast: 0ms;
+  --motion-duration-base: 0ms;
+  --motion-duration-slow: 0ms;
+
+  --motion-scale-hover: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-duration-fast: 0ms;
+    --motion-duration-base: 0ms;
+    --motion-duration-slow: 0ms;
+    --motion-scale-hover: 1;
+  }
+}
+
+/* Fade transition for router-view */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-out),
+    transform var(--motion-duration-base) var(--motion-ease-out);
+}
+.page-fade-enter-from {
+  opacity: 0;
+  transform: translateY(8px) scale(0.995);
+}
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.998);
+}
+
+/* Toast / popup pop transition */
+.pop-enter-active,
+.pop-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+.pop-enter-from,
+.pop-leave-to {
+  opacity: 0;
+  transform: translateY(6px) scale(0.96);
+}
+
+/* List item stagger */
+.list-stagger-enter-active {
+  transition:
+    opacity var(--motion-duration-base) var(--motion-ease-out),
+    transform var(--motion-duration-base) var(--motion-ease-out);
+}
+.list-stagger-leave-active {
+  transition:
+    opacity var(--motion-duration-fast) var(--motion-ease-out),
+    transform var(--motion-duration-fast) var(--motion-ease-out);
+}
+.list-stagger-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.list-stagger-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -400px 0;
+  }
+  to {
+    background-position: 400px 0;
+  }
+}
+
+[data-perf="on"] .shimmer {
+  animation: none;
+}

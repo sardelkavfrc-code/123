@@ -1,0 +1,36 @@
+/* eslint-env node */
+module.exports = {
+  root: true,
+  env: { browser: true, node: true, es2022: true },
+  parser: "vue-eslint-parser",
+  parserOptions: {
+    parser: "@typescript-eslint/parser",
+    ecmaVersion: 2022,
+    sourceType: "module",
+    extraFileExtensions: [".vue"],
+  },
+  plugins: ["@typescript-eslint"],
+  extends: [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:vue/vue3-recommended",
+  ],
+  rules: {
+    "vue/multi-word-component-names": "off",
+    "vue/no-v-html": "off",
+    "vue/html-self-closing": "off",
+    "vue/singleline-html-element-content-newline": "off",
+    "vue/max-attributes-per-line": "off",
+    "vue/html-indent": "off",
+    "vue/html-closing-bracket-newline": "off",
+    "vue/attributes-order": "off",
+    "vue/first-attribute-linebreak": "off",
+    "vue/attribute-hyphenation": "off",
+    "vue/html-closing-bracket-spacing": "off",
+    "vue/component-tags-order": "off",
+    "@typescript-eslint/no-explicit-any": "off",
+    "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    "@typescript-eslint/no-empty-object-type": "off",
+    "@typescript-eslint/no-empty-interface": "off",
+  },
+};

@@ -1,0 +1,31 @@
+# dependencies
+node_modules/
+backend/.venv/
+backend/dist/
+
+# build output
+frontend/dist/
+frontend/dist-electron/
+frontend/release/
+*.tsbuildinfo
+
+# logs
+*.log
+
+# editors
+.vscode/
+.idea/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# misc
+.DS_Store
+__pycache__/
+*.pyc
+.coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
