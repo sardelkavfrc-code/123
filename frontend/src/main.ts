@@ -3,17 +3,32 @@ import { createPinia } from "pinia";
 import { MotionPlugin } from "@vueuse/motion";
 import App from "./App.vue";
 import { router } from "./router";
+import { setBackendUrl } from "./api/client";
 import { useSettingsStore } from "./stores/settings";
 import "./styles/main.css";
 
-const app = createApp(App);
-app.use(createPinia());
+async function bootstrap(): Promise<void> {
+  // The packaged Electron app spawns the Python backend on a dynamic port and
+  // exposes it via preload. In the browser / Vite dev fallback we keep the
+  // build-time default (http://127.0.0.1:8765).
+  try {
+    const url = await window.vkmp?.getBackendUrl();
+    if (url) setBackendUrl(url);
+  } catch {
+    // ignore — defaults will apply
+  }
 
-const settings = useSettingsStore();
-settings.applyToDocument();
-void settings.syncAutoStartWithOS();
+  const app = createApp(App);
+  app.use(createPinia());
 
-app.use(router);
-app.use(MotionPlugin);
+  const settings = useSettingsStore();
+  settings.applyToDocument();
+  void settings.syncAutoStartWithOS();
 
-app.mount("#app");
+  app.use(router);
+  app.use(MotionPlugin);
+
+  app.mount("#app");
+}
+
+void bootstrap();

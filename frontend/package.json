@@ -4,6 +4,7 @@
   "private": true,
   "main": "dist-electron/main.js",
   "description": "Desktop ВКонтакте music player built with Vue 3, Electron and a Python FastAPI backend.",
+  "homepage": "https://github.com/sardelkavfrc-code/123",
   "author": "sardelkavfrc <sardelkavfrc@gmail.com>",
   "scripts": {
     "dev": "vite",
@@ -13,7 +14,56 @@
     "preview": "vite preview",
     "lint": "eslint --max-warnings 0 \"src/**/*.{ts,vue}\" \"electron/**/*.ts\"",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p electron/tsconfig.json",
-    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"electron/**/*.ts\""
+    "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"electron/**/*.ts\"",
+    "dist": "npm run build && npm run build:electron && electron-builder",
+    "dist:linux": "npm run build && npm run build:electron && electron-builder --linux",
+    "dist:win": "npm run build && npm run build:electron && electron-builder --win",
+    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac"
+  },
+  "build": {
+    "appId": "ai.devin.vkmusic",
+    "productName": "VK Music",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend/dist/",
+        "to": "backend/",
+        "filter": ["vkmp-backend", "vkmp-backend.exe"]
+      }
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "AudioVideo;Audio;Player",
+      "artifactName": "VK-Music-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": ["nsis"],
+      "artifactName": "VK-Music-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VK Music"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "category": "public.app-category.music",
+      "artifactName": "VK-Music-${version}-${arch}.${ext}"
+    },
+    "dmg": {
+      "writeUpdateInfo": false
+    }
   },
   "dependencies": {
     "@vueuse/core": "^11.1.0",

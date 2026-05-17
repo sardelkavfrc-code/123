@@ -5,6 +5,7 @@ type MediaKey = "play-pause" | "next" | "prev";
 contextBridge.exposeInMainWorld("vkmp", {
   platform: process.platform,
   version: process.versions.electron,
+  getBackendUrl: () => ipcRenderer.invoke("backend:url"),
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),
