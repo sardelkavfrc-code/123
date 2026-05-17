@@ -11,7 +11,6 @@ contextBridge.exposeInMainWorld("vkmp", {
   close: () => ipcRenderer.send("window:close"),
   setAutoStart: (enabled: boolean) => ipcRenderer.invoke("auto-start:set", enabled),
   getAutoStart: () => ipcRenderer.invoke("auto-start:get"),
-  openVKAuth: () => ipcRenderer.invoke("auth:open-vk-oauth"),
   onMediaKey: (cb: (key: MediaKey) => void) => {
     const handler = (_event: unknown, key: MediaKey) => cb(key);
     ipcRenderer.on("media-key", handler);

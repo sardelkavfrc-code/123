@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
@@ -11,9 +11,14 @@ const router = useRouter();
 const route = useRoute();
 const motion = useMotion();
 
-const { loading, lastError } = storeToRefs(auth);
+const { loading, lastError, challenge } = storeToRefs(auth);
 
-const isElectron = computed(() => typeof window !== "undefined" && !!window.vkmp?.openVKAuth);
+const form = reactive({
+  username: "",
+  password: "",
+});
+const code = ref("");
+const captchaKey = ref("");
 
 const cardVariants = computed(() =>
   motion.spring(
@@ -23,15 +28,46 @@ const cardVariants = computed(() =>
   ),
 );
 
+const isValidating = computed(() => challenge.value?.kind === "need_validation");
+const needsCaptcha = computed(() => challenge.value?.kind === "need_captcha");
+const challengeMessage = computed(() => challenge.value?.message ?? "");
+
 function redirectTarget(): string {
   return typeof route.query.redirect === "string" ? route.query.redirect : "/";
 }
 
-async function signIn() {
+async function submit() {
   if (loading.value) return;
-  const ok = await auth.loginViaOAuth();
-  if (ok) router.replace(redirectTarget());
+  if (!form.username.trim() || !form.password) return;
+
+  const payload: Parameters<typeof auth.login>[0] = {
+    username: form.username.trim(),
+    password: form.password,
+    remember: true,
+  };
+  if (isValidating.value && code.value) {
+    payload.code = code.value.trim();
+  }
+  if (needsCaptcha.value && challenge.value?.captcha_sid && captchaKey.value) {
+    payload.captcha_sid = challenge.value.captcha_sid;
+    payload.captcha_key = captchaKey.value.trim();
+  }
+
+  const ok = await auth.login(payload);
+  if (ok) {
+    code.value = "";
+    captchaKey.value = "";
+    router.replace(redirectTarget());
+  }
 }
+
+watch(challenge, (next, prev) => {
+  // When VK swaps the captcha (e.g. user typed wrong characters) we reset the
+  // input so the user types fresh — same for the SMS code after a new send.
+  if (!next) return;
+  if (prev?.captcha_sid !== next.captcha_sid) captchaKey.value = "";
+  if (prev?.validation_sid !== next.validation_sid) code.value = "";
+});
 </script>
 
 <template>
@@ -47,33 +83,92 @@ async function signIn() {
         </div>
       </div>
 
-      <div class="auth__pane">
+      <form class="auth__form" @submit.prevent="submit">
         <p class="auth__pitch">
-          Один клик — откроется официальная страница входа ВК (логин/пароль, QR-код,
-          2FA — всё на стороне ВК). Пароль до нас не доходит — получаем только токен,
-          сохраняем его в <code>~/.vk-music-player/session.json</code>.
+          Вход через Kate Mobile (прямой запрос к
+          <code>oauth.vk.com/token</code>). Единственный способ получить
+          токен с аудио-доступом: обычный OAuth-вход на сайте ВК с 2024 даёт
+          токен, у которого audio.* возвращает «Unknown method passed».
+          Пароль никуда, кроме официальных серверов ВК, не уходит.
         </p>
-        <p class="auth__pitch auth__pitch--muted">
-          После входа токен дополнительно «благословляется» как Kate Mobile-инсталл —
-          это нужно, чтобы заработали аудио-методы ВК (без этого с 2024 на чистом
-          OAuth-токене ВК отдаёт «Unknown method passed» на все audio.*).
-        </p>
+
+        <label class="auth__field">
+          <span>Телефон или email</span>
+          <input
+            v-model="form.username"
+            type="text"
+            autocomplete="username"
+            placeholder="+79991234567"
+            :disabled="loading"
+            required
+          />
+        </label>
+
+        <label class="auth__field">
+          <span>Пароль ВК</span>
+          <input
+            v-model="form.password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="••••••••"
+            :disabled="loading"
+            required
+          />
+        </label>
+
+        <label v-if="isValidating" class="auth__field auth__field--challenge">
+          <span>
+            Код подтверждения{{ challenge?.phone_mask ? ` (${challenge.phone_mask})` : "" }}
+          </span>
+          <input
+            v-model="code"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            placeholder="123456"
+            :disabled="loading"
+            required
+          />
+          <p class="auth__hint">{{ challengeMessage }}</p>
+        </label>
+
+        <div v-if="needsCaptcha" class="auth__captcha">
+          <img
+            v-if="challenge?.captcha_img"
+            :src="challenge.captcha_img"
+            alt="Капча ВК"
+            class="auth__captcha-img"
+          />
+          <label class="auth__field">
+            <span>Введи капчу с картинки</span>
+            <input
+              v-model="captchaKey"
+              type="text"
+              autocomplete="off"
+              :disabled="loading"
+              required
+            />
+            <p class="auth__hint">{{ challengeMessage }}</p>
+          </label>
+        </div>
+
         <button
           class="btn btn--primary auth__submit"
-          type="button"
-          :disabled="loading || !isElectron"
-          @click="signIn"
+          type="submit"
+          :disabled="loading || !form.username || !form.password"
         >
           <Spinner v-if="loading" :size="16" />
-          <span>{{ loading ? "Входим…" : "Войти через ВК" }}</span>
+          <span>{{ loading ? "Входим…" : "Войти" }}</span>
         </button>
-        <p v-if="!isElectron" class="auth__warn">
-          Этот вариант работает только в десктоп-версии (Electron) — в браузере ВК не
-          отдаст токен из-за CORS / редиректа.
-        </p>
-      </div>
 
-      <div v-if="lastError" class="auth__error">{{ lastError }}</div>
+        <p v-if="lastError" class="auth__error">{{ lastError }}</p>
+
+        <p class="auth__pitch auth__pitch--muted">
+          Если ВК отдаёт «Too many tries» / «Flood control» — это лимит
+          на стороне ВК на аккаунт после нескольких неудачных попыток.
+          Подожди несколько часов и попробуй снова.
+        </p>
+      </form>
     </div>
   </section>
 </template>
@@ -118,7 +213,7 @@ async function signIn() {
   color: var(--text-2);
   font-size: 13px;
 }
-.auth__pane {
+.auth__form {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -131,6 +226,7 @@ async function signIn() {
 }
 .auth__pitch--muted {
   color: var(--text-3);
+  font-size: 12px;
 }
 .auth__pitch code {
   background: var(--bg-2);
@@ -138,15 +234,56 @@ async function signIn() {
   border-radius: 4px;
   font-size: 12px;
 }
-.auth__error {
-  color: var(--danger);
-  font-size: 12px;
+.auth__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-2);
 }
-.auth__warn {
+.auth__field input {
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  transition: border-color 120ms ease;
+}
+.auth__field input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.auth__field--challenge {
+  background: rgba(26, 140, 255, 0.06);
+  border: 1px solid rgba(26, 140, 255, 0.18);
+  padding: 12px;
+  border-radius: 12px;
+}
+.auth__captcha {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(255, 196, 0, 0.06);
+  border: 1px solid rgba(255, 196, 0, 0.22);
+}
+.auth__captcha-img {
+  align-self: flex-start;
+  max-width: 200px;
+  border-radius: 6px;
+  background: var(--bg-2);
+}
+.auth__hint {
   margin: 0;
   color: var(--text-3);
+  font-size: 11px;
+}
+.auth__error {
+  margin: 0;
+  color: var(--danger);
   font-size: 12px;
-  line-height: 1.55;
 }
 .auth__submit {
   margin-top: 4px;

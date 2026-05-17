@@ -71,8 +71,15 @@ export const api = {
     const { data } = await http.get<AuthStatus>("/auth/status");
     return data;
   },
-  async loginWithToken(payload: { access_token: string; remember: boolean }): Promise<AuthStatus> {
-    const { data } = await http.post<AuthStatus>("/auth/token", payload);
+  async login(payload: {
+    username: string;
+    password: string;
+    code?: string;
+    captcha_sid?: string;
+    captcha_key?: string;
+    remember?: boolean;
+  }): Promise<AuthStatus> {
+    const { data } = await http.post<AuthStatus>("/auth/login", payload);
     return data;
   },
   async logout(): Promise<void> {

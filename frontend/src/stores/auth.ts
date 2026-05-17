@@ -1,7 +1,16 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
-import type { AuthStatus } from "@/api/types";
+import type { AuthChallenge, AuthStatus } from "@/api/types";
+
+export interface LoginPayload {
+  username: string;
+  password: string;
+  code?: string;
+  captcha_sid?: string;
+  captcha_key?: string;
+  remember?: boolean;
+}
 
 const emptyStatus = (): AuthStatus => ({
   authenticated: false,
@@ -17,6 +26,7 @@ export const useAuthStore = defineStore("auth", () => {
   const checked = ref(false);
   const loading = ref(false);
   const lastError = ref<string | null>(null);
+  const challenge = ref<AuthChallenge | null>(null);
 
   const isAuthenticated = computed(() => status.value.authenticated);
   const hasAudio = computed(() => status.value.has_audio);
@@ -43,38 +53,45 @@ export const useAuthStore = defineStore("auth", () => {
       await api.logout();
     } finally {
       status.value = emptyStatus();
+      challenge.value = null;
     }
   }
 
-  async function loginViaOAuth() {
+  async function login(payload: LoginPayload) {
     lastError.value = null;
-    if (!window.vkmp?.openVKAuth) {
-      lastError.value = "VK вход доступен только в десктоп-версии (Electron).";
-      return false;
-    }
     loading.value = true;
     try {
-      const result = await window.vkmp.openVKAuth();
-      if (!result.ok) {
-        if (result.reason !== "cancelled") {
-          lastError.value = result.message || "Не удалось получить токен ВК";
-        }
-        return false;
-      }
-      // Backend will run the Kate Mobile receipt refresh on this token
-      // before saving it, so the persisted session has audio access.
-      status.value = await api.loginWithToken({
-        access_token: result.access_token,
-        remember: true,
-      });
+      status.value = await api.login({ remember: true, ...payload });
+      challenge.value = null;
       return true;
     } catch (err) {
-      lastError.value =
-        err instanceof APIError ? err.detail.message || err.message : (err as Error).message;
+      if (err instanceof APIError) {
+        const detail = err.detail as AuthChallenge | { kind: string; message?: string };
+        if (
+          err.status === 401 &&
+          detail &&
+          (detail.kind === "need_validation" || detail.kind === "need_captcha")
+        ) {
+          challenge.value = detail as AuthChallenge;
+          lastError.value =
+            detail.kind === "need_validation"
+              ? "ВК запросил код подтверждения"
+              : "ВК запросил капчу";
+          return false;
+        }
+        lastError.value = detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
       return false;
     } finally {
       loading.value = false;
     }
+  }
+
+  function clearChallenge() {
+    challenge.value = null;
+    lastError.value = null;
   }
 
   return {
@@ -82,11 +99,13 @@ export const useAuthStore = defineStore("auth", () => {
     checked,
     loading,
     lastError,
+    challenge,
     isAuthenticated,
     hasAudio,
     displayName,
     refresh,
-    loginViaOAuth,
+    login,
     logout,
+    clearChallenge,
   };
 });

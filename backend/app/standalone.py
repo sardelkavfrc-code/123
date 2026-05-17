@@ -11,14 +11,48 @@ dies (a portable equivalent of a parent-death signal on all platforms).
 from __future__ import annotations
 
 import asyncio
+import logging
+import logging.handlers
 import os
 import sys
 import threading
 import time
+from pathlib import Path
 
 import uvicorn
 
 from app.main import app
+
+
+def _configure_file_logging() -> None:
+    """Mirror app logs to ``~/.vk-music-player/backend.log`` (rotated, 5x256kB).
+
+    stdout/stderr are owned by Electron and are swallowed when the binary is
+    launched from a desktop shortcut, so this file is the only place users
+    can read backend-side diagnostics (auth, audio probes, VK errors).
+    """
+    log_dir = Path.home() / ".vk-music-player"
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return
+    log_path = log_dir / "backend.log"
+    handler = logging.handlers.RotatingFileHandler(
+        log_path, maxBytes=256 * 1024, backupCount=5, encoding="utf-8"
+    )
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    root = logging.getLogger()
+    if root.level == logging.NOTSET or root.level > logging.INFO:
+        root.setLevel(logging.INFO)
+    root.addHandler(handler)
+    logging.getLogger("uvicorn").addHandler(handler)
+    logging.getLogger("uvicorn.error").addHandler(handler)
+    logging.getLogger("app").setLevel(logging.INFO)
 
 
 def _parent_alive(initial_ppid: int) -> bool:
@@ -68,6 +102,8 @@ def _watch_parent_stdin() -> None:
 
 
 def main() -> None:
+    _configure_file_logging()
+    logging.getLogger(__name__).info("VKMP backend starting")
     port = int(os.environ.get("VKMP_BIND_PORT", "8765"))
     host = os.environ.get("VKMP_BIND_HOST", "127.0.0.1")
 

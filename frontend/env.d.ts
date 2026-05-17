@@ -15,19 +15,6 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
-export type VKAuthResult =
-  | {
-      ok: true;
-      access_token: string;
-      user_id: number | null;
-      expires_in: number | null;
-    }
-  | {
-      ok: false;
-      reason: "cancelled" | "error" | "load_failed";
-      message?: string;
-    };
-
 declare global {
   interface Window {
     vkmp?: {
@@ -39,7 +26,6 @@ declare global {
       close: () => void;
       setAutoStart: (enabled: boolean) => Promise<boolean>;
       getAutoStart: () => Promise<boolean>;
-      openVKAuth: () => Promise<VKAuthResult>;
       onMediaKey: (cb: (key: "play-pause" | "next" | "prev") => void) => () => void;
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
     };

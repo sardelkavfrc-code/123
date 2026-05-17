@@ -6,10 +6,11 @@ from fastapi import APIRouter, HTTPException, status
 
 from .. import storage
 from ..deps import VKDep
-from ..models.auth import AuthStatus, TokenLoginRequest
+from ..models.auth import AuthChallenge, AuthStatus, LoginRequest
 from ..services.friends import parse_user
 from ..vk.audio_token import refresh_to_audio_token
-from ..vk.exceptions import VKError
+from ..vk.auth import direct_login
+from ..vk.exceptions import VKAuthError, VKError
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +20,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def _probe_audio(vk: VKDep, token: str) -> bool:
     """Return True if the token can call audio.* methods.
 
-    The OAuth implicit flow returns tokens that work for users.get /
-    friends.get but every audio.* call fails with VK error 3
-    ("Unknown method passed"). After the Kate Mobile receipt refresh
-    (see ``vk.audio_token``) the same token gets the Kate Mobile
-    blessing and audio.* starts working. We probe once at login so
-    the UI can surface ``has_audio`` to the user.
+    VK closed audio.* for OAuth implicit-flow tokens in 2024+ — every call
+    returns error 3 'Unknown method passed'. Only Kate Mobile direct password
+    grant against oauth.vk.com/token yields tokens that pass the audio check.
+    We probe with a cheap audio.get count=1 once at login time so the
+    frontend can warn the user if audio is gated (e.g. a stale session.json
+    left over from a prior version of the app).
     """
     try:
         await vk.call("audio.get", token, count=1)
@@ -72,39 +73,68 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
         return AuthStatus(authenticated=False)
 
 
-@router.post("/token", response_model=AuthStatus)
-async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
-    """Persist an access_token from the Electron OAuth implicit-flow window.
+@router.post("/login", response_model=AuthStatus)
+async def login(payload: LoginRequest, vk: VKDep) -> AuthStatus:
+    """Kate Mobile direct password grant against ``oauth.vk.com/token``.
 
-    Tokens straight off the OAuth window lack audio scope. We run them
-    through ``refresh_to_audio_token`` (Kate Mobile receipt + VK
-    auth.refreshToken) which "blesses" the token so audio.* methods
-    start responding. If the refresh fails (Google FCM unreachable,
-    VK rejects, etc.) we keep the original token — the rest of the
-    player still works, only audio stays gated.
+    The only flow VK still grants audio scope to in 2024+. The implicit
+    OAuth flow (``oauth.vk.com/authorize?response_type=token``) was
+    confirmed dead for audio.* — even pre-existing tokens stopped working
+    after VK's server-side change in 2026.
+
+    Password never leaves this process: it's POSTed directly to VK and we
+    keep only the resulting access_token. 2FA / captcha challenges are
+    surfaced back to the client as HTTP 401 with the challenge payload.
+
+    After a successful grant we apply ``refresh_to_audio_token`` (FCM
+    receipt + ``auth.refreshToken``) as a best-effort upgrade. If it
+    fails or returns the same token we keep the raw password-grant
+    token — which already carries audio scope.
     """
-    refresh_result = await refresh_to_audio_token(payload.access_token)
+    try:
+        session = await direct_login(
+            payload.username,
+            payload.password,
+            code=payload.code,
+            captcha_sid=payload.captcha_sid,
+            captcha_key=payload.captcha_key,
+        )
+    except VKAuthError as exc:
+        challenge = AuthChallenge(
+            kind=exc.kind,
+            message=exc.message,
+            validation_sid=exc.validation_sid,
+            captcha_sid=exc.captcha_sid,
+            captcha_img=exc.captcha_img,
+            phone_mask=exc.phone_mask,
+        )
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail=challenge.model_dump()
+        ) from exc
+
+    refresh_result = await refresh_to_audio_token(session.access_token)
     if refresh_result.ok and refresh_result.refreshed_token:
-        token_to_use = refresh_result.refreshed_token
-        logger.info("Audio-token refresh succeeded")
+        logger.info("Kate Mobile receipt blessing succeeded")
+        session = storage.Session(
+            access_token=refresh_result.refreshed_token,
+            user_id=session.user_id,
+            expires_at=session.expires_at,
+        )
     else:
-        token_to_use = payload.access_token
-        logger.warning(
-            "Audio-token refresh failed, keeping OAuth token: %s",
+        logger.info(
+            "Kate Mobile receipt blessing skipped (%s); using raw grant token",
             refresh_result.error,
         )
 
-    has_audio = await _probe_audio(vk, token_to_use)
-    status_response = await _resolve_user(vk, token_to_use, has_audio=has_audio)
-    assert status_response.user_id is not None  # guaranteed by _resolve_user
+    has_audio = await _probe_audio(vk, session.access_token)
+    if not has_audio:
+        logger.warning(
+            "audio.get probe failed even after direct grant — audio stays gated"
+        )
 
-    session = storage.Session(
-        access_token=token_to_use,
-        user_id=status_response.user_id,
-    )
     if payload.remember:
         storage.save(session)
-    return status_response
+    return await _resolve_user(vk, session.access_token, has_audio=has_audio)
 
 
 @router.post("/logout", response_model=AuthStatus)
