@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
-import type { AuthChallenge, AuthStatus } from "@/api/types";
+import type { AuthStatus } from "@/api/types";
 
 export const useAuthStore = defineStore("auth", () => {
   const status = ref<AuthStatus>({
@@ -13,7 +13,6 @@ export const useAuthStore = defineStore("auth", () => {
   });
   const checked = ref(false);
   const loading = ref(false);
-  const challenge = ref<AuthChallenge | null>(null);
   const lastError = ref<string | null>(null);
 
   const isAuthenticated = computed(() => status.value.authenticated);
@@ -38,38 +37,6 @@ export const useAuthStore = defineStore("auth", () => {
       }
     } finally {
       checked.value = true;
-    }
-  }
-
-  async function login(payload: {
-    username: string;
-    password: string;
-    code?: string;
-    captcha_sid?: string;
-    captcha_key?: string;
-  }) {
-    loading.value = true;
-    challenge.value = null;
-    lastError.value = null;
-    try {
-      status.value = await api.login(payload);
-      return true;
-    } catch (err) {
-      if (err instanceof APIError && err.status === 401 && err.detail.kind) {
-        if (
-          err.detail.kind === "need_validation" ||
-          err.detail.kind === "need_captcha"
-        ) {
-          challenge.value = err.detail as AuthChallenge;
-        } else {
-          lastError.value = err.detail.message || "Ошибка входа";
-        }
-      } else {
-        lastError.value = (err as Error).message || "Ошибка сети";
-      }
-      return false;
-    } finally {
-      loading.value = false;
     }
   }
 
@@ -102,17 +69,45 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function loginViaOAuth() {
+    lastError.value = null;
+    if (!window.vkmp?.openVKAuth) {
+      lastError.value = "VK вход доступен только в десктоп-версии (Electron).";
+      return false;
+    }
+    loading.value = true;
+    try {
+      const result = await window.vkmp.openVKAuth();
+      if (!result.ok) {
+        if (result.reason !== "cancelled") {
+          lastError.value = result.message || "Не удалось получить токен ВК";
+        }
+        return false;
+      }
+      status.value = await api.loginWithToken({
+        access_token: result.access_token,
+        remember: true,
+      });
+      return true;
+    } catch (err) {
+      lastError.value =
+        err instanceof APIError ? err.detail.message || err.message : (err as Error).message;
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     status,
     checked,
     loading,
-    challenge,
     lastError,
     isAuthenticated,
     displayName,
     refresh,
-    login,
     loginWithToken,
+    loginViaOAuth,
     logout,
   };
 });

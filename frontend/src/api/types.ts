@@ -72,12 +72,3 @@ export interface AuthStatus {
   last_name: string | null;
   photo: string | null;
 }
-
-export interface AuthChallenge {
-  kind: string;
-  message: string;
-  validation_sid?: string | null;
-  captcha_sid?: string | null;
-  captcha_img?: string | null;
-  phone_mask?: string | null;
-}

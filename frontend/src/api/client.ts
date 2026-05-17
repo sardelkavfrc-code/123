@@ -25,10 +25,6 @@ export interface APIErrorDetail {
   kind: string;
   message?: string;
   code?: number;
-  validation_sid?: string | null;
-  captcha_sid?: string | null;
-  captcha_img?: string | null;
-  phone_mask?: string | null;
 }
 
 export class APIError extends Error {
@@ -69,16 +65,6 @@ http.interceptors.response.use(
 export const api = {
   async authStatus(): Promise<AuthStatus> {
     const { data } = await http.get<AuthStatus>("/auth/status");
-    return data;
-  },
-  async login(payload: {
-    username: string;
-    password: string;
-    code?: string;
-    captcha_sid?: string;
-    captcha_key?: string;
-  }): Promise<AuthStatus> {
-    const { data } = await http.post<AuthStatus>("/auth/login", payload);
     return data;
   },
   async loginWithToken(payload: { access_token: string; remember: boolean }): Promise<AuthStatus> {
