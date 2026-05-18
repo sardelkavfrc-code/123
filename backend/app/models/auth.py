@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pydantic import Field
+
 from .common import APIModel
 
 
@@ -9,6 +11,13 @@ class LoginRequest(APIModel):
     code: str | None = None
     captcha_sid: str | None = None
     captcha_key: str | None = None
+    remember: bool = True
+    client: str | None = None
+
+
+class TokenLoginRequest(APIModel):
+    access_token: str = Field(min_length=10)
+    user_id: int | None = None
     remember: bool = True
 
 
