@@ -156,6 +156,11 @@ async def delete(
     return {"ok": bool(result)}
 
 
+def _slug_to_name(slug: str) -> str:
+    """Best-effort fallback: turn VK artist slug ('linkin-park') into a name."""
+    return slug.replace("-", " ").replace("_", " ").strip().title() or slug
+
+
 @router.get("/by_artist/{artist_id}", response_model=TrackList)
 async def by_artist(
     artist_id: str,
@@ -163,12 +168,40 @@ async def by_artist(
     session: SessionDep,
     offset: int = Query(0, ge=0),
     count: int = Query(50, ge=1, le=200),
+    q: str | None = Query(None, description="Имя артиста для fallback на audio.search"),
 ) -> TrackList:
+    """Tracks of an artist.
+
+    ``audio.getAudiosByArtist`` is gated to a small set of client_ids
+    (Kate Mobile / VK Admin); under the vk.com web token from
+    vkhost.github.io it returns ``Unknown method passed``. We fall back
+    to ``audio.search(q=name, performer_only=1)`` which is available to
+    every audio-scope token.
+    """
+    try:
+        response = await vk.call(
+            "audio.getAudiosByArtist",
+            session.access_token,
+            artist_id=artist_id,
+            offset=offset,
+            count=count,
+        )
+        return parse_track_list(response)
+    except VKError as exc:
+        if exc.code not in (3, 4, 15, 100):
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+            ) from exc
+
+    name = q or _slug_to_name(artist_id)
     response = await _safe_call(
         vk,
-        "audio.getAudiosByArtist",
+        "audio.search",
         session.access_token,
-        artist_id=artist_id,
+        q=name,
+        performer_only=1,
+        sort=2,
         offset=offset,
         count=count,
     )
@@ -180,15 +213,42 @@ async def artist_info(
     artist_id: str,
     vk: VKDep,
     session: SessionDep,
+    name: str | None = Query(None, description="Имя артиста для stub-карточки если VK метод недоступен"),
 ) -> Artist:
-    response = await _safe_call(
-        vk,
-        "audio.getArtistById",
-        session.access_token,
-        artist_id=artist_id,
-        extended=1,
-    )
+    """Artist meta.
+
+    ``audio.getArtistById`` is also gated on the vk.com web token; if
+    it fails we return a stub so the artist screen still renders (just
+    without photo / follow-state).
+    """
+    try:
+        response = await vk.call(
+            "audio.getArtistById",
+            session.access_token,
+            artist_id=artist_id,
+            extended=1,
+        )
+    except VKError as exc:
+        if exc.code in (3, 4, 15, 100):
+            return Artist(
+                id=artist_id,
+                name=name or _slug_to_name(artist_id),
+                domain=None,
+                photo=None,
+                is_followed=False,
+            )
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+        ) from exc
+
     artist = parse_artist(response)
     if artist is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Артист не найден")
+        return Artist(
+            id=artist_id,
+            name=name or _slug_to_name(artist_id),
+            domain=None,
+            photo=None,
+            is_followed=False,
+        )
     return artist

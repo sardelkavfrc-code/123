@@ -137,14 +137,19 @@ export const api = {
     });
     return data;
   },
-  async byArtist(artistId: string, params: { count?: number; offset?: number } = {}): Promise<TrackList> {
+  async byArtist(
+    artistId: string,
+    params: { count?: number; offset?: number; q?: string } = {}
+  ): Promise<TrackList> {
     const { data } = await http.get<TrackList>(`/audio/by_artist/${encodeURIComponent(artistId)}`, {
       params,
     });
     return data;
   },
-  async artist(artistId: string): Promise<Artist> {
-    const { data } = await http.get<Artist>(`/audio/artist/${encodeURIComponent(artistId)}`);
+  async artist(artistId: string, params: { name?: string } = {}): Promise<Artist> {
+    const { data } = await http.get<Artist>(`/audio/artist/${encodeURIComponent(artistId)}`, {
+      params,
+    });
     return data;
   },
 

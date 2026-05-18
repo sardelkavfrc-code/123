@@ -53,7 +53,13 @@ async function toggleLibrary() {
 function gotoArtist() {
   if (!current.value) return;
   const main = current.value.main_artists[0];
-  if (main?.id) router.push({ name: "artist", params: { id: main.id } });
+  if (main?.id) {
+    router.push({
+      name: "artist",
+      params: { id: main.id },
+      query: main.name ? { name: main.name } : undefined,
+    });
+  }
 }
 </script>
 

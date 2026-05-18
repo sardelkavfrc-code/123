@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { api, APIError } from "@/api/client";
 import type { Artist, Track } from "@/api/types";
 import { usePlayerStore } from "@/stores/player";
@@ -12,6 +12,7 @@ import { tracksLabel } from "@/composables/useFormat";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
+const route = useRoute();
 const player = usePlayerStore();
 
 const artist = ref<Artist | null>(null);
@@ -19,22 +20,56 @@ const tracks = ref<Track[]>([]);
 const similar = ref<Track[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
+const tracksWarning = ref<string | null>(null);
+
+const hintedName = computed(() => {
+  const v = route.query.name;
+  return typeof v === "string" ? v : null;
+});
 
 async function load() {
   loading.value = true;
   error.value = null;
+  tracksWarning.value = null;
   artist.value = null;
   tracks.value = [];
   similar.value = [];
+
+  // Run both calls independently — under the vk.com web token from
+  // vkhost.github.io, artist methods may partially fail. Each side
+  // falls back to a stub so the screen still renders something useful.
+  const name = hintedName.value ?? undefined;
+
+  const [infoRes, listRes] = await Promise.allSettled([
+    api.artist(props.id, name ? { name } : {}),
+    api.byArtist(props.id, { count: 100, ...(name ? { q: name } : {}) }),
+  ]);
+
+  if (infoRes.status === "fulfilled") {
+    artist.value = infoRes.value;
+  } else {
+    artist.value = {
+      id: props.id,
+      name: name ?? props.id,
+      domain: null,
+      photo: null,
+      is_followed: false,
+    };
+  }
+
+  if (listRes.status === "fulfilled") {
+    tracks.value = listRes.value.items;
+  } else {
+    const reason = listRes.reason;
+    tracksWarning.value =
+      reason instanceof APIError
+        ? reason.detail.message || "Не удалось загрузить треки артиста"
+        : (reason as Error).message || "Не удалось загрузить треки артиста";
+  }
+
   try {
-    const [info, list] = await Promise.all([
-      api.artist(props.id),
-      api.byArtist(props.id, { count: 100 }),
-    ]);
-    artist.value = info;
-    tracks.value = list.items;
-    if (list.items.length) {
-      const first = list.items.find((t) => !!t.url) ?? list.items[0];
+    if (tracks.value.length) {
+      const first = tracks.value.find((t) => !!t.url) ?? tracks.value[0];
       const sim = await api.recommendations({
         target_audio: `${first.owner_id}_${first.id}`,
         count: 30,
@@ -43,16 +78,20 @@ async function load() {
         (t) => !tracks.value.some((tt) => tt.id === t.id && tt.owner_id === t.owner_id)
       );
     }
-  } catch (err) {
-    error.value =
-      err instanceof APIError ? err.detail.message || "Не удалось" : (err as Error).message;
-  } finally {
-    loading.value = false;
+  } catch {
+    // recommendations are nice-to-have, swallow
   }
+
+  if (!artist.value && !tracks.value.length) {
+    error.value = "Артист не найден";
+  }
+
+  loading.value = false;
 }
 
 onMounted(load);
 watch(() => props.id, load);
+watch(() => route.query.name, load);
 
 function playAll() {
   if (tracks.value.length) player.playQueue(tracks.value);
@@ -86,12 +125,14 @@ function playAll() {
     <section class="artist__body">
       <div v-if="loading" class="artist__loading"><Spinner :size="20" /> Загружаем артиста…</div>
       <div v-else-if="error" class="artist__error">{{ error }}</div>
-      <TrackList
-        v-else
-        :tracks="tracks"
-        show-index
-        empty-title="У артиста пока нет треков"
-      />
+      <template v-else>
+        <div v-if="tracksWarning" class="artist__warn">{{ tracksWarning }}</div>
+        <TrackList
+          :tracks="tracks"
+          show-index
+          empty-title="У артиста пока нет треков"
+        />
+      </template>
     </section>
 
     <template v-if="similar.length">
@@ -160,6 +201,14 @@ function playAll() {
 .artist__error {
   color: var(--danger);
   padding: 12px 0;
+  font-size: 13px;
+}
+.artist__warn {
+  color: var(--text-2);
+  background: var(--bg-2);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin-bottom: 12px;
   font-size: 13px;
 }
 </style>

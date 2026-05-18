@@ -44,7 +44,13 @@ function playOne() {
 
 function gotoArtist() {
   const main = props.track.main_artists[0];
-  if (main?.id) router.push({ name: "artist", params: { id: main.id } });
+  if (main?.id) {
+    router.push({
+      name: "artist",
+      params: { id: main.id },
+      query: main.name ? { name: main.name } : undefined,
+    });
+  }
 }
 
 async function toggleLibrary() {
