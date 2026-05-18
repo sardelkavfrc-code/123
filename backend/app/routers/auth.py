@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from .. import storage
 from ..deps import VKDep
-from ..models.auth import AuthChallenge, AuthStatus, LoginRequest
+from ..models.auth import AuthChallenge, AuthStatus, LoginRequest, TokenLoginRequest
 from ..services.friends import parse_user
 from ..vk.audio_token import refresh_to_audio_token
 from ..vk.auth import direct_login
@@ -98,6 +98,7 @@ async def login(payload: LoginRequest, vk: VKDep) -> AuthStatus:
             code=payload.code,
             captcha_sid=payload.captcha_sid,
             captcha_key=payload.captcha_key,
+            client=payload.client,
         )
     except VKAuthError as exc:
         challenge = AuthChallenge(
@@ -130,6 +131,61 @@ async def login(payload: LoginRequest, vk: VKDep) -> AuthStatus:
     if not has_audio:
         logger.warning(
             "audio.get probe failed even after direct grant — audio stays gated"
+        )
+
+    if payload.remember:
+        storage.save(session)
+    return await _resolve_user(vk, session.access_token, has_audio=has_audio)
+
+
+@router.post("/token", response_model=AuthStatus)
+async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
+    """Accept a pre-existing access_token (OAuth implicit redirect, vkhost.github.io, etc.).
+
+    We don't know the token's provenance, so we run the same best-effort
+    ``refresh_to_audio_token`` blessing and the ``audio.get`` probe as on
+    ``/auth/login``. If the user pasted an implicit-flow token, the probe
+    will return ``has_audio=False`` and the UI will warn them that audio
+    is gated but other endpoints (friends, profile) still work.
+    """
+    user_id = payload.user_id or 0
+    if not user_id:
+        try:
+            response = await vk.call("users.get", payload.access_token)
+            if isinstance(response, list) and response:
+                user_id = int(response[0].get("id", 0))
+        except VKError as exc:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                detail={"kind": "vk_error", "message": exc.message},
+            ) from exc
+
+    if not user_id:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            detail={"kind": "vk_error", "message": "Не удалось определить user_id"},
+        )
+
+    session = storage.Session(access_token=payload.access_token, user_id=user_id)
+
+    refresh_result = await refresh_to_audio_token(session.access_token)
+    if refresh_result.ok and refresh_result.refreshed_token:
+        logger.info("Kate Mobile receipt blessing succeeded on pasted token")
+        session = storage.Session(
+            access_token=refresh_result.refreshed_token,
+            user_id=session.user_id,
+            expires_at=session.expires_at,
+        )
+    else:
+        logger.info(
+            "Kate Mobile receipt blessing skipped on pasted token (%s)",
+            refresh_result.error,
+        )
+
+    has_audio = await _probe_audio(vk, session.access_token)
+    if not has_audio:
+        logger.warning(
+            "audio.get probe failed on pasted token — likely OAuth-implicit; audio gated"
         )
 
     if payload.remember:

@@ -10,6 +10,13 @@ export interface LoginPayload {
   captcha_sid?: string;
   captcha_key?: string;
   remember?: boolean;
+  client?: string;
+}
+
+export interface TokenLoginPayload {
+  access_token: string;
+  user_id?: number;
+  remember?: boolean;
 }
 
 const emptyStatus = (): AuthStatus => ({
@@ -94,6 +101,51 @@ export const useAuthStore = defineStore("auth", () => {
     lastError.value = null;
   }
 
+  async function loginWithToken(payload: TokenLoginPayload) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      status.value = await api.loginWithToken({ remember: true, ...payload });
+      challenge.value = null;
+      return true;
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function loginViaOAuth(clientId: number) {
+    if (!window.vkmp?.openVKAuth) {
+      lastError.value = "OAuth-вход доступен только в Electron-сборке";
+      return false;
+    }
+    lastError.value = null;
+    loading.value = true;
+    try {
+      const result = await window.vkmp.openVKAuth({
+        clientId,
+        scope: "audio,friends,offline,wall,photos,groups,status",
+      });
+      if (!result.ok) {
+        lastError.value = result.error;
+        return false;
+      }
+      return await loginWithToken({
+        access_token: result.access_token,
+        user_id: result.user_id,
+        remember: true,
+      });
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     status,
     checked,
@@ -105,6 +157,8 @@ export const useAuthStore = defineStore("auth", () => {
     displayName,
     refresh,
     login,
+    loginWithToken,
+    loginViaOAuth,
     logout,
     clearChallenge,
   };

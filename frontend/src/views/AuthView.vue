@@ -13,12 +13,64 @@ const motion = useMotion();
 
 const { loading, lastError, challenge } = storeToRefs(auth);
 
-const form = reactive({
+type TabId = "password" | "oauth" | "token";
+const tab = ref<TabId>("password");
+
+interface VKClientOption {
+  id: string;
+  name: string;
+  clientId: number;
+  hint: string;
+}
+
+// Each VK client gets a per-(account, client_id) rate-limit on direct
+// grant — switching here is often enough to unstick a "Too many tries"
+// error. Kate Mobile is the de-facto default for audio-capable tokens.
+const VK_CLIENTS: VKClientOption[] = [
+  {
+    id: "kate_mobile",
+    name: "Kate Mobile",
+    clientId: 2685278,
+    hint: "Дефолт. Чаще всего отдаёт токен с audio.",
+  },
+  {
+    id: "vk_admin",
+    name: "VK Admin",
+    clientId: 6121396,
+    hint: "Резервный клиент — попробуй, если Kate Mobile залочило.",
+  },
+  {
+    id: "vk_iphone",
+    name: "VK для iPhone",
+    clientId: 3140623,
+    hint: "Иногда работает там, где Android-клиенты не пускают.",
+  },
+  {
+    id: "vk_android",
+    name: "VK для Android",
+    clientId: 2274003,
+    hint: "Официальное мобильное приложение.",
+  },
+];
+
+const passwordForm = reactive({
   username: "",
   password: "",
+  client: VK_CLIENTS[0].id,
 });
 const code = ref("");
 const captchaKey = ref("");
+
+const oauthClient = ref<string>(VK_CLIENTS[0].id);
+
+const tokenForm = reactive({
+  accessToken: "",
+  userId: "",
+});
+
+function clientByOptionId(id: string): VKClientOption {
+  return VK_CLIENTS.find((c) => c.id === id) ?? VK_CLIENTS[0];
+}
 
 const cardVariants = computed(() =>
   motion.spring(
@@ -36,14 +88,23 @@ function redirectTarget(): string {
   return typeof route.query.redirect === "string" ? route.query.redirect : "/";
 }
 
-async function submit() {
+function setTab(next: TabId) {
+  if (tab.value === next) return;
+  tab.value = next;
+  auth.clearChallenge();
+  code.value = "";
+  captchaKey.value = "";
+}
+
+async function submitPassword() {
   if (loading.value) return;
-  if (!form.username.trim() || !form.password) return;
+  if (!passwordForm.username.trim() || !passwordForm.password) return;
 
   const payload: Parameters<typeof auth.login>[0] = {
-    username: form.username.trim(),
-    password: form.password,
+    username: passwordForm.username.trim(),
+    password: passwordForm.password,
     remember: true,
+    client: passwordForm.client,
   };
   if (isValidating.value && code.value) {
     payload.code = code.value.trim();
@@ -61,13 +122,38 @@ async function submit() {
   }
 }
 
+async function submitOAuth() {
+  if (loading.value) return;
+  const client = clientByOptionId(oauthClient.value);
+  const ok = await auth.loginViaOAuth(client.clientId);
+  if (ok) {
+    router.replace(redirectTarget());
+  }
+}
+
+async function submitToken() {
+  if (loading.value) return;
+  const token = tokenForm.accessToken.trim();
+  if (!token) return;
+  const userIdRaw = tokenForm.userId.trim();
+  const userId = userIdRaw ? Number(userIdRaw) : undefined;
+  const ok = await auth.loginWithToken({
+    access_token: token,
+    user_id: Number.isFinite(userId) ? userId : undefined,
+    remember: true,
+  });
+  if (ok) {
+    router.replace(redirectTarget());
+  }
+}
+
 watch(challenge, (next, prev) => {
-  // When VK swaps the captcha (e.g. user typed wrong characters) we reset the
-  // input so the user types fresh — same for the SMS code after a new send.
   if (!next) return;
   if (prev?.captcha_sid !== next.captcha_sid) captchaKey.value = "";
   if (prev?.validation_sid !== next.validation_sid) code.value = "";
 });
+
+const hasElectron = typeof window !== "undefined" && !!window.vkmp?.openVKAuth;
 </script>
 
 <template>
@@ -78,24 +164,70 @@ watch(challenge, (next, prev) => {
         <div>
           <h1 class="auth__title">VK Music</h1>
           <p class="auth__subtitle">
-            Полноценный плеер с твоей музыкой ВК — прямо на десктопе
+            Несколько способов входа — выбери тот, на котором VK не флудоконтролит твой аккаунт
           </p>
         </div>
       </div>
 
-      <form class="auth__form" @submit.prevent="submit">
+      <div class="auth__tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'password'"
+          class="auth__tab"
+          :class="{ 'auth__tab--active': tab === 'password' }"
+          @click="setTab('password')"
+        >
+          Логин/пароль
+        </button>
+        <button
+          v-if="hasElectron"
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'oauth'"
+          class="auth__tab"
+          :class="{ 'auth__tab--active': tab === 'oauth' }"
+          @click="setTab('oauth')"
+        >
+          Окно ВК
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :aria-selected="tab === 'token'"
+          class="auth__tab"
+          :class="{ 'auth__tab--active': tab === 'token' }"
+          @click="setTab('token')"
+        >
+          Готовый токен
+        </button>
+      </div>
+
+      <form v-if="tab === 'password'" class="auth__form" @submit.prevent="submitPassword">
         <p class="auth__pitch">
-          Вход через Kate Mobile (прямой запрос к
-          <code>oauth.vk.com/token</code>). Единственный способ получить
-          токен с аудио-доступом: обычный OAuth-вход на сайте ВК с 2024 даёт
-          токен, у которого audio.* возвращает «Unknown method passed».
-          Пароль никуда, кроме официальных серверов ВК, не уходит.
+          Прямой запрос к <code>oauth.vk.com/token</code> под одним из мобильных клиентов ВК
+          (то же, что делают Kate Mobile / vk-audio-token). Пароль никуда, кроме серверов ВК,
+          не уходит.
         </p>
+
+        <label class="auth__field">
+          <span>Клиент ВК</span>
+          <select
+            v-model="passwordForm.client"
+            :disabled="loading"
+            class="auth__select"
+          >
+            <option v-for="option in VK_CLIENTS" :key="option.id" :value="option.id">
+              {{ option.name }}
+            </option>
+          </select>
+          <p class="auth__hint">{{ clientByOptionId(passwordForm.client).hint }}</p>
+        </label>
 
         <label class="auth__field">
           <span>Телефон или email</span>
           <input
-            v-model="form.username"
+            v-model="passwordForm.username"
             type="text"
             autocomplete="username"
             placeholder="+79991234567"
@@ -107,7 +239,7 @@ watch(challenge, (next, prev) => {
         <label class="auth__field">
           <span>Пароль ВК</span>
           <input
-            v-model="form.password"
+            v-model="passwordForm.password"
             type="password"
             autocomplete="current-password"
             placeholder="••••••••"
@@ -155,7 +287,7 @@ watch(challenge, (next, prev) => {
         <button
           class="btn btn--primary auth__submit"
           type="submit"
-          :disabled="loading || !form.username || !form.password"
+          :disabled="loading || !passwordForm.username || !passwordForm.password"
         >
           <Spinner v-if="loading" :size="16" />
           <span>{{ loading ? "Входим…" : "Войти" }}</span>
@@ -164,9 +296,100 @@ watch(challenge, (next, prev) => {
         <p v-if="lastError" class="auth__error">{{ lastError }}</p>
 
         <p class="auth__pitch auth__pitch--muted">
-          Если ВК отдаёт «Too many tries» / «Flood control» — это лимит
-          на стороне ВК на аккаунт после нескольких неудачных попыток.
-          Подожди несколько часов и попробуй снова.
+          «Too many tries» / «Flood control» — ВК закрывает дверь для пары (клиент, аккаунт)
+          на несколько часов. Сначала попробуй сменить клиент сверху, потом подожди и
+          попробуй заново.
+        </p>
+      </form>
+
+      <form v-else-if="tab === 'oauth'" class="auth__form" @submit.prevent="submitOAuth">
+        <p class="auth__pitch">
+          Откроется мобильное окно <code>oauth.vk.com/authorize</code>. Логинишься как угодно —
+          паролем, QR-кодом через приложение, или через VK ID. Токен мы забираем из редиректа
+          и просим у VK блессинг через FCM-чек Kate Mobile.
+        </p>
+        <p class="auth__pitch auth__pitch--warn">
+          На большинстве аккаунтов в 2026 у токенов из этого окна audio.* возвращает «Unknown
+          method passed» — VK закрыл аудио-скоуп для implicit-флоу. Если на твоём всё-таки
+          работает, это самый удобный способ. Если нет — переключайся на «Логин/пароль».
+        </p>
+
+        <label class="auth__field">
+          <span>Клиент ВК</span>
+          <select
+            v-model="oauthClient"
+            :disabled="loading"
+            class="auth__select"
+          >
+            <option v-for="option in VK_CLIENTS" :key="option.id" :value="option.id">
+              {{ option.name }}
+            </option>
+          </select>
+          <p class="auth__hint">{{ clientByOptionId(oauthClient).hint }}</p>
+        </label>
+
+        <button
+          class="btn btn--primary auth__submit"
+          type="submit"
+          :disabled="loading"
+        >
+          <Spinner v-if="loading" :size="16" />
+          <span>{{ loading ? "Ждём окно…" : "Открыть окно ВК" }}</span>
+        </button>
+
+        <p v-if="lastError" class="auth__error">{{ lastError }}</p>
+      </form>
+
+      <form v-else class="auth__form" @submit.prevent="submitToken">
+        <p class="auth__pitch">
+          Если у тебя уже есть готовый <code>access_token</code> (vkhost.github.io,
+          VK Admin, расширения браузера, чужое приложение) — вставь сюда. Мы попытаемся
+          прокрутить его через FCM-receipt чтобы поднять до audio-скоупа, но если токен
+          implicit-флоу — audio.* всё равно может не работать.
+        </p>
+
+        <label class="auth__field">
+          <span>access_token</span>
+          <textarea
+            v-model="tokenForm.accessToken"
+            rows="3"
+            placeholder="vk1.a.…"
+            autocomplete="off"
+            spellcheck="false"
+            :disabled="loading"
+            class="auth__textarea"
+            required
+          />
+        </label>
+
+        <label class="auth__field">
+          <span>user_id (необязательно — определим автоматически)</span>
+          <input
+            v-model="tokenForm.userId"
+            type="text"
+            inputmode="numeric"
+            placeholder="123456789"
+            autocomplete="off"
+            :disabled="loading"
+          />
+        </label>
+
+        <button
+          class="btn btn--primary auth__submit"
+          type="submit"
+          :disabled="loading || !tokenForm.accessToken.trim()"
+        >
+          <Spinner v-if="loading" :size="16" />
+          <span>{{ loading ? "Проверяем токен…" : "Войти по токену" }}</span>
+        </button>
+
+        <p v-if="lastError" class="auth__error">{{ lastError }}</p>
+
+        <p class="auth__pitch auth__pitch--muted">
+          Где взять токен: <a href="https://vkhost.github.io/" target="_blank" rel="noreferrer">
+            vkhost.github.io
+          </a>. Выбираешь приложение (Kate Mobile / VK Admin / VK Music и т.п.), даёшь доступ,
+          вытаскиваешь <code>access_token</code> из URL.
         </p>
       </form>
     </div>
@@ -227,6 +450,67 @@ watch(challenge, (next, prev) => {
 .auth__pitch--muted {
   color: var(--text-3);
   font-size: 12px;
+}
+.auth__pitch--warn {
+  color: var(--warning, #f1c248);
+}
+.auth__pitch a {
+  color: var(--accent);
+}
+.auth__tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-2);
+  border-radius: 12px;
+  border: 1px solid var(--border-1);
+}
+.auth__tab {
+  flex: 1 1 0;
+  padding: 9px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.auth__tab:hover {
+  color: var(--text-1);
+}
+.auth__tab--active {
+  background: var(--bg-1);
+  color: var(--text-1);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.auth__select {
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.auth__select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.auth__textarea {
+  background: var(--bg-2);
+  border: 1px solid var(--border-1);
+  color: var(--text-1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+  min-height: 60px;
+}
+.auth__textarea:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 .auth__pitch code {
   background: var(--bg-2);

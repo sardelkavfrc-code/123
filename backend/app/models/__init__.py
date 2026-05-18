@@ -6,7 +6,7 @@ from .audio import (
     TrackArtist,
     TrackList,
 )
-from .auth import AuthChallenge, AuthStatus, LoginRequest
+from .auth import AuthChallenge, AuthStatus, LoginRequest, TokenLoginRequest
 from .common import APIModel
 from .user import FriendList, User
 
@@ -19,6 +19,7 @@ __all__ = [
     "LoginRequest",
     "RecommendationBlock",
     "RecommendationFeed",
+    "TokenLoginRequest",
     "Track",
     "TrackArtist",
     "TrackList",

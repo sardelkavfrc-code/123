@@ -18,4 +18,6 @@ contextBridge.exposeInMainWorld("vkmp", {
   },
   setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) =>
     ipcRenderer.send("tray:update", info),
+  openVKAuth: (params: { clientId: number; scope: string }) =>
+    ipcRenderer.invoke("auth:open-vk-oauth", params),
 });

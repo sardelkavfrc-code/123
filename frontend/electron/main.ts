@@ -322,3 +322,91 @@ ipcMain.on("tray:update", (_event, info: { title: string; artist: string; isPlay
   tray.setContextMenu(buildTrayMenu(info));
   tray.setToolTip(info ? `${info.artist} — ${info.title}` : APP_NAME);
 });
+
+type OAuthResult =
+  | { ok: true; access_token: string; user_id: number; expires_in: number }
+  | { ok: false; error: string };
+
+const OAUTH_REDIRECT_PREFIX = "https://oauth.vk.com/blank.html";
+const MOBILE_UA =
+  "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+
+function parseOAuthFragment(rawUrl: string): OAuthResult | null {
+  const hashIndex = rawUrl.indexOf("#");
+  if (hashIndex === -1) return null;
+  const params = new URLSearchParams(rawUrl.slice(hashIndex + 1));
+  const error = params.get("error");
+  if (error) return { ok: false, error: params.get("error_description") || error };
+  const token = params.get("access_token");
+  if (!token) return null;
+  return {
+    ok: true,
+    access_token: token,
+    user_id: Number(params.get("user_id") || 0),
+    expires_in: Number(params.get("expires_in") || 0),
+  };
+}
+
+ipcMain.handle(
+  "auth:open-vk-oauth",
+  async (_event, params: { clientId: number; scope: string }): Promise<OAuthResult> => {
+    const clientId = Number(params?.clientId) || 0;
+    const scope = String(params?.scope || "audio,friends,offline,wall,photos,groups,status");
+    if (!clientId) return { ok: false, error: "Не указан client_id" };
+
+    const oauthWin = new BrowserWindow({
+      width: 480,
+      height: 760,
+      parent: mainWindow ?? undefined,
+      modal: false,
+      autoHideMenuBar: true,
+      title: "Вход в ВК",
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        partition: `persist:vk-oauth-${clientId}`,
+      },
+    });
+    oauthWin.webContents.setUserAgent(MOBILE_UA);
+    oauthWin.removeMenu();
+
+    const url =
+      "https://oauth.vk.com/authorize?" +
+      new URLSearchParams({
+        client_id: String(clientId),
+        scope,
+        redirect_uri: OAUTH_REDIRECT_PREFIX,
+        display: "mobile",
+        v: "5.131",
+        response_type: "token",
+        revoke: "1",
+      }).toString();
+
+    return new Promise<OAuthResult>((resolve) => {
+      let settled = false;
+      const finalize = (result: OAuthResult) => {
+        if (settled) return;
+        settled = true;
+        try {
+          oauthWin.close();
+        } catch {
+          // ignore
+        }
+        resolve(result);
+      };
+
+      const onUrl = (rawUrl: string) => {
+        if (!rawUrl.startsWith(OAUTH_REDIRECT_PREFIX)) return;
+        const parsed = parseOAuthFragment(rawUrl);
+        if (parsed) finalize(parsed);
+      };
+
+      oauthWin.webContents.on("will-redirect", (_e, redirectUrl) => onUrl(redirectUrl));
+      oauthWin.webContents.on("did-navigate", (_e, navUrl) => onUrl(navUrl));
+      oauthWin.webContents.on("did-navigate-in-page", (_e, navUrl) => onUrl(navUrl));
+      oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
+
+      void oauthWin.loadURL(url);
+    });
+  },
+);
