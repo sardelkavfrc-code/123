@@ -71,13 +71,14 @@ export interface AuthStatus {
   first_name: string | null;
   last_name: string | null;
   photo: string | null;
+  has_audio: boolean;
 }
 
 export interface AuthChallenge {
   kind: string;
   message: string;
-  validation_sid?: string | null;
-  captcha_sid?: string | null;
-  captcha_img?: string | null;
-  phone_mask?: string | null;
+  validation_sid: string | null;
+  captcha_sid: string | null;
+  captcha_img: string | null;
+  phone_mask: string | null;
 }

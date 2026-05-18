@@ -1,0 +1,89 @@
+name: Build installers
+
+on:
+  push:
+    branches: ["main", "devin/**"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: ${{ matrix.os-name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            os-name: Linux
+            artifact-name: VK-Music-linux
+            artifact-pattern: |
+              frontend/release/*.AppImage
+              frontend/release/*.deb
+          - os: windows-latest
+            os-name: Windows
+            artifact-name: VK-Music-windows
+            artifact-pattern: |
+              frontend/release/*.exe
+          - os: macos-latest
+            os-name: macOS
+            artifact-name: VK-Music-macos
+            artifact-pattern: |
+              frontend/release/*.dmg
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install "poetry==1.8.3"
+
+      - name: Cache poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pypoetry/virtualenvs
+          key: poetry-${{ runner.os }}-${{ hashFiles('backend/poetry.lock') }}
+          restore-keys: poetry-${{ runner.os }}-
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: npm-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: npm-${{ runner.os }}-
+
+      - name: Install backend deps
+        working-directory: backend
+        run: poetry install --no-interaction
+
+      - name: Build backend binary (PyInstaller)
+        working-directory: backend
+        run: poetry run pyinstaller --clean --noconfirm vkmp-backend.spec
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build & package installer
+        working-directory: frontend
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run dist
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-pattern }}
+          if-no-files-found: error
+          retention-days: 14

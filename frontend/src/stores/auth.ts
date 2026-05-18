@@ -3,20 +3,33 @@ import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
 import type { AuthChallenge, AuthStatus } from "@/api/types";
 
+export interface LoginPayload {
+  username: string;
+  password: string;
+  code?: string;
+  captcha_sid?: string;
+  captcha_key?: string;
+  remember?: boolean;
+}
+
+const emptyStatus = (): AuthStatus => ({
+  authenticated: false,
+  user_id: null,
+  first_name: null,
+  last_name: null,
+  photo: null,
+  has_audio: false,
+});
+
 export const useAuthStore = defineStore("auth", () => {
-  const status = ref<AuthStatus>({
-    authenticated: false,
-    user_id: null,
-    first_name: null,
-    last_name: null,
-    photo: null,
-  });
+  const status = ref<AuthStatus>(emptyStatus());
   const checked = ref(false);
   const loading = ref(false);
-  const challenge = ref<AuthChallenge | null>(null);
   const lastError = ref<string | null>(null);
+  const challenge = ref<AuthChallenge | null>(null);
 
   const isAuthenticated = computed(() => status.value.authenticated);
+  const hasAudio = computed(() => status.value.has_audio);
   const displayName = computed(() => {
     const parts = [status.value.first_name, status.value.last_name].filter(Boolean);
     return parts.join(" ") || "Профиль";
@@ -26,13 +39,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       status.value = await api.authStatus();
     } catch (err) {
-      status.value = {
-        authenticated: false,
-        user_id: null,
-        first_name: null,
-        last_name: null,
-        photo: null,
-      };
+      status.value = emptyStatus();
       if (err instanceof APIError && err.status !== 401) {
         lastError.value = err.message;
       }
@@ -41,31 +48,40 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function login(payload: {
-    username: string;
-    password: string;
-    code?: string;
-    captcha_sid?: string;
-    captcha_key?: string;
-  }) {
-    loading.value = true;
-    challenge.value = null;
-    lastError.value = null;
+  async function logout() {
     try {
-      status.value = await api.login(payload);
+      await api.logout();
+    } finally {
+      status.value = emptyStatus();
+      challenge.value = null;
+    }
+  }
+
+  async function login(payload: LoginPayload) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      status.value = await api.login({ remember: true, ...payload });
+      challenge.value = null;
       return true;
     } catch (err) {
-      if (err instanceof APIError && err.status === 401 && err.detail.kind) {
+      if (err instanceof APIError) {
+        const detail = err.detail as AuthChallenge | { kind: string; message?: string };
         if (
-          err.detail.kind === "need_validation" ||
-          err.detail.kind === "need_captcha"
+          err.status === 401 &&
+          detail &&
+          (detail.kind === "need_validation" || detail.kind === "need_captcha")
         ) {
-          challenge.value = err.detail as AuthChallenge;
-        } else {
-          lastError.value = err.detail.message || "Ошибка входа";
+          challenge.value = detail as AuthChallenge;
+          lastError.value =
+            detail.kind === "need_validation"
+              ? "ВК запросил код подтверждения"
+              : "ВК запросил капчу";
+          return false;
         }
+        lastError.value = detail.message || err.message;
       } else {
-        lastError.value = (err as Error).message || "Ошибка сети";
+        lastError.value = (err as Error).message;
       }
       return false;
     } finally {
@@ -73,46 +89,23 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function loginWithToken(payload: { access_token: string; remember: boolean }) {
-    loading.value = true;
+  function clearChallenge() {
+    challenge.value = null;
     lastError.value = null;
-    try {
-      status.value = await api.loginWithToken(payload);
-      return true;
-    } catch (err) {
-      lastError.value =
-        err instanceof APIError ? err.detail.message || err.message : (err as Error).message;
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  async function logout() {
-    try {
-      await api.logout();
-    } finally {
-      status.value = {
-        authenticated: false,
-        user_id: null,
-        first_name: null,
-        last_name: null,
-        photo: null,
-      };
-    }
   }
 
   return {
     status,
     checked,
     loading,
-    challenge,
     lastError,
+    challenge,
     isAuthenticated,
+    hasAudio,
     displayName,
     refresh,
     login,
-    loginWithToken,
     logout,
+    clearChallenge,
   };
 });

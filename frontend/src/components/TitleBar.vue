@@ -39,7 +39,9 @@ function close() {
 
 <style scoped>
 .titlebar {
+  flex: 0 0 var(--titlebar-height);
   height: var(--titlebar-height);
+  min-height: var(--titlebar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;

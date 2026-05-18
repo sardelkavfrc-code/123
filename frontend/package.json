@@ -5,6 +5,10 @@
   "main": "dist-electron/main.js",
   "description": "Desktop ВКонтакте music player built with Vue 3, Electron and a Python FastAPI backend.",
   "homepage": "https://github.com/sardelkavfrc-code/123",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sardelkavfrc-code/123.git"
+  },
   "author": "sardelkavfrc <sardelkavfrc@gmail.com>",
   "scripts": {
     "dev": "vite",
@@ -24,6 +28,7 @@
     "appId": "ai.devin.vkmusic",
     "productName": "VK Music",
     "asar": true,
+    "publish": null,
     "directories": {
       "output": "release"
     },

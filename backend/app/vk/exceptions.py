@@ -12,7 +12,7 @@ class VKError(Exception):
 
 
 class VKAuthError(VKError):
-    """Auth-specific error from /token endpoint."""
+    """Auth-specific error from /token endpoint (direct grant)."""
 
     def __init__(
         self,

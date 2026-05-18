@@ -1,8 +1,12 @@
 """VK direct token grant (Kate Mobile flow).
 
-Hits https://oauth.vk.com/token directly, NOT api.vk.com. The endpoint
-returns the same shape regardless of 2FA — we surface 2FA / captcha back
-to the client so it can re-call us with the code.
+This is the ONLY way to get a token with audio scope in 2024+. VK's
+implicit OAuth flow (oauth.vk.com/authorize) returns a token that works
+for users.get / friends.get / etc. but every audio.* call returns
+error code 3 "Unknown method passed" because audio scope is no longer
+granted to implicit-flow tokens. Direct grant against oauth.vk.com/token
+with the Kate Mobile client_id + client_secret pair is the workaround
+used by vk-audio-token, vkhost, and most open-source VK music clients.
 """
 
 from __future__ import annotations

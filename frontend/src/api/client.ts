@@ -77,12 +77,9 @@ export const api = {
     code?: string;
     captcha_sid?: string;
     captcha_key?: string;
+    remember?: boolean;
   }): Promise<AuthStatus> {
     const { data } = await http.post<AuthStatus>("/auth/login", payload);
-    return data;
-  },
-  async loginWithToken(payload: { access_token: string; remember: boolean }): Promise<AuthStatus> {
-    const { data } = await http.post<AuthStatus>("/auth/token", payload);
     return data;
   },
   async logout(): Promise<void> {
