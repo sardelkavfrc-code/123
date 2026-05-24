@@ -32,7 +32,7 @@ declare global {
       getAutoStart: () => Promise<boolean>;
       onMediaKey: (cb: (key: "play-pause" | "next" | "prev") => void) => () => void;
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
-      openVKAuth: (params: { clientId: number; scope: string }) => Promise<VKAuthResult>;
+      openVKAuth: () => Promise<VKAuthResult>;
     };
   }
 }

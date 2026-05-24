@@ -1,8 +1,28 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 
-export type ThemeName = "dark" | "amoled" | "light";
-export type AccentName = "blue" | "magenta" | "cyan" | "green" | "orange";
+export type ThemeName =
+  | "dark"
+  | "amoled"
+  | "light"
+  | "midnight"
+  | "forest"
+  | "sunset"
+  | "mocha";
+export type AccentName =
+  | "blue"
+  | "magenta"
+  | "cyan"
+  | "green"
+  | "orange"
+  | "red"
+  | "gold"
+  | "mint"
+  | "lavender"
+  | "electric"
+  | "coral"
+  | "sky"
+  | "crimson";
 
 interface PersistedSettings {
   theme: ThemeName;
@@ -13,7 +33,12 @@ interface PersistedSettings {
   startMinimized: boolean;
   hardwareAcceleration: boolean;
   autoStart: boolean;
-  volume: number;
+  /**
+   * Volume the player boots into on every app start. Runtime volume changes
+   * during playback don't overwrite this — they live in the player store only.
+   * Stored as a gain value in [0, 1].
+   */
+  startupVolume: number;
   cacheSize: number; // in MB
 }
 
@@ -28,7 +53,7 @@ const defaults: PersistedSettings = {
   startMinimized: false,
   hardwareAcceleration: true,
   autoStart: false,
-  volume: 0.6,
+  startupVolume: 0.5,
   cacheSize: 250,
 };
 
@@ -54,7 +79,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const startMinimized = ref(initial.startMinimized);
   const hardwareAcceleration = ref(initial.hardwareAcceleration);
   const autoStart = ref(initial.autoStart);
-  const volume = ref(initial.volume);
+  const startupVolume = ref(initial.startupVolume);
   const cacheSize = ref(initial.cacheSize);
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
@@ -77,7 +102,7 @@ export const useSettingsStore = defineStore("settings", () => {
       startMinimized: startMinimized.value,
       hardwareAcceleration: hardwareAcceleration.value,
       autoStart: autoStart.value,
-      volume: volume.value,
+      startupVolume: startupVolume.value,
       cacheSize: cacheSize.value,
     };
     try {
@@ -97,7 +122,7 @@ export const useSettingsStore = defineStore("settings", () => {
       startMinimized,
       hardwareAcceleration,
       autoStart,
-      volume,
+      startupVolume,
       cacheSize,
     ],
     () => {
@@ -135,7 +160,7 @@ export const useSettingsStore = defineStore("settings", () => {
     startMinimized.value = defaults.startMinimized;
     hardwareAcceleration.value = defaults.hardwareAcceleration;
     autoStart.value = defaults.autoStart;
-    volume.value = defaults.volume;
+    startupVolume.value = defaults.startupVolume;
     cacheSize.value = defaults.cacheSize;
   }
 
@@ -148,7 +173,7 @@ export const useSettingsStore = defineStore("settings", () => {
     startMinimized,
     hardwareAcceleration,
     autoStart,
-    volume,
+    startupVolume,
     cacheSize,
     motionDisabled,
     applyToDocument,

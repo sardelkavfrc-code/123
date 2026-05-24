@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { api, APIError } from "@/api/client";
 import { useLibraryStore } from "@/stores/library";
@@ -11,29 +12,27 @@ import TrackList from "@/components/TrackList.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import Spinner from "@/components/Spinner.vue";
 
-type Scope = "global" | "library" | "similar";
+type Scope = "global" | "library";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
+const router = useRouter();
+const route = useRoute();
 const { myMusic } = storeToRefs(library);
 
-const query = ref("");
+const query = ref(typeof route.query.q === "string" ? route.query.q : "");
 const scope = ref<Scope>("global");
 const debounceMs = 350;
 
 const results = ref<Track[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
-const performerOnly = ref(false);
-
-const { current } = storeToRefs(player);
-const similar = ref<Track[]>([]);
-const similarLoading = ref(false);
 
 let debounceHandle: number | null = null;
 
 onMounted(() => {
   void library.loadMyMusic();
+  if (query.value.trim()) void runGlobal();
 });
 
 const libraryMatches = computed(() => {
@@ -53,7 +52,7 @@ async function runGlobal() {
   loading.value = true;
   error.value = null;
   try {
-    const list = await api.search({ q, performer_only: performerOnly.value, count: 100 });
+    const list = await api.search({ q, performer_only: false, count: 100 });
     results.value = list.items;
   } catch (err) {
     error.value =
@@ -63,45 +62,24 @@ async function runGlobal() {
   }
 }
 
-async function refreshSimilar() {
-  similar.value = [];
-  if (!current.value) return;
-  similarLoading.value = true;
-  try {
-    const list = await api.recommendations({
-      target_audio: `${current.value.owner_id}_${current.value.id}`,
-      count: 60,
-    });
-    similar.value = list.items;
-  } finally {
-    similarLoading.value = false;
-  }
-}
-
-watch(query, () => {
+watch(query, (value) => {
   if (debounceHandle) window.clearTimeout(debounceHandle);
-  if (scope.value !== "global") return;
+  // Reflect query into URL so deep links / 'find similar' work both ways.
+  const next = value.trim();
+  const current = typeof route.query.q === "string" ? route.query.q : "";
+  if (next !== current) {
+    void router.replace({ name: "search", query: next ? { q: next } : undefined });
+  }
   debounceHandle = window.setTimeout(() => {
     void runGlobal();
   }, debounceMs);
 });
 
-watch(scope, (value) => {
-  if (value === "global") {
-    void runGlobal();
-  } else if (value === "similar") {
-    void refreshSimilar();
-  }
-});
-
-watch(performerOnly, () => {
-  if (scope.value === "global") void runGlobal();
-});
-
 watch(
-  () => current.value?.id,
-  () => {
-    if (scope.value === "similar") void refreshSimilar();
+  () => route.query.q,
+  (value) => {
+    const incoming = typeof value === "string" ? value : "";
+    if (incoming !== query.value) query.value = incoming;
   }
 );
 
@@ -112,7 +90,7 @@ function playMany(tracks: Track[]) {
 
 <template>
   <ScrollArea>
-    <PageHeader eyebrow="Поиск" title="Найти музыку" subtitle="Глобальный поиск ВК, поиск в библиотеке и похожие треки для текущего трека.">
+    <PageHeader eyebrow="Поиск" title="Найти музыку" subtitle="Один запрос — ищем по всей ВК и в твоей библиотеке. Переключай вкладки ниже.">
       <template #actions>
         <div class="search__bar">
           <input
@@ -121,25 +99,25 @@ function playMany(tracks: Track[]) {
             placeholder="Название трека или исполнителя"
             autofocus
           />
-          <label class="search__check">
-            <input v-model="performerOnly" type="checkbox" />
-            <span>Только исполнители</span>
-          </label>
         </div>
-        <div class="search__tabs">
-          <button class="chip" :class="{ 'chip--active': scope === 'global' }" @click="scope = 'global'">
-            Глобальный
-          </button>
-          <button class="chip" :class="{ 'chip--active': scope === 'library' }" @click="scope = 'library'">
-            В библиотеке
+        <div class="search__segmented" role="tablist">
+          <button
+            class="search__seg"
+            :class="{ 'search__seg--active': scope === 'global' }"
+            @click="scope = 'global'"
+            role="tab"
+            :aria-selected="scope === 'global'"
+          >
+            Везде
           </button>
           <button
-            class="chip"
-            :class="{ 'chip--active': scope === 'similar' }"
-            :disabled="!current"
-            @click="scope = 'similar'"
+            class="search__seg"
+            :class="{ 'search__seg--active': scope === 'library' }"
+            @click="scope = 'library'"
+            role="tab"
+            :aria-selected="scope === 'library'"
           >
-            Похожие на текущий
+            В библиотеке
           </button>
         </div>
       </template>
@@ -163,7 +141,7 @@ function playMany(tracks: Track[]) {
         </div>
       </template>
 
-      <template v-else-if="scope === 'library'">
+      <template v-else>
         <div v-if="!query.trim()">
           <EmptyState title="Поиск в твоей музыке" subtitle="Введи название — поищем в локально сохранённой библиотеке" />
         </div>
@@ -186,24 +164,6 @@ function playMany(tracks: Track[]) {
           />
         </div>
       </template>
-
-      <template v-else>
-        <div v-if="!current">
-          <EmptyState title="Сначала запусти трек" subtitle="Похожие подберём по тому, что сейчас играет" />
-        </div>
-        <div v-else>
-          <div class="search__head">
-            <span>Похожие на «{{ current.title }}»</span>
-            <button class="btn btn--ghost" :disabled="!similar.length" @click="playMany(similar)">
-              Слушать всё
-            </button>
-          </div>
-          <div v-if="similarLoading" class="search__loading">
-            <Spinner :size="18" /> Подбираем похожие…
-          </div>
-          <TrackList v-else :tracks="similar" show-index empty-title="Похожих не нашлось" />
-        </div>
-      </template>
     </section>
   </ScrollArea>
 </template>
@@ -223,18 +183,30 @@ function playMany(tracks: Track[]) {
   min-width: 240px;
   height: 42px;
 }
-.search__check {
+.search__segmented {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--text-2);
-  white-space: nowrap;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  gap: 2px;
 }
-.search__tabs {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.search__seg {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.search__seg:hover:not(.search__seg--active) {
+  color: var(--text-0);
+}
+.search__seg--active {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  color: var(--accent-text, #fff);
 }
 .search__pane {
   display: flex;

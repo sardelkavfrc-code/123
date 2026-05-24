@@ -65,7 +65,6 @@ function shufflePlay() {
           placeholder="Поиск в библиотеке"
           aria-label="Поиск"
         />
-        <button class="btn btn--ghost" @click="library.loadMyMusic(true)">Обновить</button>
       </template>
     </PageHeader>
 

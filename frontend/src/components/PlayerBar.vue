@@ -59,8 +59,41 @@ function gotoArtist() {
       params: { id: main.id },
       query: main.name ? { name: main.name } : undefined,
     });
+    return;
   }
+  // No clickable artist id (VK doesn't expose every artist as an entity) —
+  // fall back to a search so the user can still drill into related music.
+  const name = main?.name || current.value.artist;
+  if (name) router.push({ name: "search", query: { q: name } });
 }
+
+function findSimilar() {
+  if (!current.value) return;
+  const main = current.value.main_artists[0];
+  const q = `${main?.name || current.value.artist} ${current.value.title}`.trim();
+  if (q) router.push({ name: "search", query: { q } });
+}
+
+// Logarithmic taper: humans perceive loudness roughly on a log scale, so
+// linearly dragging the slider feels wrong (most usable range crammed into the
+// last 20%). x³ keeps the slider 1:1 visually with the position while giving
+// smooth low-volume control. See https://www.dr-lex.be/info-stuff/volumecontrols.html.
+function volumeToGain(x: number): number {
+  const clamped = Math.max(0, Math.min(1, x));
+  return clamped * clamped * clamped;
+}
+
+function onVolumeInput(event: Event) {
+  const slider = Number((event.target as HTMLInputElement).value);
+  player.setVolume(volumeToGain(slider));
+}
+
+const volumeSliderPos = computed(() => {
+  const gain = muted.value ? 0 : volume.value;
+  return Math.cbrt(Math.max(0, Math.min(1, gain)));
+});
+
+const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 </script>
 
 <template>
@@ -79,15 +112,32 @@ function gotoArtist() {
       </div>
       <button
         v-if="current"
-        class="player__icon-btn"
+        class="player__icon-btn player__icon-btn--lib"
         :class="{ 'player__icon-btn--active': inLibrary }"
         :aria-label="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
         :title="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
         @click="toggleLibrary"
       >
-        <svg viewBox="0 0 24 24" width="20" height="20">
-          <path v-if="inLibrary" fill="currentColor" d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
-          <path v-else fill="none" stroke="currentColor" stroke-width="2" d="M12 5v14M5 12h14" stroke-linecap="round" />
+        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <svg v-else class="player__lib-check" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+        </svg>
+        <svg v-if="inLibrary" class="player__lib-remove" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
+      <button
+        v-if="current"
+        class="player__icon-btn"
+        title="Искать похожие"
+        aria-label="Искать похожие"
+        @click="findSimilar"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
         </svg>
       </button>
     </div>
@@ -173,15 +223,19 @@ function gotoArtist() {
           <path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" />
         </svg>
       </button>
-      <input
-        class="player__volume-input"
-        type="range"
-        min="0"
-        max="1"
-        step="0.01"
-        :value="muted ? 0 : volume"
-        @input="(e) => player.setVolume(Number((e.target as HTMLInputElement).value))"
-      />
+      <div class="player__volume-track">
+        <div class="player__volume-fill" :style="{ width: volumePct + '%' }" />
+        <input
+          class="player__volume-input"
+          type="range"
+          min="0"
+          max="1"
+          step="0.001"
+          :value="volumeSliderPos"
+          :aria-valuetext="`${volumePct}%`"
+          @input="onVolumeInput"
+        />
+      </div>
     </div>
   </footer>
 </template>
@@ -359,27 +413,82 @@ function gotoArtist() {
 .player__volume {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   justify-self: end;
 }
+.player__volume-track {
+  position: relative;
+  width: 110px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+.player__volume-track::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: var(--border-strong);
+  border-radius: 999px;
+}
+.player__volume-fill {
+  position: absolute;
+  left: 0;
+  height: 5px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
+  border-radius: 999px;
+  pointer-events: none;
+}
 .player__volume-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
   -webkit-appearance: none;
   appearance: none;
-  width: 110px;
-  background: transparent;
+  cursor: pointer;
 }
 .player__volume-input::-webkit-slider-runnable-track {
-  height: 4px;
-  background: var(--bg-3);
-  border-radius: 2px;
+  height: 100%;
+  background: transparent;
+}
+.player__volume-input::-moz-range-track {
+  height: 100%;
+  background: transparent;
 }
 .player__volume-input::-webkit-slider-thumb {
   -webkit-appearance: none;
-  height: 12px;
-  width: 12px;
+  height: 14px;
+  width: 14px;
   border-radius: 50%;
-  background: var(--accent-1);
-  margin-top: -4px;
+  background: var(--text-0);
+  border: 2px solid var(--accent-1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   cursor: pointer;
+}
+.player__volume-input::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: var(--text-0);
+  border: 2px solid var(--accent-1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+.player__icon-btn--lib .player__lib-remove {
+  display: none;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--danger);
+}
+.player__icon-btn--lib:hover .player__lib-remove {
+  display: block;
+}
+.player__icon-btn--lib:hover .player__lib-check {
+  display: none;
 }
 </style>

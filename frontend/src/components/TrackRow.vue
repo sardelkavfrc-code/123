@@ -50,7 +50,18 @@ function gotoArtist() {
       params: { id: main.id },
       query: main.name ? { name: main.name } : undefined,
     });
+    return;
   }
+  // VK doesn't expose every credited performer as an artist entity — fall
+  // back to a search query so non-clickable names still drill into music.
+  const name = main?.name || props.track.artist;
+  if (name) router.push({ name: "search", query: { q: name } });
+}
+
+function findSimilar() {
+  const main = props.track.main_artists[0];
+  const q = `${main?.name || props.track.artist} ${props.track.title}`.trim();
+  if (q) router.push({ name: "search", query: { q } });
 }
 
 async function toggleLibrary() {
@@ -65,16 +76,6 @@ async function toggleLibrary() {
   } catch (err) {
     ui.notify((err as Error).message || "Не удалось", "error");
   }
-}
-
-function playNext() {
-  player.enqueueNext(props.track);
-  ui.notify("В очередь следующим", "info");
-}
-
-function appendQueue() {
-  player.appendToQueue(props.track);
-  ui.notify("Добавлено в очередь", "info");
 }
 </script>
 
@@ -113,18 +114,28 @@ function appendQueue() {
     </div>
 
     <div class="row__actions">
-      <button class="row__action" :title="inLibrary ? 'Удалить' : 'В библиотеку'" @click.stop="toggleLibrary">
-        <svg v-if="inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" /></svg>
-        <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
-      </button>
-      <button class="row__action" title="Сыграть следующим" @click.stop="playNext">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 6h12M4 12h8M4 18h12" /><path d="m18 14 4 4-4 4" />
+      <button
+        class="row__action row__action--lib"
+        :class="{ 'row__action--in-lib': inLibrary }"
+        :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
+        @click.stop="toggleLibrary"
+      >
+        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
         </svg>
+        <template v-else>
+          <svg class="row__lib-check" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+          </svg>
+          <svg class="row__lib-x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </template>
       </button>
-      <button class="row__action" title="В очередь" @click.stop="appendQueue">
+      <button class="row__action" title="Искать похожие" @click.stop="findSimilar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 6h16M4 12h16M4 18h10" /><path d="M19 16v6M16 19h6" />
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
         </svg>
       </button>
     </div>
@@ -273,6 +284,28 @@ function appendQueue() {
 .row__action:hover {
   background: var(--bg-3);
   color: var(--text-0);
+}
+.row__action--lib {
+  position: relative;
+}
+.row__action--in-lib {
+  color: var(--accent-1);
+}
+.row__action--in-lib .row__lib-x {
+  display: none;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--danger);
+}
+.row__action--in-lib:hover .row__lib-x {
+  display: block;
+}
+.row__action--in-lib:hover .row__lib-check {
+  display: none;
+}
+.row__action--in-lib:hover {
+  background: rgba(255, 94, 126, 0.12);
 }
 .row__duration {
   font-variant-numeric: tabular-nums;
