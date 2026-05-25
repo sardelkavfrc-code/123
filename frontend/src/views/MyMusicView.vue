@@ -12,7 +12,8 @@ import { tracksLabel } from "@/composables/useFormat";
 const library = useLibraryStore();
 const player = usePlayerStore();
 
-const { myMusic, myMusicLoading } = storeToRefs(library);
+const { myMusic, myMusicLoading, myMusicLoadingMore, myMusicHasMore, myMusicTotal } =
+  storeToRefs(library);
 const query = ref("");
 
 onMounted(() => {
@@ -26,6 +27,21 @@ const filtered = computed(() => {
     (t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
   );
 });
+
+const subtitle = computed(() => {
+  if (!myMusic.value.length) return "Загружаем твои треки…";
+  if (myMusicTotal.value && myMusicTotal.value > myMusic.value.length) {
+    return `${tracksLabel(myMusic.value.length)} из ${myMusicTotal.value}`;
+  }
+  return tracksLabel(myMusic.value.length);
+});
+
+function onReachEnd() {
+  if (!myMusicHasMore.value || myMusicLoadingMore.value || myMusicLoading.value) return;
+  // While the user is filtering, infinite scroll still hits the full list —
+  // VK returns the unfiltered library and we filter client-side.
+  void library.loadMoreMyMusic();
+}
 
 function playAll() {
   if (filtered.value.length) player.playQueue(filtered.value);
@@ -42,11 +58,11 @@ function shufflePlay() {
 </script>
 
 <template>
-  <ScrollArea>
+  <ScrollArea @reach-end="onReachEnd">
     <PageHeader
       eyebrow="Твоя коллекция"
       title="Моя музыка"
-      :subtitle="myMusic.length ? tracksLabel(myMusic.length) : 'Загружаем твои треки…'"
+      :subtitle="subtitle"
     >
       <template #actions>
         <button class="btn btn--primary" :disabled="!filtered.length" @click="playAll">
@@ -65,7 +81,6 @@ function shufflePlay() {
           placeholder="Поиск в библиотеке"
           aria-label="Поиск"
         />
-        <button class="btn btn--ghost" @click="library.loadMyMusic(true)">Обновить</button>
       </template>
     </PageHeader>
 
@@ -73,13 +88,17 @@ function shufflePlay() {
       <div v-if="myMusicLoading && !myMusic.length" class="my-music__loading">
         <Spinner :size="20" /> Грузим библиотеку…
       </div>
-      <TrackList
-        v-else
-        :tracks="filtered"
-        show-index
-        empty-title="В библиотеке пусто"
-        empty-subtitle="Сохрани треки из поиска или рекомендаций — они появятся здесь"
-      />
+      <template v-else>
+        <TrackList
+          :tracks="filtered"
+          show-index
+          empty-title="В библиотеке пусто"
+          empty-subtitle="Сохрани треки из поиска или рекомендаций — они появятся здесь"
+        />
+        <div v-if="myMusicLoadingMore" class="my-music__loading">
+          <Spinner :size="16" /> Подгружаем ещё…
+        </div>
+      </template>
     </section>
   </ScrollArea>
 </template>

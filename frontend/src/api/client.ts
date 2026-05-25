@@ -1,7 +1,9 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
 import type {
+  AlbumList,
   Artist,
   AuthStatus,
+  CoverLookup,
   FriendList,
   RecommendationFeed,
   Track,
@@ -25,10 +27,6 @@ export interface APIErrorDetail {
   kind: string;
   message?: string;
   code?: number;
-  validation_sid?: string | null;
-  captcha_sid?: string | null;
-  captcha_img?: string | null;
-  phone_mask?: string | null;
 }
 
 export class APIError extends Error {
@@ -69,18 +67,6 @@ http.interceptors.response.use(
 export const api = {
   async authStatus(): Promise<AuthStatus> {
     const { data } = await http.get<AuthStatus>("/auth/status");
-    return data;
-  },
-  async login(payload: {
-    username: string;
-    password: string;
-    code?: string;
-    captcha_sid?: string;
-    captcha_key?: string;
-    remember?: boolean;
-    client?: string;
-  }): Promise<AuthStatus> {
-    const { data } = await http.post<AuthStatus>("/auth/login", payload);
     return data;
   },
   async loginWithToken(payload: {
@@ -137,14 +123,42 @@ export const api = {
     });
     return data;
   },
-  async byArtist(artistId: string, params: { count?: number; offset?: number } = {}): Promise<TrackList> {
+  async byArtist(
+    artistId: string,
+    params: { count?: number; offset?: number; q?: string } = {}
+  ): Promise<TrackList> {
     const { data } = await http.get<TrackList>(`/audio/by_artist/${encodeURIComponent(artistId)}`, {
       params,
     });
     return data;
   },
-  async artist(artistId: string): Promise<Artist> {
-    const { data } = await http.get<Artist>(`/audio/artist/${encodeURIComponent(artistId)}`);
+  async artist(artistId: string, params: { name?: string } = {}): Promise<Artist> {
+    const { data } = await http.get<Artist>(`/audio/artist/${encodeURIComponent(artistId)}`, {
+      params,
+    });
+    return data;
+  },
+  async albums(
+    ownerId: number,
+    params: { offset?: number; count?: number } = {}
+  ): Promise<AlbumList> {
+    const { data } = await http.get<AlbumList>(`/audio/albums/${ownerId}`, { params });
+    return data;
+  },
+  async playlistTracks(
+    ownerId: number,
+    playlistId: number,
+    params: { offset?: number; count?: number } = {}
+  ): Promise<TrackList> {
+    const { data } = await http.get<TrackList>(`/audio/playlist/${ownerId}_${playlistId}`, {
+      params,
+    });
+    return data;
+  },
+  async coverLookup(artist: string, title: string): Promise<CoverLookup> {
+    const { data } = await http.get<CoverLookup>("/art/lookup", {
+      params: { artist, title },
+    });
     return data;
   },
 

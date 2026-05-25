@@ -26,13 +26,26 @@ const {
   startMinimized,
   hardwareAcceleration,
   autoStart,
+  startupVolume,
   cacheSize,
+  externalCovers,
 } = storeToRefs(settings);
+
+const startupVolumePct = computed({
+  get: () => Math.round(startupVolume.value * 100),
+  set: (v: number) => {
+    startupVolume.value = Math.max(0, Math.min(1, v / 100));
+  },
+});
 
 const themes: { value: ThemeName; label: string; preview: string }[] = [
   { value: "dark", label: "Тёмная", preview: "linear-gradient(135deg, #161922, #0b0c10)" },
   { value: "amoled", label: "AMOLED", preview: "linear-gradient(135deg, #050507, #000000)" },
   { value: "light", label: "Светлая", preview: "linear-gradient(135deg, #ffffff, #e3e6ef)" },
+  { value: "midnight", label: "Полночь", preview: "linear-gradient(135deg, #221d4e, #0a0820)" },
+  { value: "forest", label: "Лес", preview: "linear-gradient(135deg, #19302a, #0a1410)" },
+  { value: "sunset", label: "Закат", preview: "linear-gradient(135deg, #3d251f, #1a0d0b)" },
+  { value: "mocha", label: "Кофе", preview: "linear-gradient(135deg, #342a24, #161210)" },
 ];
 
 const accents: { value: AccentName; label: string; preview: string }[] = [
@@ -41,6 +54,14 @@ const accents: { value: AccentName; label: string; preview: string }[] = [
   { value: "cyan", label: "Бирюзовый", preview: "linear-gradient(135deg, #16d1cf, #1e90ff)" },
   { value: "green", label: "Зелёный", preview: "linear-gradient(135deg, #2bc48a, #0090ff)" },
   { value: "orange", label: "Оранжевый", preview: "linear-gradient(135deg, #ff8c1a, #ff4f5e)" },
+  { value: "red", label: "Красный", preview: "linear-gradient(135deg, #ff3b3b, #ff2f7a)" },
+  { value: "gold", label: "Золото", preview: "linear-gradient(135deg, #ffc24a, #ff4f5e)" },
+  { value: "mint", label: "Мятный", preview: "linear-gradient(135deg, #4dd4ac, #1e90ff)" },
+  { value: "lavender", label: "Лаванда", preview: "linear-gradient(135deg, #b88dff, #5b3cff)" },
+  { value: "electric", label: "Неон", preview: "linear-gradient(135deg, #c4ff3a, #1a8cff)" },
+  { value: "coral", label: "Коралл", preview: "linear-gradient(135deg, #ff7766, #c930ff)" },
+  { value: "sky", label: "Небо", preview: "linear-gradient(135deg, #5cd0ff, #6d3cff)" },
+  { value: "crimson", label: "Бордо", preview: "linear-gradient(135deg, #ff2f7a, #5b1a8a)" },
 ];
 
 const cacheUsage = ref<number>(estimateCache());
@@ -177,6 +198,34 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
       </article>
 
       <article class="settings__card">
+        <h2>Воспроизведение</h2>
+        <label class="settings__row">
+          <div>
+            <div class="settings__row-title">Громкость при старте</div>
+            <div class="settings__row-sub">С какой громкости запускать плеер при каждом включении</div>
+          </div>
+          <div class="settings__range">
+            <input v-model.number="startupVolumePct" type="range" min="0" max="100" step="1" />
+            <span>{{ startupVolumePct }}%</span>
+          </div>
+        </label>
+      </article>
+
+      <article class="settings__card">
+        <h2>Обложки</h2>
+        <label class="settings__row">
+          <div>
+            <div class="settings__row-title">Искать обложки в других сервисах</div>
+            <div class="settings__row-sub">
+              Если у ВК нет обложки трека, подгружаем её с iTunes. Без задержек, результат
+              кешируется локально.
+            </div>
+          </div>
+          <input v-model="externalCovers" type="checkbox" class="settings__switch" />
+        </label>
+      </article>
+
+      <article class="settings__card">
         <h2>Кеш</h2>
         <p class="settings__hint">Сейчас используется ≈ {{ cacheUsage }} MB на этом ПК.</p>
         <label class="settings__row">
@@ -211,8 +260,8 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
         <h2>О приложении</h2>
         <p class="settings__hint">
           VK Music Player — десктоп-плеер на Vue 3 + Electron с FastAPI бэкендом, который проксирует
-          VK API. Авторизация — direct token grant Kate Mobile, токен лежит локально с правами 600.
-          Открытые исходники: <code>backend/</code> + <code>frontend/</code>.
+          VK API. Авторизация — через официальный OAuth ВК, токен хранится локально
+          с правами 600. Открытые исходники: <code>backend/</code> + <code>frontend/</code>.
         </p>
       </article>
     </section>

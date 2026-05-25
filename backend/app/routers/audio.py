@@ -3,8 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import Artist, RecommendationFeed, Track, TrackList
+from ..models.audio import AlbumList, Artist, RecommendationFeed, Track, TrackList
 from ..services.audio import (
+    build_virtual_feed,
+    parse_albums,
     parse_artist,
     parse_recommendation_feed,
     parse_track,
@@ -102,15 +104,30 @@ async def recommendations(
 async def feed(vk: VKDep, session: SessionDep) -> RecommendationFeed:
     """Home-screen 'Собрано алгоритмами' feed.
 
-    audio.getCatalog returns the same data the official ВК клиент использует.
-    If catalog is unavailable, fall back to recommended playlists.
+    ``audio.getCatalog`` returns the rich catalog used by official VK clients,
+    but it is gated for the OAuth client we use. When it fails we fall back
+    to ``audio.getRecommendations`` and slice the response into cards.
     """
     try:
         response = await vk.call("audio.getCatalog", session.access_token, extended=1)
-        return parse_recommendation_feed(response)
+        feed_obj = parse_recommendation_feed(response)
+        if feed_obj.blocks:
+            return feed_obj
     except VKError:
-        # Fallback to a simpler list — wrap recommended audios into a single "card".
+        pass
+
+    try:
+        raw = await vk.call(
+            "audio.getRecommendations",
+            session.access_token,
+            user_id=session.user_id,
+            count=120,
+            shuffle=True,
+        )
+    except VKError:
         return RecommendationFeed(blocks=[])
+    track_list = parse_track_list(raw)
+    return build_virtual_feed(track_list.items)
 
 
 @router.post("/add", response_model=Track)
@@ -156,6 +173,11 @@ async def delete(
     return {"ok": bool(result)}
 
 
+def _slug_to_name(slug: str) -> str:
+    """Best-effort fallback: turn VK artist slug ('linkin-park') into a name."""
+    return slug.replace("-", " ").replace("_", " ").strip().title() or slug
+
+
 @router.get("/by_artist/{artist_id}", response_model=TrackList)
 async def by_artist(
     artist_id: str,
@@ -163,12 +185,102 @@ async def by_artist(
     session: SessionDep,
     offset: int = Query(0, ge=0),
     count: int = Query(50, ge=1, le=200),
+    q: str | None = Query(None, description="Имя артиста для fallback на audio.search"),
 ) -> TrackList:
+    """Tracks of an artist.
+
+    ``audio.getAudiosByArtist`` is gated to a small set of client_ids
+    (Kate Mobile / VK Admin); under the vk.com web token from
+    vkhost.github.io it returns ``Unknown method passed``. We fall back
+    to ``audio.search(q=name, performer_only=1)`` which is available to
+    every audio-scope token.
+    """
+    try:
+        response = await vk.call(
+            "audio.getAudiosByArtist",
+            session.access_token,
+            artist_id=artist_id,
+            offset=offset,
+            count=count,
+        )
+        return parse_track_list(response)
+    except VKError as exc:
+        if exc.code not in (3, 4, 15, 100):
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+            ) from exc
+
+    name = q or _slug_to_name(artist_id)
     response = await _safe_call(
         vk,
-        "audio.getAudiosByArtist",
+        "audio.search",
         session.access_token,
-        artist_id=artist_id,
+        q=name,
+        performer_only=1,
+        sort=2,
+        offset=offset,
+        count=count,
+    )
+    return parse_track_list(response)
+
+
+@router.get("/albums/{owner_id}", response_model=AlbumList)
+async def albums(
+    owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+    offset: int = Query(0, ge=0),
+    count: int = Query(50, ge=1, le=200),
+) -> AlbumList:
+    """Albums / playlists for a VK owner (artist or user).
+
+    Tries ``audio.getPlaylists`` (the current API) first, falls back to the
+    older ``audio.getAlbums``. Both endpoints are sometimes gated on the
+    web OAuth token — in that case we return an empty list so the artist
+    page degrades gracefully (the "Альбомы" tab will show an empty state).
+    """
+    last_exc: VKError | None = None
+    for method in ("audio.getPlaylists", "audio.getAlbums"):
+        try:
+            response = await vk.call(
+                method,
+                session.access_token,
+                owner_id=owner_id,
+                offset=offset,
+                count=count,
+            )
+        except VKError as exc:
+            last_exc = exc
+            if exc.code in (3, 4, 15, 100):
+                continue
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+            ) from exc
+        return parse_albums(response)
+    # Both methods rejected — return an empty list rather than 502 so the
+    # artist page can show an empty state.
+    _ = last_exc
+    return AlbumList(items=[], count=0)
+
+
+@router.get("/playlist/{owner_id}_{playlist_id}", response_model=TrackList)
+async def playlist(
+    owner_id: int,
+    playlist_id: int,
+    vk: VKDep,
+    session: SessionDep,
+    offset: int = Query(0, ge=0),
+    count: int = Query(100, ge=1, le=200),
+) -> TrackList:
+    """Tracks for a single playlist/album."""
+    response = await _safe_call(
+        vk,
+        "audio.get",
+        session.access_token,
+        owner_id=owner_id,
+        album_id=playlist_id,
         offset=offset,
         count=count,
     )
@@ -180,15 +292,42 @@ async def artist_info(
     artist_id: str,
     vk: VKDep,
     session: SessionDep,
+    name: str | None = Query(None, description="Имя артиста для stub-карточки если VK метод недоступен"),
 ) -> Artist:
-    response = await _safe_call(
-        vk,
-        "audio.getArtistById",
-        session.access_token,
-        artist_id=artist_id,
-        extended=1,
-    )
+    """Artist meta.
+
+    ``audio.getArtistById`` is also gated on the vk.com web token; if
+    it fails we return a stub so the artist screen still renders (just
+    without photo / follow-state).
+    """
+    try:
+        response = await vk.call(
+            "audio.getArtistById",
+            session.access_token,
+            artist_id=artist_id,
+            extended=1,
+        )
+    except VKError as exc:
+        if exc.code in (3, 4, 15, 100):
+            return Artist(
+                id=artist_id,
+                name=name or _slug_to_name(artist_id),
+                domain=None,
+                photo=None,
+                is_followed=False,
+            )
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+        ) from exc
+
     artist = parse_artist(response)
     if artist is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Артист не найден")
+        return Artist(
+            id=artist_id,
+            name=name or _slug_to_name(artist_id),
+            domain=None,
+            photo=None,
+            is_followed=False,
+        )
     return artist

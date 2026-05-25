@@ -13,7 +13,6 @@ const library = useLibraryStore();
 const motion = useMotion();
 const { friends, friendsLoading } = storeToRefs(library);
 const query = ref("");
-const showHidden = ref(false);
 
 onMounted(() => {
   void library.loadFriends();
@@ -21,7 +20,9 @@ onMounted(() => {
 
 const visibleFriends = computed(() => {
   if (!friends.value) return [];
-  const base = showHidden.value ? friends.value.items : friends.value.items.filter((u) => u.audio_visible);
+  // VK never exposes audio of friends who hide it, so showing locked profiles
+  // is just noise — drop them unconditionally.
+  const base = friends.value.items.filter((u) => u.audio_visible);
   const q = query.value.trim().toLowerCase();
   if (!q) return base;
   return base.filter((u) =>
@@ -42,11 +43,6 @@ const tileVariants = (i: number) =>
     >
       <template #actions>
         <input v-model="query" class="input friends__filter" placeholder="Найти друга" />
-        <label class="friends__toggle">
-          <input v-model="showHidden" type="checkbox" />
-          <span>Показывать со скрытой музыкой</span>
-        </label>
-        <button class="btn btn--ghost" @click="library.loadFriends(true)">Обновить</button>
       </template>
     </PageHeader>
 
@@ -90,13 +86,6 @@ const tileVariants = (i: number) =>
 .friends__filter {
   width: 240px;
   height: 38px;
-}
-.friends__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--text-2);
-  font-size: 12px;
 }
 .friends__loading {
   display: inline-flex;

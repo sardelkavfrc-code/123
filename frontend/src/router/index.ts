@@ -35,9 +35,20 @@ const routes: RouteRecordRaw[] = [
     component: () => import("@/views/SearchView.vue"),
   },
   {
+    path: "/queue",
+    name: "queue",
+    component: () => import("@/views/QueueView.vue"),
+  },
+  {
     path: "/artist/:id",
     name: "artist",
     component: () => import("@/views/ArtistView.vue"),
+    props: true,
+  },
+  {
+    path: "/similar/:audioId",
+    name: "similar",
+    component: () => import("@/views/SimilarView.vue"),
     props: true,
   },
   {

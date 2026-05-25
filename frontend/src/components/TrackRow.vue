@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, toRef } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
 import { useMotion } from "@/composables/useSpring";
+import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
 
@@ -44,8 +45,57 @@ function playOne() {
 
 function gotoArtist() {
   const main = props.track.main_artists[0];
-  if (main?.id) router.push({ name: "artist", params: { id: main.id } });
+  if (main?.id) {
+    router.push({
+      name: "artist",
+      params: { id: main.id },
+      query: main.name ? { name: main.name } : undefined,
+    });
+    return;
+  }
+  // VK doesn't expose every credited performer as an artist entity — fall
+  // back to a search query so non-clickable names still drill into music.
+  const name = main?.name || props.track.artist;
+  if (name) router.push({ name: "search", query: { q: name } });
 }
+
+function uncensoredSearch() {
+  const main = props.track.main_artists[0];
+  const q = `${main?.name || props.track.artist} ${props.track.title}`.trim();
+  if (q) router.push({ name: "search", query: { q, mode: "any" } });
+}
+
+function openSimilar() {
+  router.push({
+    name: "similar",
+    params: { audioId: `${props.track.owner_id}_${props.track.id}` },
+    query: {
+      artist: props.track.artist || undefined,
+      title: props.track.title || undefined,
+    },
+  });
+}
+
+function addToQueue() {
+  if (unavailable.value) {
+    ui.notify("Трек недоступен", "error");
+    return;
+  }
+  player.appendToQueue(props.track);
+  ui.notify("Добавлено в очередь", "success");
+}
+
+// Cover fallback (iTunes) only when VK doesn't ship a cover and the user
+// hasn't disabled the setting. Composable returns `null` otherwise.
+const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
+const trackTitle = computed(() => props.track.title || null);
+const hasVkCover = computed(() => !!props.track.album_cover);
+const { cover: externalCover } = useExternalArt(
+  trackArtist,
+  trackTitle,
+  toRef(() => hasVkCover.value)
+);
+const displayCover = computed(() => props.track.album_cover || externalCover.value || null);
 
 async function toggleLibrary() {
   try {
@@ -59,16 +109,6 @@ async function toggleLibrary() {
   } catch (err) {
     ui.notify((err as Error).message || "Не удалось", "error");
   }
-}
-
-function playNext() {
-  player.enqueueNext(props.track);
-  ui.notify("В очередь следующим", "info");
-}
-
-function appendQueue() {
-  player.appendToQueue(props.track);
-  ui.notify("Добавлено в очередь", "info");
 }
 </script>
 
@@ -94,8 +134,8 @@ function appendQueue() {
       </button>
     </div>
 
-    <div class="row__cover" :style="track.album_cover ? { backgroundImage: `url(${track.album_cover})` } : undefined">
-      <span v-if="!track.album_cover" class="row__cover-fallback accent-gradient" />
+    <div class="row__cover" :style="displayCover ? { backgroundImage: `url(${displayCover})` } : undefined">
+      <span v-if="!displayCover" class="row__cover-fallback accent-gradient" />
     </div>
 
     <div class="row__main">
@@ -107,18 +147,47 @@ function appendQueue() {
     </div>
 
     <div class="row__actions">
-      <button class="row__action" :title="inLibrary ? 'Удалить' : 'В библиотеку'" @click.stop="toggleLibrary">
-        <svg v-if="inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" /></svg>
-        <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+      <button
+        class="row__action row__action--lib"
+        :class="{ 'row__action--in-lib': inLibrary }"
+        :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
+        @click.stop="toggleLibrary"
+      >
+        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <template v-else>
+          <svg class="row__lib-check" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+            <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+          </svg>
+          <svg class="row__lib-x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </template>
       </button>
-      <button class="row__action" title="Сыграть следующим" @click.stop="playNext">
+      <button class="row__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensoredSearch">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 6h12M4 12h8M4 18h12" /><path d="m18 14 4 4-4 4" />
+          <circle cx="6" cy="6" r="3" />
+          <circle cx="6" cy="18" r="3" />
+          <line x1="20" y1="4" x2="8.12" y2="15.88" />
+          <line x1="14.47" y1="14.48" x2="20" y2="20" />
+          <line x1="8.12" y1="8.12" x2="12" y2="12" />
         </svg>
       </button>
-      <button class="row__action" title="В очередь" @click.stop="appendQueue">
+      <button class="row__action" title="Похожие" aria-label="Похожие" @click.stop="openSimilar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 6h16M4 12h16M4 18h10" /><path d="M19 16v6M16 19h6" />
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          <path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      <button class="row__action" title="В очередь" aria-label="Добавить в очередь" @click.stop="addToQueue">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="15" y2="6" />
+          <line x1="3" y1="12" x2="15" y2="12" />
+          <line x1="3" y1="18" x2="11" y2="18" />
+          <line x1="19" y1="9" x2="19" y2="19" />
+          <line x1="14" y1="14" x2="24" y2="14" />
         </svg>
       </button>
     </div>
@@ -267,6 +336,28 @@ function appendQueue() {
 .row__action:hover {
   background: var(--bg-3);
   color: var(--text-0);
+}
+.row__action--lib {
+  position: relative;
+}
+.row__action--in-lib {
+  color: var(--accent-1);
+}
+.row__action--in-lib .row__lib-x {
+  display: none;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--danger);
+}
+.row__action--in-lib:hover .row__lib-x {
+  display: block;
+}
+.row__action--in-lib:hover .row__lib-check {
+  display: none;
+}
+.row__action--in-lib:hover {
+  background: rgba(255, 94, 126, 0.12);
 }
 .row__duration {
   font-variant-numeric: tabular-nums;

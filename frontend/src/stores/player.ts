@@ -158,7 +158,11 @@ export const usePlayerStore = defineStore("player", () => {
   const duration = ref(0);
   const repeat = ref<RepeatMode>("off");
   const shuffle = ref(false);
-  const volume = ref(settings.volume);
+  // Volume is initialised from the user-configured startup volume on every
+  // session. Runtime adjustments live only in this store — we don't write
+  // back to settings.startupVolume so a quick tweak doesn't override the
+  // user's chosen default at the next launch.
+  const volume = ref(settings.startupVolume);
   const muted = ref(false);
   const loadingTrack = ref(false);
 
@@ -174,7 +178,6 @@ export const usePlayerStore = defineStore("player", () => {
   const hasPrev = computed(() => index.value > 0 || repeat.value === "all");
 
   watch(volume, (v) => {
-    settings.volume = v;
     if (backend) backend.setVolume(muted.value ? 0 : v);
   });
   watch(muted, (m) => {
@@ -379,6 +382,41 @@ export const usePlayerStore = defineStore("player", () => {
     isPlaying.value = false;
   }
 
+  function removeFromQueue(target: number) {
+    if (target < 0 || target >= queue.value.length) return;
+    const removed = queue.value.splice(target, 1)[0];
+    originalQueue.value = originalQueue.value.filter(
+      (t) => !(t.id === removed.id && t.owner_id === removed.owner_id)
+    );
+    if (target < index.value) {
+      index.value -= 1;
+    } else if (target === index.value) {
+      if (queue.value.length === 0) {
+        clear();
+        return;
+      }
+      if (index.value >= queue.value.length) index.value = queue.value.length - 1;
+      loadCurrent(isPlaying.value);
+    }
+  }
+
+  function moveInQueue(from: number, to: number) {
+    if (from === to) return;
+    if (from < 0 || from >= queue.value.length) return;
+    const clamped = Math.max(0, Math.min(queue.value.length - 1, to));
+    const [moved] = queue.value.splice(from, 1);
+    queue.value.splice(clamped, 0, moved);
+    // Keep `index` pointed at the currently-playing track so we don't stutter.
+    if (from === index.value) {
+      index.value = clamped;
+    } else if (from < index.value && clamped >= index.value) {
+      index.value -= 1;
+    } else if (from > index.value && clamped <= index.value) {
+      index.value += 1;
+    }
+    originalQueue.value = [...queue.value];
+  }
+
   return {
     queue,
     index,
@@ -408,6 +446,8 @@ export const usePlayerStore = defineStore("player", () => {
     toggleMute,
     setVolume,
     clear,
+    removeFromQueue,
+    moveInQueue,
   };
 });
 

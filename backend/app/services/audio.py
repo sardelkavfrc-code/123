@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from ..models.audio import (
+    AlbumList,
+    AlbumSummary,
     Artist,
     RecommendationBlock,
     RecommendationFeed,
@@ -244,6 +246,133 @@ def parse_recommendation_feed(response: Any) -> RecommendationFeed:
         unique.append(block)
 
     return RecommendationFeed(blocks=unique)
+
+
+_RECO_CARD_TITLES: list[tuple[str, str]] = [
+    ("Микс для тебя", "Свежие рекомендации ВК"),
+    ("Открытия дня", "Новое для твоего вкуса"),
+    ("Под настроение", "Подобрано алгоритмами"),
+    ("Можешь зайти", "Близкое тому, что слушаешь"),
+    ("Тренды твоего круга", "Что на повторе у похожих слушателей"),
+    ("Залипнуть надолго", "Глубокие сеты для фона"),
+]
+
+
+def build_virtual_feed(tracks: list[Track], *, per_block: int = 8) -> RecommendationFeed:
+    """Build a RecommendationFeed out of an unsorted track list.
+
+    ``audio.getCatalog`` is blocked for the OAuth client we use, so we slice
+    the response of ``audio.getRecommendations`` into fixed-size chunks and
+    label them with friendly Russian titles. The cover of the first track in
+    each chunk is reused as the card art so the home screen stays visual.
+    """
+
+    blocks: list[RecommendationBlock] = []
+    if not tracks:
+        return RecommendationFeed(blocks=blocks)
+
+    # Filter out tracks without a URL — they can't be played anyway and they
+    # don't carry useful metadata.
+    playable = [t for t in tracks if t.url]
+    if not playable:
+        playable = tracks
+
+    palette = _ACCENT_PALETTE
+    pool = playable
+    seen_ids: set[str] = set()
+    idx = 0
+    while idx < len(pool) and len(blocks) < len(_RECO_CARD_TITLES):
+        chunk: list[Track] = []
+        while idx < len(pool) and len(chunk) < per_block:
+            t = pool[idx]
+            key = f"{t.owner_id}_{t.id}"
+            if key not in seen_ids:
+                seen_ids.add(key)
+                chunk.append(t)
+            idx += 1
+        if not chunk:
+            break
+        title, subtitle = _RECO_CARD_TITLES[len(blocks)]
+        cover = next((t.album_cover for t in chunk if t.album_cover), None)
+        blocks.append(
+            RecommendationBlock(
+                id=f"reco_{len(blocks)}",
+                title=title,
+                subtitle=subtitle,
+                cover=cover,
+                accent=palette[len(blocks) % len(palette)],
+                track_count=len(chunk),
+                tracks=chunk,
+            )
+        )
+    return RecommendationFeed(blocks=blocks)
+
+
+def _album_cover(item: dict[str, Any]) -> str | None:
+    return _playlist_cover(item)
+
+
+def _album_year(item: dict[str, Any]) -> int | None:
+    for key in ("year", "release_year", "year_released"):
+        v = item.get(key)
+        if v:
+            try:
+                return int(v)
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def parse_albums(response: Any) -> AlbumList:
+    """Normalise a VK playlists/albums response into AlbumList.
+
+    Works for both ``audio.getAlbums`` (legacy) and ``audio.getPlaylists``
+    (current). When neither is available we get a stub list back; the artist
+    page degrades gracefully.
+    """
+
+    items_raw: list[Any]
+    count = 0
+    if isinstance(response, dict):
+        items_raw = response.get("items") or []
+        try:
+            count = int(response.get("count") or len(items_raw))
+        except (TypeError, ValueError):
+            count = len(items_raw)
+    elif isinstance(response, list):
+        items_raw = response
+        count = len(items_raw)
+    else:
+        items_raw = []
+
+    albums: list[AlbumSummary] = []
+    for raw in items_raw:
+        if not isinstance(raw, dict):
+            continue
+        pid = raw.get("id") or raw.get("playlist_id")
+        if pid is None:
+            continue
+        owner_id = raw.get("owner_id")
+        try:
+            owner_int = int(owner_id) if owner_id is not None else None
+        except (TypeError, ValueError):
+            owner_int = None
+        try:
+            track_count = int(raw.get("count") or 0) or None
+        except (TypeError, ValueError):
+            track_count = None
+        albums.append(
+            AlbumSummary(
+                id=str(pid),
+                owner_id=owner_int,
+                title=str(raw.get("title") or "Альбом"),
+                subtitle=str(raw.get("subtitle") or raw.get("description") or "") or None,
+                cover=_album_cover(raw),
+                year=_album_year(raw),
+                track_count=track_count,
+            )
+        )
+    return AlbumList(items=albums, count=count or len(albums))
 
 
 def parse_artist(payload: Any) -> Artist | None:

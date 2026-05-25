@@ -1,17 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
-import type { AuthChallenge, AuthStatus } from "@/api/types";
-
-export interface LoginPayload {
-  username: string;
-  password: string;
-  code?: string;
-  captcha_sid?: string;
-  captcha_key?: string;
-  remember?: boolean;
-  client?: string;
-}
+import type { AuthStatus } from "@/api/types";
 
 export interface TokenLoginPayload {
   access_token: string;
@@ -33,7 +23,6 @@ export const useAuthStore = defineStore("auth", () => {
   const checked = ref(false);
   const loading = ref(false);
   const lastError = ref<string | null>(null);
-  const challenge = ref<AuthChallenge | null>(null);
 
   const isAuthenticated = computed(() => status.value.authenticated);
   const hasAudio = computed(() => status.value.has_audio);
@@ -60,45 +49,7 @@ export const useAuthStore = defineStore("auth", () => {
       await api.logout();
     } finally {
       status.value = emptyStatus();
-      challenge.value = null;
     }
-  }
-
-  async function login(payload: LoginPayload) {
-    lastError.value = null;
-    loading.value = true;
-    try {
-      status.value = await api.login({ remember: true, ...payload });
-      challenge.value = null;
-      return true;
-    } catch (err) {
-      if (err instanceof APIError) {
-        const detail = err.detail as AuthChallenge | { kind: string; message?: string };
-        if (
-          err.status === 401 &&
-          detail &&
-          (detail.kind === "need_validation" || detail.kind === "need_captcha")
-        ) {
-          challenge.value = detail as AuthChallenge;
-          lastError.value =
-            detail.kind === "need_validation"
-              ? "ВК запросил код подтверждения"
-              : "ВК запросил капчу";
-          return false;
-        }
-        lastError.value = detail.message || err.message;
-      } else {
-        lastError.value = (err as Error).message;
-      }
-      return false;
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  function clearChallenge() {
-    challenge.value = null;
-    lastError.value = null;
   }
 
   async function loginWithToken(payload: TokenLoginPayload) {
@@ -106,7 +57,6 @@ export const useAuthStore = defineStore("auth", () => {
     loading.value = true;
     try {
       status.value = await api.loginWithToken({ remember: true, ...payload });
-      challenge.value = null;
       return true;
     } catch (err) {
       if (err instanceof APIError) {
@@ -120,18 +70,15 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function loginViaOAuth(clientId: number) {
+  async function loginViaOAuth() {
     if (!window.vkmp?.openVKAuth) {
-      lastError.value = "OAuth-вход доступен только в Electron-сборке";
+      lastError.value = "OAuth-вход доступен только в десктоп-сборке";
       return false;
     }
     lastError.value = null;
     loading.value = true;
     try {
-      const result = await window.vkmp.openVKAuth({
-        clientId,
-        scope: "audio,friends,offline,wall,photos,groups,status",
-      });
+      const result = await window.vkmp.openVKAuth();
       if (!result.ok) {
         lastError.value = result.error;
         return false;
@@ -151,15 +98,12 @@ export const useAuthStore = defineStore("auth", () => {
     checked,
     loading,
     lastError,
-    challenge,
     isAuthenticated,
     hasAudio,
     displayName,
     refresh,
-    login,
     loginWithToken,
     loginViaOAuth,
     logout,
-    clearChallenge,
   };
 });

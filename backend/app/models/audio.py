@@ -49,11 +49,41 @@ class RecommendationBlock(APIModel):
     playlist_id: str | None = None
     owner_id: int | None = None
     track_count: int | None = None
+    # When the block is built from audio.getRecommendations rather than a real
+    # VK playlist, we ship the tracks inline so the frontend can play them
+    # without a follow-up request.
+    tracks: list[Track] = Field(default_factory=list)
 
 
 class RecommendationFeed(APIModel):
     title: str = "Собрано алгоритмами"
     blocks: list[RecommendationBlock] = Field(default_factory=list)
+
+
+class AlbumSummary(APIModel):
+    """Compact playlist / album card for the artist page."""
+
+    id: str
+    owner_id: int | None = None
+    title: str
+    subtitle: str | None = None
+    cover: str | None = None
+    year: int | None = None
+    track_count: int | None = None
+
+
+class AlbumList(APIModel):
+    items: list[AlbumSummary] = Field(default_factory=list)
+    count: int = 0
+
+
+class CoverLookup(APIModel):
+    """Result of fetching cover art from a non-VK source (iTunes today)."""
+
+    artist: str
+    title: str
+    cover: str | None = None
+    source: str | None = None
 
 
 class Artist(APIModel):

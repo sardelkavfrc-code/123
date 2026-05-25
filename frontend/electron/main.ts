@@ -327,9 +327,15 @@ type OAuthResult =
   | { ok: true; access_token: string; user_id: number; expires_in: number }
   | { ok: false; error: string };
 
+// Single working auth path: vk.com web client (the "vk.com" button on
+// vkhost.github.io). client_id 6287487 + scope 1073737727 ("everything")
+// is the only combination that still yields tokens with audio.* access
+// in 2026; every other documented client returns "Unknown method passed".
+const VK_OAUTH_CLIENT_ID = 6287487;
+const VK_OAUTH_SCOPE = "1073737727";
 const OAUTH_REDIRECT_PREFIX = "https://oauth.vk.com/blank.html";
-const MOBILE_UA =
-  "Mozilla/5.0 (Linux; Android 13; Pixel 6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
+const DESKTOP_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 function parseOAuthFragment(rawUrl: string): OAuthResult | null {
   const hashIndex = rawUrl.indexOf("#");
@@ -347,66 +353,59 @@ function parseOAuthFragment(rawUrl: string): OAuthResult | null {
   };
 }
 
-ipcMain.handle(
-  "auth:open-vk-oauth",
-  async (_event, params: { clientId: number; scope: string }): Promise<OAuthResult> => {
-    const clientId = Number(params?.clientId) || 0;
-    const scope = String(params?.scope || "audio,friends,offline,wall,photos,groups,status");
-    if (!clientId) return { ok: false, error: "Не указан client_id" };
+ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
+  const oauthWin = new BrowserWindow({
+    width: 560,
+    height: 760,
+    parent: mainWindow ?? undefined,
+    modal: false,
+    autoHideMenuBar: true,
+    title: "Вход в ВК",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      partition: `persist:vk-oauth-${VK_OAUTH_CLIENT_ID}`,
+    },
+  });
+  oauthWin.webContents.setUserAgent(DESKTOP_UA);
+  oauthWin.removeMenu();
 
-    const oauthWin = new BrowserWindow({
-      width: 480,
-      height: 760,
-      parent: mainWindow ?? undefined,
-      modal: false,
-      autoHideMenuBar: true,
-      title: "Вход в ВК",
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        partition: `persist:vk-oauth-${clientId}`,
-      },
-    });
-    oauthWin.webContents.setUserAgent(MOBILE_UA);
-    oauthWin.removeMenu();
+  const url =
+    "https://oauth.vk.com/authorize?" +
+    new URLSearchParams({
+      client_id: String(VK_OAUTH_CLIENT_ID),
+      scope: VK_OAUTH_SCOPE,
+      redirect_uri: OAUTH_REDIRECT_PREFIX,
+      display: "page",
+      v: "5.131",
+      response_type: "token",
+      revoke: "1",
+    }).toString();
 
-    const url =
-      "https://oauth.vk.com/authorize?" +
-      new URLSearchParams({
-        client_id: String(clientId),
-        scope,
-        redirect_uri: OAUTH_REDIRECT_PREFIX,
-        display: "mobile",
-        v: "5.131",
-        response_type: "token",
-        revoke: "1",
-      }).toString();
+  return new Promise<OAuthResult>((resolve) => {
+    let settled = false;
+    const finalize = (result: OAuthResult) => {
+      if (settled) return;
+      settled = true;
+      try {
+        oauthWin.close();
+      } catch {
+        // ignore
+      }
+      resolve(result);
+    };
 
-    return new Promise<OAuthResult>((resolve) => {
-      let settled = false;
-      const finalize = (result: OAuthResult) => {
-        if (settled) return;
-        settled = true;
-        try {
-          oauthWin.close();
-        } catch {
-          // ignore
-        }
-        resolve(result);
-      };
+    const onUrl = (rawUrl: string) => {
+      if (!rawUrl.startsWith(OAUTH_REDIRECT_PREFIX)) return;
+      const parsed = parseOAuthFragment(rawUrl);
+      if (parsed) finalize(parsed);
+    };
 
-      const onUrl = (rawUrl: string) => {
-        if (!rawUrl.startsWith(OAUTH_REDIRECT_PREFIX)) return;
-        const parsed = parseOAuthFragment(rawUrl);
-        if (parsed) finalize(parsed);
-      };
+    oauthWin.webContents.on("will-redirect", (_e, redirectUrl) => onUrl(redirectUrl));
+    oauthWin.webContents.on("did-navigate", (_e, navUrl) => onUrl(navUrl));
+    oauthWin.webContents.on("did-navigate-in-page", (_e, navUrl) => onUrl(navUrl));
+    oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
 
-      oauthWin.webContents.on("will-redirect", (_e, redirectUrl) => onUrl(redirectUrl));
-      oauthWin.webContents.on("did-navigate", (_e, navUrl) => onUrl(navUrl));
-      oauthWin.webContents.on("did-navigate-in-page", (_e, navUrl) => onUrl(navUrl));
-      oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
-
-      void oauthWin.loadURL(url);
-    });
-  },
-);
+    void oauthWin.loadURL(url);
+  });
+});

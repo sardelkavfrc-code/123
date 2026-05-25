@@ -36,6 +36,7 @@ export interface RecommendationBlock {
   playlist_id: string | null;
   owner_id: number | null;
   track_count: number | null;
+  tracks: Track[];
 }
 
 export interface RecommendationFeed {
@@ -49,6 +50,28 @@ export interface Artist {
   domain: string | null;
   photo: string | null;
   is_followed: boolean;
+}
+
+export interface AlbumSummary {
+  id: string;
+  owner_id: number | null;
+  title: string;
+  subtitle: string | null;
+  cover: string | null;
+  year: number | null;
+  track_count: number | null;
+}
+
+export interface AlbumList {
+  items: AlbumSummary[];
+  count: number;
+}
+
+export interface CoverLookup {
+  artist: string;
+  title: string;
+  cover: string | null;
+  source: string | null;
 }
 
 export interface User {
@@ -72,13 +95,4 @@ export interface AuthStatus {
   last_name: string | null;
   photo: string | null;
   has_audio: boolean;
-}
-
-export interface AuthChallenge {
-  kind: string;
-  message: string;
-  validation_sid: string | null;
-  captcha_sid: string | null;
-  captcha_img: string | null;
-  phone_mask: string | null;
 }

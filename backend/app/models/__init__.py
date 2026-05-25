@@ -1,22 +1,26 @@
 from .audio import (
+    AlbumList,
+    AlbumSummary,
     Artist,
+    CoverLookup,
     RecommendationBlock,
     RecommendationFeed,
     Track,
     TrackArtist,
     TrackList,
 )
-from .auth import AuthChallenge, AuthStatus, LoginRequest, TokenLoginRequest
+from .auth import AuthStatus, TokenLoginRequest
 from .common import APIModel
 from .user import FriendList, User
 
 __all__ = [
     "APIModel",
+    "AlbumList",
+    "AlbumSummary",
     "Artist",
-    "AuthChallenge",
     "AuthStatus",
+    "CoverLookup",
     "FriendList",
-    "LoginRequest",
     "RecommendationBlock",
     "RecommendationFeed",
     "TokenLoginRequest",

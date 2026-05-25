@@ -6,11 +6,10 @@ from fastapi import APIRouter, HTTPException, status
 
 from .. import storage
 from ..deps import VKDep
-from ..models.auth import AuthChallenge, AuthStatus, LoginRequest, TokenLoginRequest
+from ..models.auth import AuthStatus, TokenLoginRequest
 from ..services.friends import parse_user
 from ..vk.audio_token import refresh_to_audio_token
-from ..vk.auth import direct_login
-from ..vk.exceptions import VKAuthError, VKError
+from ..vk.exceptions import VKError
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +19,11 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def _probe_audio(vk: VKDep, token: str) -> bool:
     """Return True if the token can call audio.* methods.
 
-    VK closed audio.* for OAuth implicit-flow tokens in 2024+ — every call
-    returns error 3 'Unknown method passed'. Only Kate Mobile direct password
-    grant against oauth.vk.com/token yields tokens that pass the audio check.
-    We probe with a cheap audio.get count=1 once at login time so the
-    frontend can warn the user if audio is gated (e.g. a stale session.json
-    left over from a prior version of the app).
+    The vk.com web client (the only OAuth-implicit flow that still grants
+    audio scope in 2026) returns error 3 'Unknown method passed' for a
+    handful of audio.* endpoints (notably audio.getAudiosByArtist), but
+    audio.get works. We probe with a cheap audio.get count=1 once at
+    login time so the frontend can warn if audio is gated.
     """
     try:
         await vk.call("audio.get", token, count=1)
@@ -73,80 +71,19 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
         return AuthStatus(authenticated=False)
 
 
-@router.post("/login", response_model=AuthStatus)
-async def login(payload: LoginRequest, vk: VKDep) -> AuthStatus:
-    """Kate Mobile direct password grant against ``oauth.vk.com/token``.
-
-    The only flow VK still grants audio scope to in 2024+. The implicit
-    OAuth flow (``oauth.vk.com/authorize?response_type=token``) was
-    confirmed dead for audio.* — even pre-existing tokens stopped working
-    after VK's server-side change in 2026.
-
-    Password never leaves this process: it's POSTed directly to VK and we
-    keep only the resulting access_token. 2FA / captcha challenges are
-    surfaced back to the client as HTTP 401 with the challenge payload.
-
-    After a successful grant we apply ``refresh_to_audio_token`` (FCM
-    receipt + ``auth.refreshToken``) as a best-effort upgrade. If it
-    fails or returns the same token we keep the raw password-grant
-    token — which already carries audio scope.
-    """
-    try:
-        session = await direct_login(
-            payload.username,
-            payload.password,
-            code=payload.code,
-            captcha_sid=payload.captcha_sid,
-            captcha_key=payload.captcha_key,
-            client=payload.client,
-        )
-    except VKAuthError as exc:
-        challenge = AuthChallenge(
-            kind=exc.kind,
-            message=exc.message,
-            validation_sid=exc.validation_sid,
-            captcha_sid=exc.captcha_sid,
-            captcha_img=exc.captcha_img,
-            phone_mask=exc.phone_mask,
-        )
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, detail=challenge.model_dump()
-        ) from exc
-
-    refresh_result = await refresh_to_audio_token(session.access_token)
-    if refresh_result.ok and refresh_result.refreshed_token:
-        logger.info("Kate Mobile receipt blessing succeeded")
-        session = storage.Session(
-            access_token=refresh_result.refreshed_token,
-            user_id=session.user_id,
-            expires_at=session.expires_at,
-        )
-    else:
-        logger.info(
-            "Kate Mobile receipt blessing skipped (%s); using raw grant token",
-            refresh_result.error,
-        )
-
-    has_audio = await _probe_audio(vk, session.access_token)
-    if not has_audio:
-        logger.warning(
-            "audio.get probe failed even after direct grant — audio stays gated"
-        )
-
-    if payload.remember:
-        storage.save(session)
-    return await _resolve_user(vk, session.access_token, has_audio=has_audio)
-
-
 @router.post("/token", response_model=AuthStatus)
 async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
-    """Accept a pre-existing access_token (OAuth implicit redirect, vkhost.github.io, etc.).
+    """Accept an access_token captured from the vk.com OAuth redirect.
 
-    We don't know the token's provenance, so we run the same best-effort
-    ``refresh_to_audio_token`` blessing and the ``audio.get`` probe as on
-    ``/auth/login``. If the user pasted an implicit-flow token, the probe
-    will return ``has_audio=False`` and the UI will warn them that audio
-    is gated but other endpoints (friends, profile) still work.
+    The Electron main process opens ``oauth.vk.com/authorize`` with the
+    vk.com web client (client_id 6287487, scope 1073737727), captures the
+    token from the ``oauth.vk.com/blank.html`` redirect, and POSTs it
+    here. This is the only flow in 2026 that still yields a token with
+    working audio.get / audio.search / audio.getRecommendations.
+
+    We still apply a best-effort ``refresh_to_audio_token`` blessing and
+    probe audio.get once so the frontend knows whether to display the
+    'audio gated' warning.
     """
     user_id = payload.user_id or 0
     if not user_id:
@@ -170,23 +107,18 @@ async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
 
     refresh_result = await refresh_to_audio_token(session.access_token)
     if refresh_result.ok and refresh_result.refreshed_token:
-        logger.info("Kate Mobile receipt blessing succeeded on pasted token")
+        logger.info("FCM receipt blessing succeeded")
         session = storage.Session(
             access_token=refresh_result.refreshed_token,
             user_id=session.user_id,
             expires_at=session.expires_at,
         )
     else:
-        logger.info(
-            "Kate Mobile receipt blessing skipped on pasted token (%s)",
-            refresh_result.error,
-        )
+        logger.info("FCM receipt blessing skipped (%s)", refresh_result.error)
 
     has_audio = await _probe_audio(vk, session.access_token)
     if not has_audio:
-        logger.warning(
-            "audio.get probe failed on pasted token — likely OAuth-implicit; audio gated"
-        )
+        logger.warning("audio.get probe failed on token — audio gated")
 
     if payload.remember:
         storage.save(session)

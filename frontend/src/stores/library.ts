@@ -1,12 +1,17 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
 import type { FriendList, RecommendationFeed, Track, TrackList } from "@/api/types";
+
+/** VK rejects audio.get requests with count > 200 — keep page size below that. */
+const PAGE_SIZE = 100;
 
 export const useLibraryStore = defineStore("library", () => {
   const myMusic = ref<Track[]>([]);
   const myMusicLoading = ref(false);
+  const myMusicLoadingMore = ref(false);
   const myMusicError = ref<string | null>(null);
+  const myMusicTotal = ref(0);
 
   const friends = ref<FriendList | null>(null);
   const friendsLoading = ref(false);
@@ -15,6 +20,10 @@ export const useLibraryStore = defineStore("library", () => {
   const feedLoading = ref(false);
 
   const myMusicIdSet = ref<Set<string>>(new Set());
+
+  const myMusicHasMore = computed(
+    () => myMusicTotal.value > 0 && myMusic.value.length < myMusicTotal.value
+  );
 
   function refreshMyMusicIndex(items: Track[]) {
     myMusicIdSet.value = new Set(items.map((t) => `${t.owner_id}_${t.id}`));
@@ -25,8 +34,9 @@ export const useLibraryStore = defineStore("library", () => {
     myMusicLoading.value = true;
     myMusicError.value = null;
     try {
-      const list = await api.myMusic({ count: 200 });
+      const list = await api.myMusic({ count: PAGE_SIZE, offset: 0 });
       myMusic.value = list.items;
+      myMusicTotal.value = list.count;
       refreshMyMusicIndex(list.items);
       return list.items;
     } catch (err) {
@@ -34,6 +44,27 @@ export const useLibraryStore = defineStore("library", () => {
       return [];
     } finally {
       myMusicLoading.value = false;
+    }
+  }
+
+  async function loadMoreMyMusic(): Promise<void> {
+    if (myMusicLoadingMore.value || myMusicLoading.value) return;
+    if (!myMusicHasMore.value) return;
+    myMusicLoadingMore.value = true;
+    try {
+      const list = await api.myMusic({
+        offset: myMusic.value.length,
+        count: PAGE_SIZE,
+      });
+      // Dedupe in case VK returns overlapping items — happens occasionally on
+      // collections that change between pages.
+      const have = new Set(myMusic.value.map((t) => `${t.owner_id}_${t.id}`));
+      const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+      myMusic.value = [...myMusic.value, ...fresh];
+      if (list.count > 0) myMusicTotal.value = list.count;
+      refreshMyMusicIndex(myMusic.value);
+    } finally {
+      myMusicLoadingMore.value = false;
     }
   }
 
@@ -46,6 +77,7 @@ export const useLibraryStore = defineStore("library", () => {
       myMusic.value = [...myMusic.value, ...list.items];
       refreshMyMusicIndex(myMusic.value);
     }
+    if (list.count > 0) myMusicTotal.value = list.count;
     return list;
   }
 
@@ -91,6 +123,7 @@ export const useLibraryStore = defineStore("library", () => {
   function reset() {
     myMusic.value = [];
     myMusicIdSet.value = new Set();
+    myMusicTotal.value = 0;
     friends.value = null;
     feed.value = null;
   }
@@ -98,13 +131,17 @@ export const useLibraryStore = defineStore("library", () => {
   return {
     myMusic,
     myMusicLoading,
+    myMusicLoadingMore,
     myMusicError,
+    myMusicTotal,
+    myMusicHasMore,
     friends,
     friendsLoading,
     feed,
     feedLoading,
     myMusicIdSet,
     loadMyMusic,
+    loadMoreMyMusic,
     loadMyMusicPage,
     loadFriends,
     loadFeed,

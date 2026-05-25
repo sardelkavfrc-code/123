@@ -12,6 +12,7 @@ const items = [
   { to: { name: "library" }, label: "Моя музыка", icon: "library" },
   { to: { name: "friends" }, label: "Друзья", icon: "friends" },
   { to: { name: "search" }, label: "Поиск", icon: "search" },
+  { to: { name: "queue" }, label: "Очередь", icon: "queue" },
   { to: { name: "settings" }, label: "Настройки", icon: "settings" },
 ];
 </script>
@@ -40,10 +41,6 @@ const items = [
         <span class="sidebar__label">{{ item.label }}</span>
       </RouterLink>
     </nav>
-
-    <div class="sidebar__footer">
-      <div class="sidebar__hint">media keys ⌨</div>
-    </div>
   </aside>
 </template>
 
@@ -167,17 +164,12 @@ const items = [
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M10 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12Zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm5.5 7L21 18.5 19.5 20 14 14.5z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M10 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12Zm0 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm5.5 7L21 18.5 19.5 20 14 14.5z'/%3E%3C/svg%3E");
 }
+.sidebar__icon[data-icon="queue"] {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h13M3 12h13M3 18h9'/%3E%3Cpath d='M16 14v8l6-4z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h13M3 12h13M3 18h9'/%3E%3Cpath d='M16 14v8l6-4z'/%3E%3C/svg%3E");
+}
 .sidebar__icon[data-icon="settings"] {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 8a4 4 0 1 0 4 4 4 4 0 0 0-4-4Zm9.4 4 1.6 2-1 1.7-2.5-.4a8 8 0 0 1-1.7 1l-.4 2.5h-2L15 16.3a8 8 0 0 1-1.7-1l-2.5.4-1-1.7 1.6-2-1.6-2 1-1.7L13.3 9a8 8 0 0 1 1.7-1l.4-2.5h2L17.8 8a8 8 0 0 1 1.7 1l2.5-.4 1 1.7-1.6 2Z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 8a4 4 0 1 0 4 4 4 4 0 0 0-4-4Zm9.4 4 1.6 2-1 1.7-2.5-.4a8 8 0 0 1-1.7 1l-.4 2.5h-2L15 16.3a8 8 0 0 1-1.7-1l-2.5.4-1-1.7 1.6-2-1.6-2 1-1.7L13.3 9a8 8 0 0 1 1.7-1l.4-2.5h2L17.8 8a8 8 0 0 1 1.7 1l2.5-.4 1 1.7-1.6 2Z'/%3E%3C/svg%3E");
-}
-.sidebar__hint {
-  font-size: 11px;
-  color: var(--text-3);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  text-align: center;
-  padding: 8px 4px;
-  border-top: 1px solid var(--border);
 }
 </style>
