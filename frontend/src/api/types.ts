@@ -26,6 +26,23 @@ export interface TrackList {
   next_from: string | null;
 }
 
+export interface ArtistAlbum {
+  id: number;
+  owner_id: number;
+  title: string;
+  subtitle: string | null;
+  cover: string | null;
+  access_key: string | null;
+  track_count: number | null;
+  year: number | null;
+  album_type: string | null;
+}
+
+export interface ArtistAlbums {
+  items: ArtistAlbum[];
+  count: number;
+}
+
 export interface RecommendationBlock {
   id: string;
   title: string;
@@ -35,6 +52,7 @@ export interface RecommendationBlock {
   section_id: string | null;
   playlist_id: string | null;
   owner_id: number | null;
+  access_key: string | null;
   track_count: number | null;
 }
 

@@ -37,6 +37,27 @@ class TrackList(APIModel):
     next_from: str | None = None
 
 
+class ArtistAlbum(APIModel):
+    id: int
+    owner_id: int
+    title: str
+    subtitle: str | None = None
+    cover: str | None = None
+    access_key: str | None = None
+    track_count: int | None = None
+    year: int | None = None
+    album_type: str | None = None
+
+    @property
+    def full_id(self) -> str:
+        return f"{self.owner_id}_{self.id}"
+
+
+class ArtistAlbums(APIModel):
+    items: list[ArtistAlbum] = Field(default_factory=list)
+    count: int = 0
+
+
 class RecommendationBlock(APIModel):
     """One card on the home screen (e.g. 'Для вас', 'Открытия', 'Плейлист дня')."""
 
@@ -48,6 +69,7 @@ class RecommendationBlock(APIModel):
     section_id: str | None = None  # used to drill in via audio.getCatalogSection
     playlist_id: str | None = None
     owner_id: int | None = None
+    access_key: str | None = None
     track_count: int | None = None
 
 

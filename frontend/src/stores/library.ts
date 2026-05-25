@@ -13,6 +13,8 @@ export const useLibraryStore = defineStore("library", () => {
 
   const feed = ref<RecommendationFeed | null>(null);
   const feedLoading = ref(false);
+  const moods = ref<RecommendationFeed | null>(null);
+  const moodsLoading = ref(false);
 
   const myMusicIdSet = ref<Set<string>>(new Set());
 
@@ -71,6 +73,17 @@ export const useLibraryStore = defineStore("library", () => {
     }
   }
 
+  async function loadMoods(force = false) {
+    if (moods.value && !force) return moods.value;
+    moodsLoading.value = true;
+    try {
+      moods.value = await api.moods();
+      return moods.value;
+    } finally {
+      moodsLoading.value = false;
+    }
+  }
+
   async function addToLibrary(track: Track) {
     const added = await api.addTrack(track.id, track.owner_id);
     myMusic.value = [added, ...myMusic.value];
@@ -93,6 +106,7 @@ export const useLibraryStore = defineStore("library", () => {
     myMusicIdSet.value = new Set();
     friends.value = null;
     feed.value = null;
+    moods.value = null;
   }
 
   return {
@@ -103,11 +117,14 @@ export const useLibraryStore = defineStore("library", () => {
     friendsLoading,
     feed,
     feedLoading,
+    moods,
+    moodsLoading,
     myMusicIdSet,
     loadMyMusic,
     loadMyMusicPage,
     loadFriends,
     loadFeed,
+    loadMoods,
     addToLibrary,
     removeFromLibrary,
     isInLibrary,

@@ -59,3 +59,11 @@ class VKClient:
     async def raw_get(self, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
         """Used by the auth flow which hits oauth.vk.com directly."""
         return await self._client.get(url, params=params)
+
+    async def external_get(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        return await self._client.get(url, params=params, headers=headers)

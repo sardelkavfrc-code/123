@@ -63,12 +63,7 @@ async function toggleLibrary() {
 
 function playNext() {
   player.enqueueNext(props.track);
-  ui.notify("В очередь следующим", "info");
-}
-
-function appendQueue() {
-  player.appendToQueue(props.track);
-  ui.notify("Добавлено в очередь", "info");
+  ui.notify("Будет играть далее", "info");
 }
 </script>
 
@@ -111,14 +106,9 @@ function appendQueue() {
         <svg v-if="inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" /></svg>
         <svg v-else viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
       </button>
-      <button class="row__action" title="Сыграть следующим" @click.stop="playNext">
+      <button class="row__action" title="Слушать далее" @click.stop="playNext">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 6h12M4 12h8M4 18h12" /><path d="m18 14 4 4-4 4" />
-        </svg>
-      </button>
-      <button class="row__action" title="В очередь" @click.stop="appendQueue">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 6h16M4 12h16M4 18h10" /><path d="M19 16v6M16 19h6" />
         </svg>
       </button>
     </div>

@@ -20,6 +20,7 @@ class Settings(BaseSettings):
         default="KateMobileAndroid/56 lite-460 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)",
         alias="VK_USER_AGENT",
     )
+    genius_access_token: str | None = Field(default=None, alias="GENIUS_ACCESS_TOKEN")
 
     bind_host: str = Field(default="127.0.0.1", alias="VKMP_BIND_HOST")
     bind_port: int = Field(default=8765, alias="VKMP_BIND_PORT")

@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from app.services.audio import parse_recommendation_feed, parse_track, parse_track_list
+from app.services.audio import (
+    parse_artist_albums,
+    parse_mood_feed,
+    parse_recommendation_feed,
+    parse_track,
+    parse_track_list,
+)
 from app.services.friends import parse_friends, parse_user
 
 
@@ -161,6 +167,7 @@ def test_parse_recommendation_feed_handles_inline_playlists_in_block() -> None:
                         "blocks": [
                             {
                                 "data_type": "music_playlists",
+                                "layout": {"name": "recomms_slider"},
                                 "playlists": [
                                     {
                                         "id": 99,
@@ -197,6 +204,73 @@ def test_parse_recommendation_feed_falls_back_to_flat_playlists() -> None:
     assert {b.title for b in feed.blocks} == {"Старое", "Новое"}
 
 
+def test_parse_recommendation_feed_uses_recomms_slider_only() -> None:
+    feed = parse_recommendation_feed(
+        {
+            "catalog": {
+                "sections": [
+                    {
+                        "blocks": [
+                            {
+                                "data_type": "music_playlists",
+                                "layout": {"name": "crop_slider"},
+                                "playlists_ids": ["1_1"],
+                            },
+                            {
+                                "data_type": "music_playlists",
+                                "layout": {"name": "recomms_slider"},
+                                "playlists_ids": ["1_2"],
+                            },
+                        ]
+                    }
+                ]
+            },
+            "playlists": [
+                {"id": 1, "owner_id": 1, "title": "Жанр"},
+                {"id": 2, "owner_id": 1, "title": "Для вас", "access_key": "key"},
+            ],
+        }
+    )
+    assert [b.title for b in feed.blocks] == ["Для вас"]
+    assert feed.blocks[0].access_key == "key"
+
+
+def test_parse_mood_feed_extracts_cards_after_header() -> None:
+    feed = parse_mood_feed(
+        {
+            "catalog": {
+                "sections": [
+                    {
+                        "blocks": [
+                            {"data_type": "none", "layout": {"name": "header", "title": "Жанры"}},
+                            {
+                                "data_type": "music_playlists",
+                                "layout": {"name": "crop_slider"},
+                                "playlists_ids": ["1_1"],
+                            },
+                            {
+                                "data_type": "none",
+                                "layout": {"name": "header", "title": "Настроения и\xa0занятия"},
+                            },
+                            {
+                                "data_type": "music_playlists",
+                                "layout": {"name": "crop_slider"},
+                                "playlists_ids": ["1_2"],
+                            },
+                        ]
+                    }
+                ]
+            },
+            "playlists": [
+                {"id": 1, "owner_id": 1, "title": "Поп"},
+                {"id": 2, "owner_id": 1, "title": "Работа"},
+            ],
+        }
+    )
+    assert feed.title == "Настроения и занятия"
+    assert [b.title for b in feed.blocks] == ["Работа"]
+
+
 def test_parse_recommendation_feed_tolerates_garbage_and_nulls() -> None:
     """Junk input must not raise. A non-dict response → empty feed; mixed
     valid+invalid → only valid cards surface."""
@@ -225,7 +299,11 @@ def test_parse_recommendation_feed_dedups_when_referenced_twice() -> None:
                 "sections": [
                     {
                         "blocks": [
-                            {"data_type": "music_playlists", "playlists_ids": ["-1_1", "-1_1"]}
+                            {
+                                "data_type": "music_playlists",
+                                "layout": {"name": "recomms_slider"},
+                                "playlists_ids": ["-1_1", "-1_1"],
+                            }
                         ]
                     }
                 ]
@@ -234,3 +312,40 @@ def test_parse_recommendation_feed_dedups_when_referenced_twice() -> None:
         }
     )
     assert len(feed.blocks) == 1
+
+
+def test_parse_artist_albums_uses_release_blocks_only() -> None:
+    parsed = parse_artist_albums(
+        {
+            "section": {
+                "blocks": [
+                    {"data_type": "none", "layout": {"name": "header", "title": "Релизы"}},
+                    {
+                        "data_type": "music_playlists",
+                        "layout": {"name": "large_slider"},
+                        "playlists_ids": ["-200_1"],
+                    },
+                    {"data_type": "none", "layout": {"name": "header", "title": "Встречается в плейлистах"}},
+                    {
+                        "data_type": "music_playlists",
+                        "layout": {"name": "large_slider"},
+                        "playlists_ids": ["-147_2"],
+                    },
+                ]
+            },
+            "playlists": [
+                {
+                    "id": 1,
+                    "owner_id": -200,
+                    "title": "Album",
+                    "count": 7,
+                    "year": 2025,
+                    "album_type": "collection",
+                },
+                {"id": 2, "owner_id": -147, "title": "Editorial", "album_type": "playlist"},
+            ],
+        }
+    )
+    assert parsed.count == 1
+    assert parsed.items[0].title == "Album"
+    assert parsed.items[0].track_count == 7

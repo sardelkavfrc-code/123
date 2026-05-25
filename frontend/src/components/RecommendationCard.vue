@@ -6,6 +6,7 @@ import type { RecommendationBlock } from "@/api/types";
 const props = defineProps<{
   block: RecommendationBlock;
   index?: number;
+  variant?: "default" | "wide";
 }>();
 
 defineEmits<{ open: [block: RecommendationBlock] }>();
@@ -28,7 +29,13 @@ const background = computed(() => {
 </script>
 
 <template>
-  <button v-motion="variants" class="rec-card hover-lift" :style="{ background }" @click="$emit('open', block)">
+  <button
+    v-motion="variants"
+    class="rec-card hover-lift"
+    :class="{ 'rec-card--wide': variant === 'wide' }"
+    :style="{ background }"
+    @click="$emit('open', block)"
+  >
     <div class="rec-card__top">
       <div class="rec-card__title">{{ block.title }}</div>
       <div v-if="block.subtitle" class="rec-card__subtitle">{{ block.subtitle }}</div>
@@ -64,6 +71,28 @@ const background = computed(() => {
   border: none;
   box-shadow: var(--shadow-md);
   min-height: 200px;
+}
+.rec-card--wide {
+  aspect-ratio: 3.6 / 1.6;
+  min-height: 72px;
+  padding: 14px 12px;
+}
+.rec-card--wide .rec-card__title {
+  font-size: 16px;
+}
+.rec-card--wide .rec-card__subtitle,
+.rec-card--wide .rec-card__count {
+  display: none;
+}
+.rec-card--wide .rec-card__bottom {
+  justify-content: flex-end;
+}
+.rec-card--wide .rec-card__icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--bg-0);
+  background: #fff;
 }
 .rec-card::after {
   content: "";

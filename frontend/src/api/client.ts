@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
 import type {
   Artist,
+  ArtistAlbums,
   AuthStatus,
   FriendList,
   RecommendationFeed,
@@ -127,6 +128,20 @@ export const api = {
     const { data } = await http.get<RecommendationFeed>("/audio/feed");
     return data;
   },
+  async moods(): Promise<RecommendationFeed> {
+    const { data } = await http.get<RecommendationFeed>("/audio/moods");
+    return data;
+  },
+  async playlist(params: {
+    owner_id: number;
+    playlist_id: number;
+    access_key?: string | null;
+    offset?: number;
+    count?: number;
+  }): Promise<TrackList> {
+    const { data } = await http.get<TrackList>("/audio/playlist", { params });
+    return data;
+  },
   async addTrack(audio_id: number, owner_id: number): Promise<Track> {
     const { data } = await http.post<Track>("/audio/add", null, { params: { audio_id, owner_id } });
     return data;
@@ -145,6 +160,12 @@ export const api = {
   },
   async artist(artistId: string): Promise<Artist> {
     const { data } = await http.get<Artist>(`/audio/artist/${encodeURIComponent(artistId)}`);
+    return data;
+  },
+  async artistAlbums(artistId: string): Promise<ArtistAlbums> {
+    const { data } = await http.get<ArtistAlbums>(
+      `/audio/artist/${encodeURIComponent(artistId)}/albums`
+    );
     return data;
   },
 

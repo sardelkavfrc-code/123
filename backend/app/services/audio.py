@@ -6,6 +6,8 @@ from typing import Any
 
 from ..models.audio import (
     Artist,
+    ArtistAlbum,
+    ArtistAlbums,
     RecommendationBlock,
     RecommendationFeed,
     Track,
@@ -131,6 +133,45 @@ _PLAYLIST_BLOCK_TYPES = {
     "music_editorial_playlists",
 }
 
+_RECOMMENDATIONS_LAYOUTS = {"recomms_slider"}
+_MOOD_HEADER_TITLES = {"настроения и занятия", "настроения и\u00a0занятия"}
+_ALBUM_BLOCK_HEADERS = {"релизы", "альбомы", "синглы", "ep", "мини-альбомы"}
+_ALBUM_TYPES = {"main_only", "collection", "main_feat", "single", "album", "ep"}
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed
+
+
+def _card_from_playlist(item: dict[str, Any], accent_index: int) -> RecommendationBlock | None:
+    pid = item.get("id") or item.get("playlist_id")
+    if pid is None:
+        return None
+    owner_id = _int_or_none(item.get("owner_id"))
+    track_count = _int_or_none(item.get("count"))
+    accent = item.get("main_color")
+    if isinstance(accent, str) and accent.startswith("#"):
+        accent = f"linear-gradient(135deg, {accent}, rgba(255,255,255,0.18))"
+    else:
+        accent = _ACCENT_PALETTE[accent_index % len(_ACCENT_PALETTE)]
+    return RecommendationBlock(
+        id=f"{owner_id}_{pid}" if owner_id is not None else str(pid),
+        title=str(item.get("title") or "Плейлист"),
+        subtitle=str(item.get("subtitle") or item.get("description") or "") or None,
+        cover=_playlist_cover(item),
+        accent=accent,
+        playlist_id=str(pid),
+        owner_id=owner_id,
+        access_key=str(item.get("access_key") or "") or None,
+        track_count=track_count,
+    )
+
 
 def parse_recommendation_feed(response: Any) -> RecommendationFeed:
     """Parse audio.getCatalog response into card blocks for the home screen.
@@ -160,35 +201,10 @@ def parse_recommendation_feed(response: Any) -> RecommendationFeed:
         if isinstance(source, list):
             raw_blocks.extend(b for b in source if isinstance(b, dict))
 
-    def card_from_playlist(item: dict[str, Any]) -> RecommendationBlock | None:
-        pid = item.get("id") or item.get("playlist_id")
-        if pid is None:
-            return None
-        owner_id_raw = item.get("owner_id")
-        try:
-            owner_id = int(owner_id_raw) if owner_id_raw is not None else None
-        except (TypeError, ValueError):
-            owner_id = None
-        accent = _ACCENT_PALETTE[len(blocks) % len(_ACCENT_PALETTE)]
-        try:
-            track_count: int | None = int(item.get("count") or 0) or None
-        except (TypeError, ValueError):
-            track_count = None
-        return RecommendationBlock(
-            id=f"{owner_id}_{pid}" if owner_id is not None else str(pid),
-            title=str(item.get("title") or "Плейлист"),
-            subtitle=str(item.get("subtitle") or item.get("description") or "") or None,
-            cover=_playlist_cover(item),
-            accent=accent,
-            playlist_id=str(pid),
-            owner_id=owner_id,
-            track_count=track_count,
-        )
-
     def push(item: Any) -> None:
         if not isinstance(item, dict):
             return
-        card = card_from_playlist(item)
+        card = _card_from_playlist(item, len(blocks))
         if card is not None:
             blocks.append(card)
 
@@ -200,6 +216,8 @@ def parse_recommendation_feed(response: Any) -> RecommendationFeed:
         return None
 
     # 1. Walk every block in every section and resolve referenced playlists.
+    # Prefer VK's daily "Собрано алгоритмами" block instead of unrelated
+    # catalog playlist groups such as genres.
     for sec in sections:
         if not isinstance(sec, dict):
             continue
@@ -208,25 +226,29 @@ def parse_recommendation_feed(response: Any) -> RecommendationFeed:
             if not isinstance(b, dict):
                 continue
             data_type = str(b.get("data_type") or "")
-            if data_type in _PLAYLIST_BLOCK_TYPES:
+            layout_name = str((b.get("layout") or {}).get("name") or "")
+            if data_type in _PLAYLIST_BLOCK_TYPES and layout_name in _RECOMMENDATIONS_LAYOUTS:
                 for pid in b.get("playlists_ids") or []:
                     match = find_match(pid)
                     if match is not None:
                         push(match)
             # Some catalog versions inline the playlist payload directly.
-            for inline in b.get("playlists") or []:
-                push(inline)
+            if layout_name in _RECOMMENDATIONS_LAYOUTS:
+                for inline in b.get("playlists") or []:
+                    push(inline)
 
     # 2. Top-level / catalog-level blocks (older shape).
     for b in raw_blocks:
         data_type = str(b.get("data_type") or "")
-        if data_type in _PLAYLIST_BLOCK_TYPES:
+        layout_name = str((b.get("layout") or {}).get("name") or "")
+        if data_type in _PLAYLIST_BLOCK_TYPES and layout_name in _RECOMMENDATIONS_LAYOUTS:
             for pid in b.get("playlists_ids") or []:
                 match = find_match(pid)
                 if match is not None:
                     push(match)
-        for inline in b.get("playlists") or []:
-            push(inline)
+        if layout_name in _RECOMMENDATIONS_LAYOUTS:
+            for inline in b.get("playlists") or []:
+                push(inline)
 
     # 3. Fallback: if no section/block referenced anything, just surface the
     #    flat list of playlists. Better an unsorted set of cards than empty.
@@ -246,10 +268,137 @@ def parse_recommendation_feed(response: Any) -> RecommendationFeed:
     return RecommendationFeed(blocks=unique)
 
 
+def parse_mood_feed(response: Any) -> RecommendationFeed:
+    blocks: list[RecommendationBlock] = []
+    if not isinstance(response, dict):
+        return RecommendationFeed(title="Настроения и занятия", blocks=blocks)
+
+    catalog = response.get("catalog") if isinstance(response.get("catalog"), dict) else response
+    sections = catalog.get("sections") if isinstance(catalog.get("sections"), list) else []
+    raw_playlists: list[dict[str, Any]] = []
+    for source in (response.get("playlists"), catalog.get("playlists")):
+        if isinstance(source, list):
+            raw_playlists.extend(p for p in source if isinstance(p, dict))
+
+    def find_match(pid: Any) -> dict[str, Any] | None:
+        needle = str(pid)
+        for p in raw_playlists:
+            if needle in _playlist_id_keys(p):
+                return p
+        return None
+
+    for sec in sections:
+        if not isinstance(sec, dict):
+            continue
+        section_blocks = sec.get("blocks") if isinstance(sec.get("blocks"), list) else []
+        mood_header_seen = False
+        for b in section_blocks:
+            if not isinstance(b, dict):
+                continue
+            layout = b.get("layout") or {}
+            layout_name = str(layout.get("name") or "")
+            title = str(layout.get("title") or b.get("title") or "").lower()
+            if layout_name == "header":
+                mood_header_seen = title in _MOOD_HEADER_TITLES
+                continue
+            if not mood_header_seen or b.get("data_type") != "music_playlists":
+                continue
+            for pid in b.get("playlists_ids") or []:
+                match = find_match(pid)
+                if match is not None:
+                    card = _card_from_playlist(match, len(blocks))
+                    if card is not None:
+                        blocks.append(card)
+            for inline in b.get("playlists") or []:
+                if isinstance(inline, dict):
+                    card = _card_from_playlist(inline, len(blocks))
+                    if card is not None:
+                        blocks.append(card)
+            break
+
+    seen: set[str] = set()
+    unique: list[RecommendationBlock] = []
+    for block in blocks:
+        if block.id in seen:
+            continue
+        seen.add(block.id)
+        unique.append(block)
+
+    return RecommendationFeed(title="Настроения и занятия", blocks=unique)
+
+
+def parse_artist_albums(response: Any) -> ArtistAlbums:
+    if not isinstance(response, dict):
+        return ArtistAlbums()
+
+    section = response.get("section") if isinstance(response.get("section"), dict) else {}
+    raw_playlists = response.get("playlists") if isinstance(response.get("playlists"), list) else []
+    playlists = {key: p for p in raw_playlists if isinstance(p, dict) for key in _playlist_id_keys(p)}
+
+    albums: list[ArtistAlbum] = []
+    current_header = ""
+    for block in section.get("blocks") or []:
+        if not isinstance(block, dict):
+            continue
+        layout = block.get("layout") or {}
+        layout_name = str(layout.get("name") or "")
+        if layout_name == "header":
+            current_header = str(layout.get("title") or block.get("title") or "").lower()
+            continue
+        if block.get("data_type") != "music_playlists" or current_header not in _ALBUM_BLOCK_HEADERS:
+            continue
+        block_playlists = list(block.get("playlists_ids") or [])
+        block_playlists.extend(
+            f"{p.get('owner_id')}_{p.get('id')}" for p in (block.get("playlists") or []) if isinstance(p, dict)
+        )
+        if not block_playlists:
+            block_playlists = [f"{p.get('owner_id')}_{p.get('id')}" for p in raw_playlists if isinstance(p, dict)]
+        for pid in block_playlists:
+            playlist = playlists.get(str(pid))
+            if not playlist:
+                continue
+            album_type = str(playlist.get("album_type") or "") or None
+            if album_type and album_type not in _ALBUM_TYPES:
+                continue
+            album_id = _int_or_none(playlist.get("id"))
+            owner_id = _int_or_none(playlist.get("owner_id"))
+            if album_id is None or owner_id is None:
+                continue
+            albums.append(
+                ArtistAlbum(
+                    id=album_id,
+                    owner_id=owner_id,
+                    title=str(playlist.get("title") or "Альбом"),
+                    subtitle=str(playlist.get("subtitle") or playlist.get("description") or "") or None,
+                    cover=_playlist_cover(playlist),
+                    access_key=str(playlist.get("access_key") or "") or None,
+                    track_count=_int_or_none(playlist.get("count")),
+                    year=_int_or_none(playlist.get("year")),
+                    album_type=album_type,
+                )
+            )
+
+    seen: set[str] = set()
+    unique: list[ArtistAlbum] = []
+    for album in albums:
+        if album.full_id in seen:
+            continue
+        seen.add(album.full_id)
+        unique.append(album)
+    return ArtistAlbums(items=unique, count=len(unique))
+
+
 def parse_artist(payload: Any) -> Artist | None:
     if not isinstance(payload, dict):
         return None
     artist = payload.get("artist") or payload
+    if "catalog" in artist:
+        sections = ((artist.get("catalog") or {}).get("sections") or [])
+        if sections and isinstance(sections[0], dict):
+            artist = {
+                "id": sections[0].get("id") or sections[0].get("url") or "",
+                "name": sections[0].get("title") or "Артист",
+            }
     if not isinstance(artist, dict):
         return None
     photo = None

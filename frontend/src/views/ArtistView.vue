@@ -2,7 +2,7 @@
 import { onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { api, APIError } from "@/api/client";
-import type { Artist, Track } from "@/api/types";
+import type { Artist, ArtistAlbum, Track } from "@/api/types";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
@@ -16,6 +16,7 @@ const player = usePlayerStore();
 
 const artist = ref<Artist | null>(null);
 const tracks = ref<Track[]>([]);
+const albums = ref<ArtistAlbum[]>([]);
 const similar = ref<Track[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -25,14 +26,17 @@ async function load() {
   error.value = null;
   artist.value = null;
   tracks.value = [];
+  albums.value = [];
   similar.value = [];
   try {
-    const [info, list] = await Promise.all([
+    const [info, list, albumList] = await Promise.all([
       api.artist(props.id),
       api.byArtist(props.id, { count: 100 }),
+      api.artistAlbums(props.id),
     ]);
     artist.value = info;
     tracks.value = list.items;
+    albums.value = albumList.items;
     if (list.items.length) {
       const first = list.items.find((t) => !!t.url) ?? list.items[0];
       const sim = await api.recommendations({
@@ -56,6 +60,16 @@ watch(() => props.id, load);
 
 function playAll() {
   if (tracks.value.length) player.playQueue(tracks.value);
+}
+
+async function playAlbum(album: ArtistAlbum) {
+  const list = await api.playlist({
+    owner_id: album.owner_id,
+    playlist_id: album.id,
+    access_key: album.access_key,
+    count: 100,
+  });
+  if (list.items.length) player.playQueue(list.items);
 }
 </script>
 
@@ -81,6 +95,30 @@ function playAll() {
         </div>
       </div>
     </section>
+
+    <template v-if="albums.length">
+      <PageHeader eyebrow="Релизы" title="Альбомы и синглы" />
+      <section class="artist__albums">
+        <button
+          v-for="album in albums"
+          :key="`${album.owner_id}_${album.id}`"
+          class="artist__album hover-lift"
+          @click="playAlbum(album)"
+        >
+          <div
+            class="artist__album-cover"
+            :style="album.cover ? { backgroundImage: `url(${album.cover})` } : undefined"
+          >
+            <span v-if="!album.cover" class="artist__album-fallback accent-gradient" />
+          </div>
+          <div class="artist__album-title" :title="album.title">{{ album.title }}</div>
+          <div class="artist__album-meta">
+            <span v-if="album.year">{{ album.year }}</span>
+            <span v-if="album.track_count">{{ album.track_count }} треков</span>
+          </div>
+        </button>
+      </section>
+    </template>
 
     <PageHeader eyebrow="Треки" title="Все треки" />
     <section class="artist__body">
@@ -149,6 +187,46 @@ function playAll() {
 }
 .artist__body {
   padding: 0 32px 24px;
+}
+.artist__albums {
+  padding: 0 32px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 16px;
+}
+.artist__album {
+  text-align: left;
+  color: var(--text-0);
+  min-width: 0;
+}
+.artist__album-cover {
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  background-color: var(--bg-3);
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+  position: relative;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 10px;
+}
+.artist__album-fallback {
+  position: absolute;
+  inset: 0;
+}
+.artist__album-title {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.artist__album-meta {
+  display: flex;
+  gap: 6px;
+  margin-top: 3px;
+  color: var(--text-2);
+  font-size: 12px;
 }
 .artist__loading {
   display: inline-flex;

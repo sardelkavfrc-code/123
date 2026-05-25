@@ -360,7 +360,9 @@ function gotoArtist() {
   -webkit-appearance: none;
   appearance: none;
   width: 110px;
+  height: 16px;
   background: transparent;
+  display: block;
 }
 .player__volume-input::-webkit-slider-runnable-track {
   height: 4px;
@@ -374,6 +376,19 @@ function gotoArtist() {
   border-radius: 50%;
   background: var(--accent-1);
   margin-top: -4px;
+  cursor: pointer;
+}
+.player__volume-input::-moz-range-track {
+  height: 4px;
+  background: var(--bg-3);
+  border-radius: 2px;
+}
+.player__volume-input::-moz-range-thumb {
+  height: 12px;
+  width: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent-1);
   cursor: pointer;
 }
 </style>
