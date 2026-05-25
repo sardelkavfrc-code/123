@@ -13,7 +13,6 @@ const library = useLibraryStore();
 const motion = useMotion();
 const { friends, friendsLoading } = storeToRefs(library);
 const query = ref("");
-const showHidden = ref(false);
 
 onMounted(() => {
   void library.loadFriends();
@@ -21,7 +20,9 @@ onMounted(() => {
 
 const visibleFriends = computed(() => {
   if (!friends.value) return [];
-  const base = showHidden.value ? friends.value.items : friends.value.items.filter((u) => u.audio_visible);
+  // VK never exposes audio of friends who hide it, so showing locked profiles
+  // is just noise — drop them unconditionally.
+  const base = friends.value.items.filter((u) => u.audio_visible);
   const q = query.value.trim().toLowerCase();
   if (!q) return base;
   return base.filter((u) =>
@@ -42,11 +43,6 @@ const tileVariants = (i: number) =>
     >
       <template #actions>
         <input v-model="query" class="input friends__filter" placeholder="Найти друга" />
-        <label class="friends__toggle" :class="{ 'friends__toggle--on': showHidden }">
-          <input v-model="showHidden" type="checkbox" class="friends__toggle-input" />
-          <span class="friends__toggle-track" aria-hidden="true" />
-          <span class="friends__toggle-label">Показывать со скрытой музыкой</span>
-        </label>
       </template>
     </PageHeader>
 
@@ -90,50 +86,6 @@ const tileVariants = (i: number) =>
 .friends__filter {
   width: 240px;
   height: 38px;
-}
-.friends__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-1);
-  font-size: 13px;
-  cursor: pointer;
-  user-select: none;
-}
-.friends__toggle-input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.friends__toggle-track {
-  width: 36px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--bg-3);
-  position: relative;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
-}
-.friends__toggle-track::after {
-  content: "";
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
-}
-.friends__toggle--on .friends__toggle-track {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
-}
-.friends__toggle--on .friends__toggle-track::after {
-  transform: translateX(16px);
-}
-.friends__toggle-label {
-  color: var(--text-2);
-  font-size: 12px;
 }
 .friends__loading {
   display: inline-flex;

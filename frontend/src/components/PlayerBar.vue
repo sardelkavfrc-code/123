@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, toRef } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
 import { formatDuration } from "@/composables/useFormat";
+import { useExternalArt } from "@/composables/useExternalArt";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
@@ -67,12 +68,46 @@ function gotoArtist() {
   if (name) router.push({ name: "search", query: { q: name } });
 }
 
-function findSimilar() {
+function uncensoredSearch() {
   if (!current.value) return;
   const main = current.value.main_artists[0];
   const q = `${main?.name || current.value.artist} ${current.value.title}`.trim();
-  if (q) router.push({ name: "search", query: { q } });
+  if (q) router.push({ name: "search", query: { q, mode: "any" } });
 }
+
+function openSimilar() {
+  if (!current.value) return;
+  router.push({
+    name: "similar",
+    params: { audioId: `${current.value.owner_id}_${current.value.id}` },
+    query: {
+      artist: current.value.artist || undefined,
+      title: current.value.title || undefined,
+    },
+  });
+}
+
+function addToQueue() {
+  if (!current.value) return;
+  player.appendToQueue(current.value);
+  ui.notify("Добавлено в очередь", "success");
+}
+
+function openQueue() {
+  router.push({ name: "queue" });
+}
+
+// Cover-art fallback (iTunes) when VK doesn't ship a cover. The composable
+// no-ops when the setting is off or when VK already has artwork.
+const trackArtist = computed(() => current.value?.main_artists[0]?.name || current.value?.artist || null);
+const trackTitle = computed(() => current.value?.title || null);
+const hasVkCover = computed(() => !!current.value?.album_cover);
+const { cover: externalCover } = useExternalArt(
+  trackArtist,
+  trackTitle,
+  toRef(() => hasVkCover.value)
+);
+const displayCover = computed(() => current.value?.album_cover || externalCover.value || null);
 
 // Logarithmic taper: humans perceive loudness roughly on a log scale, so
 // linearly dragging the slider feels wrong (most usable range crammed into the
@@ -99,8 +134,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 <template>
   <footer class="player">
     <div class="player__track">
-      <div class="player__cover" :style="current?.album_cover ? { backgroundImage: `url(${current.album_cover})` } : undefined">
-        <span v-if="!current?.album_cover" class="player__cover-fallback accent-gradient" />
+      <div class="player__cover" :style="displayCover ? { backgroundImage: `url(${displayCover})` } : undefined">
+        <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
       </div>
       <div v-if="current" class="player__track-info">
         <div class="player__title" :title="current.title">{{ current.title }}</div>
@@ -131,13 +166,63 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       <button
         v-if="current"
         class="player__icon-btn"
-        title="Искать похожие"
-        aria-label="Искать похожие"
-        @click="findSimilar"
+        title="Без цензуры"
+        aria-label="Без цензуры"
+        @click="uncensoredSearch"
+      >
+        <!-- Scissors: same flow as before (search by artist + title), but the
+             icon and tooltip now match what it actually does. -->
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="3" />
+          <circle cx="6" cy="18" r="3" />
+          <line x1="20" y1="4" x2="8.12" y2="15.88" />
+          <line x1="14.47" y1="14.48" x2="20" y2="20" />
+          <line x1="8.12" y1="8.12" x2="12" y2="12" />
+        </svg>
+      </button>
+      <button
+        v-if="current"
+        class="player__icon-btn"
+        title="Похожие (рекомендации ВК)"
+        aria-label="Похожие"
+        @click="openSimilar"
+      >
+        <!-- Sparkles — reserved for VK's recommendation engine. -->
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          <path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      <button
+        v-if="current"
+        class="player__icon-btn"
+        title="В очередь"
+        aria-label="Добавить в очередь"
+        @click="addToQueue"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
+          <line x1="3" y1="6" x2="15" y2="6" />
+          <line x1="3" y1="12" x2="15" y2="12" />
+          <line x1="3" y1="18" x2="11" y2="18" />
+          <line x1="19" y1="9" x2="19" y2="19" />
+          <line x1="14" y1="14" x2="24" y2="14" />
+        </svg>
+      </button>
+      <button
+        v-if="current"
+        class="player__icon-btn"
+        title="Открыть очередь"
+        aria-label="Очередь"
+        @click="openQueue"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <line x1="3" y1="6" x2="3.01" y2="6" />
+          <line x1="3" y1="12" x2="3.01" y2="12" />
+          <line x1="3" y1="18" x2="3.01" y2="18" />
         </svg>
       </button>
     </div>
@@ -223,8 +308,11 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" />
         </svg>
       </button>
-      <div class="player__volume-track">
-        <div class="player__volume-fill" :style="{ width: volumePct + '%' }" />
+      <div
+        class="player__volume-track"
+        :style="{ '--volume-pos': volumeSliderPos }"
+      >
+        <div class="player__volume-fill" />
         <input
           class="player__volume-input"
           type="range"
@@ -417,25 +505,32 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   justify-self: end;
 }
 .player__volume-track {
+  /* The thumb is 14px wide — native range inputs centre the thumb on the
+   * value, so its centre lives at `7px … (width - 7px)`. The fill needs to
+   * match that, otherwise the bar drifts visibly when volume is low. */
+  --volume-thumb: 14px;
+  --volume-pos: 0;
   position: relative;
   width: 110px;
   height: 24px;
   display: flex;
   align-items: center;
+  padding: 0 calc(var(--volume-thumb) / 2);
 }
 .player__volume-track::before {
   content: "";
   position: absolute;
-  left: 0;
-  right: 0;
+  left: calc(var(--volume-thumb) / 2);
+  right: calc(var(--volume-thumb) / 2);
   height: 5px;
   background: var(--border-strong);
   border-radius: 999px;
 }
 .player__volume-fill {
   position: absolute;
-  left: 0;
+  left: calc(var(--volume-thumb) / 2);
   height: 5px;
+  width: calc((100% - var(--volume-thumb)) * var(--volume-pos));
   background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
   border-radius: 999px;
   pointer-events: none;

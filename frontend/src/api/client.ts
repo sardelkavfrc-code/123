@@ -1,7 +1,9 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
 import type {
+  AlbumList,
   Artist,
   AuthStatus,
+  CoverLookup,
   FriendList,
   RecommendationFeed,
   Track,
@@ -133,6 +135,29 @@ export const api = {
   async artist(artistId: string, params: { name?: string } = {}): Promise<Artist> {
     const { data } = await http.get<Artist>(`/audio/artist/${encodeURIComponent(artistId)}`, {
       params,
+    });
+    return data;
+  },
+  async albums(
+    ownerId: number,
+    params: { offset?: number; count?: number } = {}
+  ): Promise<AlbumList> {
+    const { data } = await http.get<AlbumList>(`/audio/albums/${ownerId}`, { params });
+    return data;
+  },
+  async playlistTracks(
+    ownerId: number,
+    playlistId: number,
+    params: { offset?: number; count?: number } = {}
+  ): Promise<TrackList> {
+    const { data } = await http.get<TrackList>(`/audio/playlist/${ownerId}_${playlistId}`, {
+      params,
+    });
+    return data;
+  },
+  async coverLookup(artist: string, title: string): Promise<CoverLookup> {
+    const { data } = await http.get<CoverLookup>("/art/lookup", {
+      params: { artist, title },
     });
     return data;
   },

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, toRef } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
 import { useMotion } from "@/composables/useSpring";
+import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
 
@@ -58,11 +59,43 @@ function gotoArtist() {
   if (name) router.push({ name: "search", query: { q: name } });
 }
 
-function findSimilar() {
+function uncensoredSearch() {
   const main = props.track.main_artists[0];
   const q = `${main?.name || props.track.artist} ${props.track.title}`.trim();
-  if (q) router.push({ name: "search", query: { q } });
+  if (q) router.push({ name: "search", query: { q, mode: "any" } });
 }
+
+function openSimilar() {
+  router.push({
+    name: "similar",
+    params: { audioId: `${props.track.owner_id}_${props.track.id}` },
+    query: {
+      artist: props.track.artist || undefined,
+      title: props.track.title || undefined,
+    },
+  });
+}
+
+function addToQueue() {
+  if (unavailable.value) {
+    ui.notify("Трек недоступен", "error");
+    return;
+  }
+  player.appendToQueue(props.track);
+  ui.notify("Добавлено в очередь", "success");
+}
+
+// Cover fallback (iTunes) only when VK doesn't ship a cover and the user
+// hasn't disabled the setting. Composable returns `null` otherwise.
+const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
+const trackTitle = computed(() => props.track.title || null);
+const hasVkCover = computed(() => !!props.track.album_cover);
+const { cover: externalCover } = useExternalArt(
+  trackArtist,
+  trackTitle,
+  toRef(() => hasVkCover.value)
+);
+const displayCover = computed(() => props.track.album_cover || externalCover.value || null);
 
 async function toggleLibrary() {
   try {
@@ -101,8 +134,8 @@ async function toggleLibrary() {
       </button>
     </div>
 
-    <div class="row__cover" :style="track.album_cover ? { backgroundImage: `url(${track.album_cover})` } : undefined">
-      <span v-if="!track.album_cover" class="row__cover-fallback accent-gradient" />
+    <div class="row__cover" :style="displayCover ? { backgroundImage: `url(${displayCover})` } : undefined">
+      <span v-if="!displayCover" class="row__cover-fallback accent-gradient" />
     </div>
 
     <div class="row__main">
@@ -132,10 +165,29 @@ async function toggleLibrary() {
           </svg>
         </template>
       </button>
-      <button class="row__action" title="Искать похожие" @click.stop="findSimilar">
+      <button class="row__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensoredSearch">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
+          <circle cx="6" cy="6" r="3" />
+          <circle cx="6" cy="18" r="3" />
+          <line x1="20" y1="4" x2="8.12" y2="15.88" />
+          <line x1="14.47" y1="14.48" x2="20" y2="20" />
+          <line x1="8.12" y1="8.12" x2="12" y2="12" />
+        </svg>
+      </button>
+      <button class="row__action" title="Похожие" aria-label="Похожие" @click.stop="openSimilar">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          <path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
+      <button class="row__action" title="В очередь" aria-label="Добавить в очередь" @click.stop="addToQueue">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="15" y2="6" />
+          <line x1="3" y1="12" x2="15" y2="12" />
+          <line x1="3" y1="18" x2="11" y2="18" />
+          <line x1="19" y1="9" x2="19" y2="19" />
+          <line x1="14" y1="14" x2="24" y2="14" />
         </svg>
       </button>
     </div>

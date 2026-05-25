@@ -14,6 +14,8 @@ import Spinner from "@/components/Spinner.vue";
 
 type Scope = "global" | "library";
 
+const PAGE_SIZE = 100;
+
 const library = useLibraryStore();
 const player = usePlayerStore();
 const router = useRouter();
@@ -25,10 +27,15 @@ const scope = ref<Scope>("global");
 const debounceMs = 350;
 
 const results = ref<Track[]>([]);
+const total = ref(0);
 const loading = ref(false);
+const loadingMore = ref(false);
 const error = ref<string | null>(null);
 
+const hasMore = computed(() => total.value > 0 && results.value.length < total.value);
+
 let debounceHandle: number | null = null;
+let runToken = 0;
 
 onMounted(() => {
   void library.loadMyMusic();
@@ -47,18 +54,49 @@ async function runGlobal() {
   const q = query.value.trim();
   if (!q) {
     results.value = [];
+    total.value = 0;
     return;
   }
+  const token = ++runToken;
   loading.value = true;
   error.value = null;
   try {
-    const list = await api.search({ q, performer_only: false, count: 100 });
+    const list = await api.search({ q, performer_only: false, count: PAGE_SIZE, offset: 0 });
+    if (token !== runToken) return; // user typed something newer
     results.value = list.items;
+    total.value = list.count;
   } catch (err) {
+    if (token !== runToken) return;
     error.value =
       err instanceof APIError ? err.detail.message || "Не удалось" : (err as Error).message;
   } finally {
-    loading.value = false;
+    if (token === runToken) loading.value = false;
+  }
+}
+
+async function loadMore() {
+  if (scope.value !== "global") return;
+  if (!hasMore.value || loadingMore.value || loading.value) return;
+  const q = query.value.trim();
+  if (!q) return;
+  const token = runToken;
+  loadingMore.value = true;
+  try {
+    const list = await api.search({
+      q,
+      performer_only: false,
+      count: PAGE_SIZE,
+      offset: results.value.length,
+    });
+    if (token !== runToken) return;
+    const have = new Set(results.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    results.value = [...results.value, ...fresh];
+    if (list.count > 0) total.value = list.count;
+  } catch {
+    // swallow — next scroll will retry
+  } finally {
+    if (token === runToken) loadingMore.value = false;
   }
 }
 
@@ -89,7 +127,7 @@ function playMany(tracks: Track[]) {
 </script>
 
 <template>
-  <ScrollArea>
+  <ScrollArea @reach-end="loadMore">
     <PageHeader eyebrow="Поиск" title="Найти музыку" subtitle="Один запрос — ищем по всей ВК и в твоей библиотеке. Переключай вкладки ниже.">
       <template #actions>
         <div class="search__bar">
@@ -132,12 +170,15 @@ function playMany(tracks: Track[]) {
         </div>
         <div v-else class="search__pane">
           <div class="search__head">
-            <span>Найдено {{ results.length }}</span>
+            <span>Найдено {{ total || results.length }}</span>
             <button class="btn btn--ghost" :disabled="!results.length" @click="playMany(results)">
               Слушать всё
             </button>
           </div>
           <TrackList :tracks="results" show-index empty-title="Ничего не нашлось" />
+          <div v-if="loadingMore" class="search__loading">
+            <Spinner :size="16" /> Подгружаем ещё…
+          </div>
         </div>
       </template>
 

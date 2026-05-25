@@ -28,6 +28,7 @@ const {
   autoStart,
   startupVolume,
   cacheSize,
+  externalCovers,
 } = storeToRefs(settings);
 
 const startupVolumePct = computed({
@@ -207,6 +208,20 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             <input v-model.number="startupVolumePct" type="range" min="0" max="100" step="1" />
             <span>{{ startupVolumePct }}%</span>
           </div>
+        </label>
+      </article>
+
+      <article class="settings__card">
+        <h2>Обложки</h2>
+        <label class="settings__row">
+          <div>
+            <div class="settings__row-title">Искать обложки в других сервисах</div>
+            <div class="settings__row-sub">
+              Если у ВК нет обложки трека, подгружаем её с iTunes. Без задержек, результат
+              кешируется локально.
+            </div>
+          </div>
+          <input v-model="externalCovers" type="checkbox" class="settings__switch" />
         </label>
       </article>
 

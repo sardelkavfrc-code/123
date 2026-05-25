@@ -46,6 +46,12 @@ const routes: RouteRecordRaw[] = [
     props: true,
   },
   {
+    path: "/similar/:audioId",
+    name: "similar",
+    component: () => import("@/views/SimilarView.vue"),
+    props: true,
+  },
+  {
     path: "/settings",
     name: "settings",
     component: () => import("@/views/SettingsView.vue"),

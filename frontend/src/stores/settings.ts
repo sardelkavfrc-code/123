@@ -40,6 +40,12 @@ interface PersistedSettings {
    */
   startupVolume: number;
   cacheSize: number; // in MB
+  /**
+   * When VK doesn't ship a cover for a track, ask the backend to look it up
+   * from a non-VK source (iTunes today). The lookup is cached on disk so
+   * subsequent renders are instant.
+   */
+  externalCovers: boolean;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -55,6 +61,7 @@ const defaults: PersistedSettings = {
   autoStart: false,
   startupVolume: 0.5,
   cacheSize: 250,
+  externalCovers: true,
 };
 
 function load(): PersistedSettings {
@@ -81,6 +88,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const autoStart = ref(initial.autoStart);
   const startupVolume = ref(initial.startupVolume);
   const cacheSize = ref(initial.cacheSize);
+  const externalCovers = ref(initial.externalCovers);
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -104,6 +112,7 @@ export const useSettingsStore = defineStore("settings", () => {
       autoStart: autoStart.value,
       startupVolume: startupVolume.value,
       cacheSize: cacheSize.value,
+      externalCovers: externalCovers.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -124,6 +133,7 @@ export const useSettingsStore = defineStore("settings", () => {
       autoStart,
       startupVolume,
       cacheSize,
+      externalCovers,
     ],
     () => {
       applyToDocument();
@@ -162,6 +172,7 @@ export const useSettingsStore = defineStore("settings", () => {
     autoStart.value = defaults.autoStart;
     startupVolume.value = defaults.startupVolume;
     cacheSize.value = defaults.cacheSize;
+    externalCovers.value = defaults.externalCovers;
   }
 
   return {
@@ -175,6 +186,7 @@ export const useSettingsStore = defineStore("settings", () => {
     autoStart,
     startupVolume,
     cacheSize,
+    externalCovers,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,

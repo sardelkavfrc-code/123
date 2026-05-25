@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -15,23 +14,28 @@ import Spinner from "@/components/Spinner.vue";
 const library = useLibraryStore();
 const player = usePlayerStore();
 const auth = useAuthStore();
-const router = useRouter();
 
 const { feed, feedLoading } = storeToRefs(library);
-const recommendedTracks = ref<Track[]>([]);
-const recommendedLoading = ref(false);
+const mixTracks = ref<Track[]>([]);
+const mixLoading = ref(false);
 
 onMounted(async () => {
-  await Promise.all([library.loadFeed(), library.loadMyMusic()]);
-  recommendedLoading.value = true;
+  void library.loadFeed();
+  mixLoading.value = true;
   try {
     const res = await api.recommendations({
       user_id: auth.status.user_id ?? undefined,
-      count: 40,
+      count: 60,
     });
-    recommendedTracks.value = res.items;
+    // Shuffle so the same login doesn't always start with the same prefix.
+    const arr = [...res.items];
+    for (let i = arr.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    mixTracks.value = arr;
   } finally {
-    recommendedLoading.value = false;
+    mixLoading.value = false;
   }
 });
 
@@ -44,16 +48,17 @@ const greetings = computed(() => {
 });
 
 function openBlock(block: RecommendationBlock) {
-  // For now we just play the recommendations stream — playlist drill-in is a
-  // future iteration; opening a card kicks off a fresh recommendation queue.
-  player.playQueue(recommendedTracks.value);
-  router.push({ name: "library" });
-  void block;
+  // Backend ships tracks inline when /feed falls back to
+  // audio.getRecommendations, so we can launch the queue without an extra
+  // round-trip. If we ever get a real catalog block (no inline tracks), we
+  // fall back to the personal mix.
+  const tracks = block.tracks?.length ? block.tracks : mixTracks.value;
+  if (tracks.length) player.playQueue(tracks);
 }
 
 function playFeed() {
-  if (recommendedTracks.value.length) {
-    player.playQueue(recommendedTracks.value);
+  if (mixTracks.value.length) {
+    player.playQueue(mixTracks.value);
   }
 }
 </script>
@@ -63,30 +68,26 @@ function playFeed() {
     <PageHeader
       :eyebrow="greetings + ', ' + (auth.status.first_name ?? '')"
       title="Что послушаем сегодня?"
-      subtitle="Собрано алгоритмами ВКонтакте — обновляется автоматически. Открывай карточки или включай микс целиком."
-    >
-      <template #actions>
-        <RouterLink :to="{ name: 'library' }" class="btn btn--ghost">Моя музыка →</RouterLink>
-      </template>
-    </PageHeader>
+      subtitle="Алгоритмы ВК подбирают свежий микс под твой вкус и обновляют его автоматически."
+    />
 
     <section class="home__hero">
       <button
         class="home__mix"
-        :disabled="!recommendedTracks.length"
+        :disabled="!mixTracks.length"
         @click="playFeed"
-        :aria-label="recommendedTracks.length ? 'Включить VK Микс' : 'Микс загружается'"
+        :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'"
       >
         <div class="home__mix-glow" />
         <div class="home__mix-body">
           <div class="home__mix-eyebrow">Персональная подборка</div>
           <div class="home__mix-title">Слушать VK Микс</div>
           <div class="home__mix-sub">
-            <template v-if="recommendedLoading">
+            <template v-if="mixLoading">
               <Spinner :size="14" /> Готовим микс…
             </template>
-            <template v-else-if="recommendedTracks.length">
-              {{ recommendedTracks.length }} треков, подобранных алгоритмами ВК
+            <template v-else-if="mixTracks.length">
+              Бесконечный поток под твой вкус
             </template>
             <template v-else>Нет свежих рекомендаций</template>
           </div>

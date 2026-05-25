@@ -2,22 +2,39 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, APIError } from "@/api/client";
-import type { Artist, Track } from "@/api/types";
+import type { AlbumSummary, Artist, Track } from "@/api/types";
 import { usePlayerStore } from "@/stores/player";
-import PageHeader from "@/components/PageHeader.vue";
+import { useUIStore } from "@/stores/ui";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
 import Spinner from "@/components/Spinner.vue";
 import { tracksLabel } from "@/composables/useFormat";
 
+const PAGE_SIZE = 100;
+
+type ArtistTab = "all" | "albums" | "similar";
+
 const props = defineProps<{ id: string }>();
 const router = useRouter();
 const route = useRoute();
 const player = usePlayerStore();
+const ui = useUIStore();
 
 const artist = ref<Artist | null>(null);
 const tracks = ref<Track[]>([]);
+const tracksTotal = ref(0);
+const tracksLoadingMore = ref(false);
 const similar = ref<Track[]>([]);
+const similarLoading = ref(false);
+const albums = ref<AlbumSummary[]>([]);
+const albumsLoading = ref(false);
+const albumsLoaded = ref(false);
+const albumsError = ref<string | null>(null);
+const openAlbumId = ref<string | null>(null);
+const albumTracks = ref<Record<string, Track[]>>({});
+const albumTracksLoading = ref<Record<string, boolean>>({});
+const tab = ref<ArtistTab>("all");
+
 const loading = ref(false);
 const error = ref<string | null>(null);
 const tracksWarning = ref<string | null>(null);
@@ -27,13 +44,25 @@ const hintedName = computed(() => {
   return typeof v === "string" ? v : null;
 });
 
+const tracksHasMore = computed(
+  () => tracksTotal.value > 0 && tracks.value.length < tracksTotal.value
+);
+
 async function load() {
   loading.value = true;
   error.value = null;
   tracksWarning.value = null;
   artist.value = null;
   tracks.value = [];
+  tracksTotal.value = 0;
   similar.value = [];
+  albums.value = [];
+  albumsLoaded.value = false;
+  albumsError.value = null;
+  openAlbumId.value = null;
+  albumTracks.value = {};
+  albumTracksLoading.value = {};
+  tab.value = "all";
 
   // Run both calls independently — under the vk.com web token from
   // vkhost.github.io, artist methods may partially fail. Each side
@@ -42,7 +71,7 @@ async function load() {
 
   const [infoRes, listRes] = await Promise.allSettled([
     api.artist(props.id, name ? { name } : {}),
-    api.byArtist(props.id, { count: 100, ...(name ? { q: name } : {}) }),
+    api.byArtist(props.id, { count: PAGE_SIZE, offset: 0, ...(name ? { q: name } : {}) }),
   ]);
 
   if (infoRes.status === "fulfilled") {
@@ -59,6 +88,7 @@ async function load() {
 
   if (listRes.status === "fulfilled") {
     tracks.value = listRes.value.items;
+    tracksTotal.value = listRes.value.count;
   } else {
     const reason = listRes.reason;
     tracksWarning.value =
@@ -67,20 +97,7 @@ async function load() {
         : (reason as Error).message || "Не удалось загрузить треки артиста";
   }
 
-  try {
-    if (tracks.value.length) {
-      const first = tracks.value.find((t) => !!t.url) ?? tracks.value[0];
-      const sim = await api.recommendations({
-        target_audio: `${first.owner_id}_${first.id}`,
-        count: 30,
-      });
-      similar.value = sim.items.filter(
-        (t) => !tracks.value.some((tt) => tt.id === t.id && tt.owner_id === t.owner_id)
-      );
-    }
-  } catch {
-    // recommendations are nice-to-have, swallow
-  }
+  loadSimilar();
 
   if (!artist.value && !tracks.value.length) {
     error.value = "Артист не найден";
@@ -88,6 +105,108 @@ async function load() {
 
   loading.value = false;
 }
+
+async function loadMoreTracks() {
+  if (!tracksHasMore.value || tracksLoadingMore.value || loading.value) return;
+  if (tab.value !== "all") return;
+  tracksLoadingMore.value = true;
+  try {
+    const name = hintedName.value ?? undefined;
+    const list = await api.byArtist(props.id, {
+      count: PAGE_SIZE,
+      offset: tracks.value.length,
+      ...(name ? { q: name } : {}),
+    });
+    const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    tracks.value = [...tracks.value, ...fresh];
+    if (list.count > 0) tracksTotal.value = list.count;
+  } catch {
+    // swallow — retry on next scroll
+  } finally {
+    tracksLoadingMore.value = false;
+  }
+}
+
+async function loadSimilar() {
+  if (!tracks.value.length) return;
+  if (similar.value.length || similarLoading.value) return;
+  similarLoading.value = true;
+  try {
+    const first = tracks.value.find((t) => !!t.url) ?? tracks.value[0];
+    const sim = await api.recommendations({
+      target_audio: `${first.owner_id}_${first.id}`,
+      count: 60,
+    });
+    similar.value = sim.items.filter(
+      (t) => !tracks.value.some((tt) => tt.id === t.id && tt.owner_id === t.owner_id)
+    );
+  } catch {
+    // recommendations are nice-to-have, swallow
+  } finally {
+    similarLoading.value = false;
+  }
+}
+
+async function ensureAlbums() {
+  if (albumsLoaded.value || albumsLoading.value) return;
+  // Albums live under the artist's owner_id — we extract it from the first
+  // known track. Some artist IDs are non-numeric (slugs), so without a track
+  // we can't query VK's audio.getAlbums.
+  const firstWithOwner = tracks.value.find((t) => typeof t.owner_id === "number");
+  if (!firstWithOwner) {
+    albumsError.value = "Не удалось определить владельца альбомов";
+    albumsLoaded.value = true;
+    return;
+  }
+  albumsLoading.value = true;
+  albumsError.value = null;
+  try {
+    const res = await api.albums(firstWithOwner.owner_id, { count: 100, offset: 0 });
+    albums.value = res.items;
+  } catch (err) {
+    albumsError.value =
+      err instanceof APIError
+        ? err.detail.message || "Альбомы недоступны"
+        : "Альбомы недоступны";
+  } finally {
+    albumsLoading.value = false;
+    albumsLoaded.value = true;
+  }
+}
+
+async function toggleAlbum(album: AlbumSummary) {
+  if (album.owner_id == null) {
+    ui.notify("Неверный альбом", "error");
+    return;
+  }
+  if (openAlbumId.value === album.id) {
+    openAlbumId.value = null;
+    return;
+  }
+  openAlbumId.value = album.id;
+  if (albumTracks.value[album.id]) return;
+  albumTracksLoading.value = { ...albumTracksLoading.value, [album.id]: true };
+  try {
+    const numericId = Number(album.id.split("_").pop());
+    const list = await api.playlistTracks(album.owner_id, numericId, { count: 100 });
+    albumTracks.value = { ...albumTracks.value, [album.id]: list.items };
+  } catch {
+    ui.notify("Не удалось открыть альбом", "error");
+  } finally {
+    albumTracksLoading.value = { ...albumTracksLoading.value, [album.id]: false };
+  }
+}
+
+function playAlbum(album: AlbumSummary) {
+  const list = albumTracks.value[album.id];
+  if (list && list.length) player.playQueue(list);
+}
+
+watch(tab, (next) => {
+  if (next === "albums") void ensureAlbums();
+  if (next === "similar" && !similar.value.length) void loadSimilar();
+});
 
 onMounted(load);
 watch(() => props.id, load);
@@ -99,7 +218,7 @@ function playAll() {
 </script>
 
 <template>
-  <ScrollArea>
+  <ScrollArea @reach-end="loadMoreTracks">
     <section
       class="artist__hero"
       :style="artist?.photo ? { backgroundImage: `linear-gradient(180deg, rgba(8,9,14,0.15), rgba(8,9,14,0.7)), url(${artist.photo})` } : undefined"
@@ -108,7 +227,7 @@ function playAll() {
         <div class="artist__eyebrow">Артист</div>
         <h1 class="artist__name">{{ artist?.name ?? "Загрузка…" }}</h1>
         <div class="artist__meta">
-          <span v-if="tracks.length">{{ tracksLabel(tracks.length) }}</span>
+          <span v-if="tracks.length">{{ tracksLabel(tracksTotal || tracks.length) }}</span>
           <span v-if="artist?.is_followed" class="chip chip--active">Подписка</span>
         </div>
         <div class="artist__actions">
@@ -121,26 +240,114 @@ function playAll() {
       </div>
     </section>
 
-    <PageHeader eyebrow="Треки" title="Все треки" />
+    <nav class="artist__tabs" role="tablist">
+      <button
+        class="artist__tab"
+        :class="{ 'artist__tab--active': tab === 'all' }"
+        role="tab"
+        :aria-selected="tab === 'all'"
+        @click="tab = 'all'"
+      >
+        Все треки
+      </button>
+      <button
+        class="artist__tab"
+        :class="{ 'artist__tab--active': tab === 'albums' }"
+        role="tab"
+        :aria-selected="tab === 'albums'"
+        @click="tab = 'albums'"
+      >
+        Альбомы
+      </button>
+      <button
+        class="artist__tab"
+        :class="{ 'artist__tab--active': tab === 'similar' }"
+        role="tab"
+        :aria-selected="tab === 'similar'"
+        @click="tab = 'similar'"
+      >
+        Похожие
+      </button>
+    </nav>
+
     <section class="artist__body">
       <div v-if="loading" class="artist__loading"><Spinner :size="20" /> Загружаем артиста…</div>
       <div v-else-if="error" class="artist__error">{{ error }}</div>
       <template v-else>
-        <div v-if="tracksWarning" class="artist__warn">{{ tracksWarning }}</div>
-        <TrackList
-          :tracks="tracks"
-          show-index
-          empty-title="У артиста пока нет треков"
-        />
+        <template v-if="tab === 'all'">
+          <div v-if="tracksWarning" class="artist__warn">{{ tracksWarning }}</div>
+          <TrackList
+            :tracks="tracks"
+            show-index
+            empty-title="У артиста пока нет треков"
+          />
+          <div v-if="tracksLoadingMore" class="artist__loading">
+            <Spinner :size="16" /> Подгружаем ещё…
+          </div>
+        </template>
+
+        <template v-else-if="tab === 'albums'">
+          <div v-if="albumsLoading" class="artist__loading"><Spinner :size="16" /> Грузим альбомы…</div>
+          <div v-else-if="albumsError" class="artist__warn">{{ albumsError }}</div>
+          <div v-else-if="!albums.length" class="artist__warn">
+            У артиста нет альбомов, либо ВК их не отдал.
+          </div>
+          <div v-else class="artist__albums">
+            <div
+              v-for="album in albums"
+              :key="album.id"
+              class="artist__album"
+              :class="{ 'artist__album--open': openAlbumId === album.id }"
+            >
+              <button class="artist__album-head" @click="toggleAlbum(album)">
+                <div class="artist__album-cover">
+                  <img v-if="album.cover" :src="album.cover" :alt="album.title" loading="lazy" />
+                  <span v-else>{{ album.title.charAt(0) }}</span>
+                </div>
+                <div class="artist__album-meta">
+                  <div class="artist__album-title">{{ album.title }}</div>
+                  <div class="artist__album-sub">
+                    <span v-if="album.year">{{ album.year }}</span>
+                    <span v-if="album.track_count">· {{ tracksLabel(album.track_count) }}</span>
+                    <span v-if="album.subtitle">· {{ album.subtitle }}</span>
+                  </div>
+                </div>
+                <span class="artist__album-caret" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path :d="openAlbumId === album.id ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'" />
+                  </svg>
+                </span>
+              </button>
+              <div v-if="openAlbumId === album.id" class="artist__album-body">
+                <div v-if="albumTracksLoading[album.id]" class="artist__loading">
+                  <Spinner :size="16" /> Открываем альбом…
+                </div>
+                <template v-else-if="albumTracks[album.id]?.length">
+                  <div class="artist__album-actions">
+                    <button class="btn btn--ghost" @click="playAlbum(album)">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                      Слушать весь альбом
+                    </button>
+                  </div>
+                  <TrackList :tracks="albumTracks[album.id]" show-index />
+                </template>
+                <div v-else class="artist__warn">Пусто</div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template v-else>
+          <div v-if="similarLoading" class="artist__loading"><Spinner :size="16" /> Подбираем похожее…</div>
+          <TrackList
+            v-else
+            :tracks="similar"
+            show-index
+            empty-title="Похожих треков не нашлось"
+          />
+        </template>
       </template>
     </section>
-
-    <template v-if="similar.length">
-      <PageHeader eyebrow="Похожие" title="С чем послушать дальше" />
-      <section class="artist__body">
-        <TrackList :tracks="similar.slice(0, 12)" show-index />
-      </section>
-    </template>
   </ScrollArea>
 </template>
 
@@ -210,5 +417,111 @@ function playAll() {
   padding: 10px 14px;
   margin-bottom: 12px;
   font-size: 13px;
+}
+.artist__tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin: 20px 32px 12px;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+.artist__tab {
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.artist__tab:hover:not(.artist__tab--active) {
+  color: var(--text-0);
+}
+.artist__tab--active {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  color: var(--accent-text, #fff);
+}
+.artist__albums {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.artist__album {
+  background: var(--bg-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+.artist__album--open {
+  background: var(--bg-3);
+}
+.artist__album-head {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  width: 100%;
+  text-align: left;
+  color: var(--text-0);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.artist__album-head:hover {
+  background: var(--bg-3);
+}
+.artist__album-cover {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  font-weight: 700;
+}
+.artist__album-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.artist__album-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.artist__album-title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.artist__album-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+.artist__album-caret {
+  color: var(--text-2);
+}
+.artist__album-body {
+  padding: 8px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.artist__album-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

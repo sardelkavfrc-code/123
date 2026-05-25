@@ -3,8 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import Artist, RecommendationFeed, Track, TrackList
+from ..models.audio import AlbumList, Artist, RecommendationFeed, Track, TrackList
 from ..services.audio import (
+    build_virtual_feed,
+    parse_albums,
     parse_artist,
     parse_recommendation_feed,
     parse_track,
@@ -102,15 +104,30 @@ async def recommendations(
 async def feed(vk: VKDep, session: SessionDep) -> RecommendationFeed:
     """Home-screen 'Собрано алгоритмами' feed.
 
-    audio.getCatalog returns the same data the official ВК клиент использует.
-    If catalog is unavailable, fall back to recommended playlists.
+    ``audio.getCatalog`` returns the rich catalog used by official VK clients,
+    but it is gated for the OAuth client we use. When it fails we fall back
+    to ``audio.getRecommendations`` and slice the response into cards.
     """
     try:
         response = await vk.call("audio.getCatalog", session.access_token, extended=1)
-        return parse_recommendation_feed(response)
+        feed_obj = parse_recommendation_feed(response)
+        if feed_obj.blocks:
+            return feed_obj
     except VKError:
-        # Fallback to a simpler list — wrap recommended audios into a single "card".
+        pass
+
+    try:
+        raw = await vk.call(
+            "audio.getRecommendations",
+            session.access_token,
+            user_id=session.user_id,
+            count=120,
+            shuffle=True,
+        )
+    except VKError:
         return RecommendationFeed(blocks=[])
+    track_list = parse_track_list(raw)
+    return build_virtual_feed(track_list.items)
 
 
 @router.post("/add", response_model=Track)
@@ -202,6 +219,68 @@ async def by_artist(
         q=name,
         performer_only=1,
         sort=2,
+        offset=offset,
+        count=count,
+    )
+    return parse_track_list(response)
+
+
+@router.get("/albums/{owner_id}", response_model=AlbumList)
+async def albums(
+    owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+    offset: int = Query(0, ge=0),
+    count: int = Query(50, ge=1, le=200),
+) -> AlbumList:
+    """Albums / playlists for a VK owner (artist or user).
+
+    Tries ``audio.getPlaylists`` (the current API) first, falls back to the
+    older ``audio.getAlbums``. Both endpoints are sometimes gated on the
+    web OAuth token — in that case we return an empty list so the artist
+    page degrades gracefully (the "Альбомы" tab will show an empty state).
+    """
+    last_exc: VKError | None = None
+    for method in ("audio.getPlaylists", "audio.getAlbums"):
+        try:
+            response = await vk.call(
+                method,
+                session.access_token,
+                owner_id=owner_id,
+                offset=offset,
+                count=count,
+            )
+        except VKError as exc:
+            last_exc = exc
+            if exc.code in (3, 4, 15, 100):
+                continue
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+            ) from exc
+        return parse_albums(response)
+    # Both methods rejected — return an empty list rather than 502 so the
+    # artist page can show an empty state.
+    _ = last_exc
+    return AlbumList(items=[], count=0)
+
+
+@router.get("/playlist/{owner_id}_{playlist_id}", response_model=TrackList)
+async def playlist(
+    owner_id: int,
+    playlist_id: int,
+    vk: VKDep,
+    session: SessionDep,
+    offset: int = Query(0, ge=0),
+    count: int = Query(100, ge=1, le=200),
+) -> TrackList:
+    """Tracks for a single playlist/album."""
+    response = await _safe_call(
+        vk,
+        "audio.get",
+        session.access_token,
+        owner_id=owner_id,
+        album_id=playlist_id,
         offset=offset,
         count=count,
     )
