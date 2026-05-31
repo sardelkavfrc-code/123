@@ -23,6 +23,7 @@ const moodsScroll = ref<HTMLElement | null>(null);
 const loadingAlbumId = ref<string | null>(null);
 
 // VK Mix state
+let mixTrackCache: Track[] = [];
 const mixTracks = ref<Track[]>([]);
 const mixLoading = ref(false);
 
@@ -31,7 +32,40 @@ onMounted(async () => {
     library.loadAlgorithms();
     library.loadMoods();
   }
+  // Начинаем фоновую накачку кэша сразу при загрузке приложения
+  ensureCacheBuffer().catch(console.error);
 });
+
+let isCaching = false;
+async function ensureCacheBuffer() {
+  if (isCaching) return;
+  isCaching = true;
+  try {
+    const knownIds = new Set([
+      ...mixTracks.value.map(t => t.id),
+      ...mixTrackCache.map(t => t.id)
+    ]);
+    
+    let attempts = 0;
+    // Поддерживаем кэш на уровне 150 треков. Запросы делаем последовательно,
+    // иначе ВК API отдаёт одинаковые массивы на параллельные запросы.
+    while (mixTrackCache.length < 150 && attempts < 10) {
+      const res = await api.recommendations({ shuffle: true, count: 100 });
+      if (!res.items || res.items.length === 0) break;
+      
+      for (const t of res.items) {
+        if (mixTrackCache.length >= 150) break;
+        if (!knownIds.has(t.id)) {
+          knownIds.add(t.id);
+          mixTrackCache.push(t);
+        }
+      }
+      attempts++;
+    }
+  } finally {
+    isCaching = false;
+  }
+}
 
 function scrollMoods(direction: number) {
   const el = document.querySelector('.home__moods') as HTMLElement;
@@ -44,43 +78,64 @@ async function playMix() {
   if (mixLoading.value) return;
   mixLoading.value = true;
   try {
-    const res = await api.recommendations();
-    mixTracks.value = res.items;
+    // 1. Быстрый старт: забираем 50 треков прямиком из предзагруженного кэша в памяти
+    mixTracks.value = [];
+    await fillMixBuffer(50);
+    
     player.playQueue(
       mixTracks.value,
       0,
       async () => {
-        if (mixLoading.value) return;
-        mixLoading.value = true;
-        try {
-          let newTracks: Track[] = [];
-          let attempts = 0;
-          while (newTracks.length < 15 && attempts < 5) {
-            // Pick a random track from the recent half of the mix to branch off
-            const pool = mixTracks.value.slice(Math.floor(mixTracks.value.length / 2));
-            const trackToUse = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : undefined;
-            
-            const res = await api.recommendations({ 
-              target_audio: trackToUse ? `${trackToUse.owner_id}_${trackToUse.id}` : undefined 
-            });
-            const unique = res.items.filter(t => !mixTracks.value.some(ext => ext.id === t.id) && !newTracks.some(ext => ext.id === t.id));
-            if (unique.length > 0) {
-              newTracks.push(...unique);
-            }
-            attempts++;
-          }
-          if (newTracks.length > 0) {
-            mixTracks.value.push(...newTracks);
-            player.appendTracksToQueue(newTracks);
-          }
-        } finally {
-          mixLoading.value = false;
-        }
+        // Обычная подгрузка, когда доиграли почти до конца (осталось < 10 треков)
+        await fillMixBuffer(50);
       }
     );
+
   } finally {
-    mixLoading.value = false;
+    mixLoading.value = false; // UI кнопка отвисает моментально!
   }
+}
+
+// Функция фоновой подгрузки N уникальных треков
+async function fillMixBuffer(needTracks: number) {
+  let newTracks: Track[] = [];
+  let attempts = 0;
+  const knownIds = new Set(mixTracks.value.map(t => t.id));
+
+  // 1. Выгребаем треки из кэша, если они там есть
+  while (mixTrackCache.length > 0 && newTracks.length < needTracks) {
+    const t = mixTrackCache.shift();
+    if (t && !knownIds.has(t.id)) {
+      knownIds.add(t.id);
+      newTracks.push(t);
+    }
+  }
+
+  // 2. Если кэша не хватило, идем в ВК (последовательно)
+  while (newTracks.length < needTracks && attempts < 15) {
+    const res = await api.recommendations({ shuffle: true, count: 100 });
+    if (!res.items || res.items.length === 0) break;
+    
+    for (const t of res.items) {
+      if (!knownIds.has(t.id)) {
+        knownIds.add(t.id);
+        if (newTracks.length < needTracks) {
+          newTracks.push(t);
+        } else {
+          mixTrackCache.push(t); // Сохраняем излишки на будущее
+        }
+      }
+    }
+    attempts++;
+  }
+
+  if (newTracks.length > 0) {
+    mixTracks.value.push(...newTracks);
+    player.appendTracksToQueue(newTracks);
+  }
+
+  // 3. Пингуем фоновую накачку, чтобы она восполнила потраченный кэш
+  ensureCacheBuffer().catch(console.error);
 }
 
 async function playAlbum(album: AlbumSummary) {
