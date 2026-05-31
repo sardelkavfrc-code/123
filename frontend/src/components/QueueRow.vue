@@ -2,6 +2,7 @@
 import { computed, toRef } from "vue";
 import { useRouter } from "vue-router";
 import { usePlayerStore } from "@/stores/player";
+import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
@@ -20,8 +21,25 @@ const emit = defineEmits<{
 }>();
 
 const player = usePlayerStore();
+const library = useLibraryStore();
 const ui = useUIStore();
 const router = useRouter();
+
+const inLibrary = computed(() => library.isInLibrary(props.track));
+
+async function toggleLibrary() {
+  try {
+    if (inLibrary.value) {
+      await library.removeFromLibrary(props.track);
+      ui.notify("Удалено из библиотеки", "success");
+    } else {
+      await library.addToLibrary(props.track);
+      ui.notify("Добавлено в библиотеку", "success");
+    }
+  } catch (err) {
+    ui.notify((err as Error).message || "Не удалось", "error");
+  }
+}
 
 const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
 const trackTitle = computed(() => props.track.title || null);
@@ -33,18 +51,16 @@ const { cover: externalCover } = useExternalArt(
 );
 const displayCover = computed(() => props.track.album_cover || externalCover.value || null);
 
-function gotoArtist() {
-  const main = props.track.main_artists[0];
-  if (main?.id) {
+function gotoSpecificArtist(artistId?: string | null, artistName?: string | null) {
+  if (artistId) {
     router.push({
       name: "artist",
-      params: { id: main.id },
-      query: main.name ? { name: main.name } : undefined,
+      params: { id: artistId },
+      query: artistName ? { name: artistName } : undefined,
     });
-    return;
+  } else if (artistName) {
+    router.push({ name: "search", query: { q: artistName } });
   }
-  const name = main?.name || props.track.artist;
-  if (name) router.push({ name: "search", query: { q: name } });
 }
 
 function uncensored() {
@@ -69,8 +85,8 @@ function addToQueue() {
     ui.notify("Трек недоступен", "error");
     return;
   }
-  player.appendToQueue(props.track);
-  ui.notify("Добавлено в очередь", "success");
+  player.enqueueNext(props.track);
+  ui.notify("Трек будет играть следующим", "success");
 }
 </script>
 
@@ -106,9 +122,36 @@ function addToQueue() {
     </button>
     <div class="queue__meta">
       <button class="queue__title" @click="emit('play', index)">{{ track.title }}</button>
-      <button class="queue__artist" @click.stop="gotoArtist">{{ track.artist }}</button>
+      <div class="queue__artist-wrap" :title="track.artist">
+        <template v-if="track.main_artists?.length">
+          <template v-for="(artist, idx) in track.main_artists" :key="artist.id || artist.name">
+            <button class="queue__artist" @click.stop="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < track.main_artists.length - 1" class="queue__artist-comma">, </span>
+          </template>
+        </template>
+        <template v-else>
+          <button class="queue__artist" @click.stop="gotoSpecificArtist(undefined, track.artist)">{{ track.artist }}</button>
+        </template>
+      </div>
     </div>
     <div class="queue__actions">
+      <button
+        class="queue__action queue__action--lib"
+        :class="{ 'queue__action--in-lib': inLibrary }"
+        :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
+        @click.stop="toggleLibrary"
+      >
+        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        <template v-else>
+          <svg class="queue__lib-check" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+          </svg>
+          <svg class="queue__lib-x" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </template>
+      </button>
       <button class="queue__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensored">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="6" cy="6" r="3" />
@@ -125,7 +168,7 @@ function addToQueue() {
           <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
-      <button class="queue__action" title="В очередь" aria-label="Добавить в очередь" @click.stop="addToQueue">
+      <button class="queue__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="6" x2="15" y2="6" />
           <line x1="3" y1="12" x2="15" y2="12" />
@@ -148,3 +191,28 @@ function addToQueue() {
     </button>
   </li>
 </template>
+
+<style scoped>
+.queue__action--lib {
+  position: relative;
+}
+.queue__action--in-lib {
+  color: var(--accent-1);
+}
+.queue__action--in-lib .queue__lib-x {
+  display: none;
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: var(--danger);
+}
+.queue__action--in-lib:hover .queue__lib-x {
+  display: block;
+}
+.queue__action--in-lib:hover .queue__lib-check {
+  display: none;
+}
+.queue__action--in-lib:hover {
+  background: rgba(255, 94, 126, 0.12);
+}
+</style>

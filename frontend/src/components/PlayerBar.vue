@@ -51,21 +51,16 @@ async function toggleLibrary() {
   }
 }
 
-function gotoArtist() {
-  if (!current.value) return;
-  const main = current.value.main_artists[0];
-  if (main?.id) {
+function gotoSpecificArtist(artistId?: string | null, artistName?: string | null) {
+  if (artistId) {
     router.push({
       name: "artist",
-      params: { id: main.id },
-      query: main.name ? { name: main.name } : undefined,
+      params: { id: artistId },
+      query: artistName ? { name: artistName } : undefined,
     });
-    return;
+  } else if (artistName) {
+    router.push({ name: "search", query: { q: artistName } });
   }
-  // No clickable artist id (VK doesn't expose every artist as an entity) —
-  // fall back to a search so the user can still drill into related music.
-  const name = main?.name || current.value.artist;
-  if (name) router.push({ name: "search", query: { q: name } });
 }
 
 function uncensoredSearch() {
@@ -89,8 +84,8 @@ function openSimilar() {
 
 function addToQueue() {
   if (!current.value) return;
-  player.appendToQueue(current.value);
-  ui.notify("Добавлено в очередь", "success");
+  player.enqueueNext(current.value);
+  ui.notify("Трек будет играть следующим", "success");
 }
 
 function openQueue() {
@@ -139,11 +134,22 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       </div>
       <div v-if="current" class="player__track-info">
         <div class="player__title" :title="current.title">{{ current.title }}</div>
-        <button class="player__artist" @click="gotoArtist">{{ current.artist }}</button>
+        <div class="player__artist-wrap" :title="current.artist">
+          <template v-if="current.main_artists?.length">
+            <template v-for="(artist, idx) in current.main_artists" :key="artist.id || artist.name">
+              <button class="player__artist" @click="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < current.main_artists.length - 1" class="player__artist-comma">, </span>
+            </template>
+          </template>
+          <template v-else>
+            <button class="player__artist" @click="gotoSpecificArtist(undefined, current.artist)">{{ current.artist }}</button>
+          </template>
+        </div>
       </div>
       <div v-else class="player__track-info">
         <div class="player__title player__title--empty">Выберите трек</div>
-        <div class="player__artist player__artist--empty">из любого списка ниже</div>
+        <div class="player__artist-wrap">
+          <div class="player__artist player__artist--empty">из любого списка ниже</div>
+        </div>
       </div>
       <button
         v-if="current"
@@ -197,8 +203,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       <button
         v-if="current"
         class="player__icon-btn"
-        title="В очередь"
-        aria-label="Добавить в очередь"
+        title="Слушать далее"
+        aria-label="Слушать далее"
         @click="addToQueue"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -330,11 +336,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 
 <style scoped>
 .player {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(360px, 2fr) minmax(180px, 1fr);
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 12px 20px;
-  gap: 24px;
   background: var(--bg-1);
   border-top: 1px solid var(--border);
   height: var(--player-height);
@@ -343,6 +348,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
   min-width: 0;
 }
 .player__cover {
@@ -366,19 +372,37 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 }
 .player__title {
   font-weight: 600;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: normal;
+  line-height: 1.3;
 }
 .player__title--empty {
   color: var(--text-2);
+}
+.player__artist-wrap {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  max-width: 100%;
 }
 .player__artist {
   margin-top: 2px;
   font-size: 12px;
   color: var(--text-2);
   text-align: left;
+  display: inline;
   transition: color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.player__artist-comma {
+  font-size: 12px;
+  color: var(--text-2);
 }
 .player__artist:hover {
   color: var(--text-0);
@@ -392,6 +416,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   flex-direction: column;
   align-items: center;
   gap: 8px;
+  flex: 0 1 500px;
+  min-width: 0;
 }
 .player__buttons {
   display: flex;
@@ -502,7 +528,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-self: end;
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
 }
 .player__volume-track {
   /* The thumb is 14px wide — native range inputs centre the thumb on the
@@ -522,6 +550,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   position: absolute;
   left: calc(var(--volume-thumb) / 2);
   right: calc(var(--volume-thumb) / 2);
+  top: 0;
+  bottom: 0;
+  margin: auto;
   height: 5px;
   background: var(--border-strong);
   border-radius: 999px;
@@ -529,6 +560,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 .player__volume-fill {
   position: absolute;
   left: calc(var(--volume-thumb) / 2);
+  top: 0;
+  bottom: 0;
+  margin: auto;
   height: 5px;
   width: calc((100% - var(--volume-thumb)) * var(--volume-pos));
   background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
@@ -537,25 +571,29 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 }
 .player__volume-input {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
   width: 100%;
-  height: 100%;
-  margin: 0;
+  height: 14px;
   background: transparent;
   -webkit-appearance: none;
   appearance: none;
   cursor: pointer;
 }
 .player__volume-input::-webkit-slider-runnable-track {
-  height: 100%;
+  height: 14px;
   background: transparent;
 }
 .player__volume-input::-moz-range-track {
-  height: 100%;
+  height: 14px;
   background: transparent;
 }
 .player__volume-input::-webkit-slider-thumb {
   -webkit-appearance: none;
+  appearance: none;
   height: 14px;
   width: 14px;
   border-radius: 50%;
@@ -563,6 +601,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   border: 2px solid var(--accent-1);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
   cursor: pointer;
+  margin-top: 0;
 }
 .player__volume-input::-moz-range-thumb {
   height: 14px;

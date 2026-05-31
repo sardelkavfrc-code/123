@@ -20,6 +20,8 @@ export const useLibraryStore = defineStore("library", () => {
   const feedLoading = ref(false);
 
   const myMusicIdSet = ref<Set<string>>(new Set());
+  const addedOriginals = ref<Set<string>>(new Set());
+  const addedTracksMap = ref<Map<string, Track>>(new Map());
 
   const myMusicHasMore = computed(
     () => myMusicTotal.value > 0 && myMusic.value.length < myMusicTotal.value
@@ -104,25 +106,41 @@ export const useLibraryStore = defineStore("library", () => {
   }
 
   async function addToLibrary(track: Track) {
+    const key = `${track.owner_id}_${track.id}`;
     const added = await api.addTrack(track.id, track.owner_id);
     myMusic.value = [added, ...myMusic.value];
+    addedOriginals.value.add(key);
+    addedTracksMap.value.set(key, added);
     refreshMyMusicIndex(myMusic.value);
     return added;
   }
 
   async function removeFromLibrary(track: Track) {
-    await api.removeTrack(track.id, track.owner_id);
-    myMusic.value = myMusic.value.filter((t) => !(t.id === track.id && t.owner_id === track.owner_id));
+    const key = `${track.owner_id}_${track.id}`;
+    
+    // If the track was added in this session, use the newly added track's user-owned ID.
+    // Otherwise, try to remove it using its given ID (it might already be a user-owned track).
+    const added = addedTracksMap.value.get(key);
+    const targetId = added ? added.id : track.id;
+    const targetOwnerId = added ? added.owner_id : track.owner_id;
+
+    await api.removeTrack(targetId, targetOwnerId);
+    myMusic.value = myMusic.value.filter((t) => !(t.id === targetId && t.owner_id === targetOwnerId));
+    addedOriginals.value.delete(key);
+    addedTracksMap.value.delete(key);
     refreshMyMusicIndex(myMusic.value);
   }
 
   function isInLibrary(track: Track): boolean {
-    return myMusicIdSet.value.has(`${track.owner_id}_${track.id}`);
+    const key = `${track.owner_id}_${track.id}`;
+    return myMusicIdSet.value.has(key) || addedOriginals.value.has(key);
   }
 
   function reset() {
     myMusic.value = [];
     myMusicIdSet.value = new Set();
+    addedOriginals.value = new Set();
+    addedTracksMap.value = new Map();
     myMusicTotal.value = 0;
     friends.value = null;
     feed.value = null;
