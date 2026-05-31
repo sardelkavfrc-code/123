@@ -533,6 +533,18 @@ export const usePlayerStore = defineStore("player", () => {
     originalQueue.value = [...queue.value];
   }
 
+  function setQueue(newQueue: Track[]) {
+    const currentTrack = current.value;
+    queue.value = newQueue;
+    originalQueue.value = [...newQueue];
+    if (currentTrack) {
+      const newIndex = newQueue.findIndex(t => t.id === currentTrack.id && t.owner_id === currentTrack.owner_id);
+      if (newIndex !== -1) {
+        index.value = newIndex;
+      }
+    }
+  }
+
   return {
     queue,
     index,
@@ -568,6 +580,7 @@ export const usePlayerStore = defineStore("player", () => {
     clear,
     removeFromQueue,
     moveInQueue,
+    setQueue,
   };
 });
 

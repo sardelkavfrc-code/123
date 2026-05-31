@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, ref, onMounted, onUnmounted, nextTick } from "vue";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";
@@ -9,9 +9,16 @@ import QueueRow from "@/components/QueueRow.vue";
 import { formatDuration } from "@/composables/useFormat";
 import { useIntersectionObserver } from "@vueuse/core";
 import Spinner from "@/components/Spinner.vue";
+import draggable from "vuedraggable";
+import type { Track } from "@/api/types";
 
 const player = usePlayerStore();
 const { queue, index, isPlaying } = storeToRefs(player);
+
+const draggableQueue = computed({
+  get: () => queue.value,
+  set: (val: Track[]) => player.setQueue(val)
+});
 
 const dragIndex = ref<number | null>(null);
 const dropTarget = ref<number | null>(null);
@@ -32,47 +39,30 @@ function scrollToCurrent() {
   }
 }
 
+function globalDragOver(e: DragEvent) {
+  e.preventDefault();
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = "move";
+  }
+}
+
 onMounted(() => {
+  window.addEventListener("dragover", globalDragOver);
   nextTick(() => {
     // A tiny timeout ensures the list is fully rendered and layout is calculated
     setTimeout(scrollToCurrent, 50);
   });
 });
 
+onUnmounted(() => {
+  window.removeEventListener("dragover", globalDragOver);
+});
+
+
+
 const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
 
-function onDragStart(i: number, event: DragEvent) {
-  dragIndex.value = i;
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = "move";
-    // Firefox refuses to fire dragover unless dataTransfer has data set.
-    event.dataTransfer.setData("text/plain", String(i));
-  }
-}
-
-function onDragOver(i: number, event: DragEvent) {
-  if (dragIndex.value === null) return;
-  event.preventDefault();
-  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-  dropTarget.value = i;
-}
-
-function onDrop(i: number, event: DragEvent) {
-  event.preventDefault();
-  if (dragIndex.value === null || dragIndex.value === i) {
-    dragIndex.value = null;
-    dropTarget.value = null;
-    return;
-  }
-  player.moveInQueue(dragIndex.value, i);
-  dragIndex.value = null;
-  dropTarget.value = null;
-}
-
-function onDragEnd() {
-  dragIndex.value = null;
-  dropTarget.value = null;
-}
+// Native drag states removed since we use vuedraggable now
 
 function playAt(i: number) {
   if (i === index.value) {
@@ -106,40 +96,42 @@ function clearQueue() {
     >
     </PageHeader>
 
-    <section class="queue">
+    <section class="queue" @wheel.stop>
       <EmptyState
         v-if="!queue.length"
         title="Очередь пуста"
         subtitle="Откуда угодно нажми Play — добавится сюда. Можно перетягивать и удалять"
       />
-      <ol v-else class="queue__list" ref="listRef">
-        <div
-          v-for="(track, i) in queue"
-          :key="`${track.owner_id}_${track.id}_${i}`"
-          class="queue__row-wrap"
-          :class="{
-            'queue__row-wrap--dragging': dragIndex === i,
-            'queue__row-wrap--drop': dropTarget === i && dragIndex !== null && dragIndex !== i,
-          }"
-          draggable="true"
-          @dragstart="onDragStart(i, $event)"
-          @dragover="onDragOver(i, $event)"
-          @drop="onDrop(i, $event)"
-          @dragend="onDragEnd"
-        >
-          <QueueRow
-            :track="track"
-            :index="i"
-            :current="i === index"
-            :playing="i === index && isPlaying"
-            @play="playAt"
-            @remove="remove"
-          />
-        </div>
-        <div ref="loaderRef" class="queue__loader">
-          <Spinner v-if="player.loadingMore" :size="24" color="var(--accent-1)" />
-        </div>
-      </ol>
+      <draggable
+        v-model="draggableQueue"
+        item-key="id"
+        tag="ol"
+        class="queue__list"
+        ghost-class="queue__row-wrap--ghost"
+        drag-class="queue__row-wrap--dragging"
+        fallback-class="queue__row-wrap--dragging"
+        :force-fallback="true"
+        :fallback-on-body="true"
+        :animation="250"
+      >
+        <template #item="{ element: track, index: i }">
+          <div class="queue__row-wrap" @dblclick="playAt(i)">
+            <QueueRow
+              :track="track"
+              :index="i"
+              :current="i === index"
+              :playing="i === index && isPlaying"
+              @play="playAt"
+              @remove="remove"
+            />
+          </div>
+        </template>
+        <template #footer>
+          <div ref="loaderRef" class="queue__loader" key="loader">
+            <Spinner v-if="player.loadingMore" :size="24" color="var(--accent-1)" />
+          </div>
+        </template>
+      </draggable>
     </section>
   </ScrollArea>
 </template>
@@ -158,21 +150,17 @@ function clearQueue() {
 }
 .queue__row-wrap {
   position: relative;
+  width: 100%;
 }
-.queue__row-wrap--dragging :deep(.queue__row) {
-  opacity: 0.5;
-  transform: scale(0.99);
+.queue__row-wrap--dragging {
+  opacity: 1 !important;
+  z-index: 100;
 }
-.queue__row-wrap--drop::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  top: -3px;
-  height: 2px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
-  z-index: 1;
+.queue__row-wrap--ghost {
+  opacity: 0.2;
+}
+.queue__row-wrap--ghost :deep(.queue__row) {
+  background: var(--bg-2);
 }
 :deep(.queue__row) {
   position: relative;
