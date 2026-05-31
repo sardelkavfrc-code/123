@@ -16,6 +16,8 @@ interface PlaybackBackend {
   position(): number;
   duration(): number;
   setVolume(volume: number): void;
+  fadeOut(durationMs: number): void;
+  fadeIn(durationMs: number, targetVolume: number): void;
   destroy(): void;
 }
 
@@ -63,6 +65,19 @@ function createHowlerBackend(
     position: () => (sound.seek() as number) || 0,
     duration: () => sound.duration(),
     setVolume: (v) => sound.volume(v),
+    fadeOut: (ms) => {
+      const v = sound.volume();
+      sound.fade(v, 0, ms);
+      window.setTimeout(() => {
+        sound.off();
+        sound.stop();
+        sound.unload();
+      }, ms + 50);
+    },
+    fadeIn: (ms, targetV) => {
+      sound.volume(0);
+      sound.fade(0, targetV, ms);
+    },
     destroy: () => {
       sound.off();
       sound.stop();
@@ -135,6 +150,43 @@ function createHlsBackend(
     setVolume: (v) => {
       audio.volume = Math.max(0, Math.min(1, v));
     },
+    fadeOut: (ms) => {
+      let v = audio.volume;
+      const steps = 20;
+      const stepTime = ms / steps;
+      const stepVol = v / steps;
+      const iv = setInterval(() => {
+        v -= stepVol;
+        if (v <= 0) {
+          clearInterval(iv);
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+          if (hls) {
+            hls.destroy();
+            hls = null;
+          }
+        } else {
+          audio.volume = v;
+        }
+      }, stepTime);
+    },
+    fadeIn: (ms, targetV) => {
+      let v = 0;
+      audio.volume = v;
+      const steps = 20;
+      const stepTime = ms / steps;
+      const stepVol = targetV / steps;
+      const iv = setInterval(() => {
+        v += stepVol;
+        if (v >= targetV) {
+          audio.volume = targetV;
+          clearInterval(iv);
+        } else {
+          audio.volume = v;
+        }
+      }, stepTime);
+    },
     destroy: () => {
       audio.pause();
       audio.removeAttribute("src");
@@ -155,6 +207,8 @@ export const usePlayerStore = defineStore("player", () => {
   const index = ref(-1);
   const isPlaying = ref(false);
   const currentTime = ref(0);
+  const loadingTrack = ref(false);
+  const loadingMore = ref(false);
   const duration = ref(0);
   const repeat = ref<RepeatMode>("off");
   const shuffle = ref(false);
@@ -164,10 +218,10 @@ export const usePlayerStore = defineStore("player", () => {
   // user's chosen default at the next launch.
   const volume = ref(settings.startupVolume);
   const muted = ref(false);
-  const loadingTrack = ref(false);
 
   let backend: PlaybackBackend | null = null;
   let tickHandle: number | null = null;
+  let nearEndCallback: (() => void) | null = null;
 
   const current = computed<Track | null>(() => {
     if (index.value < 0 || index.value >= queue.value.length) return null;
@@ -184,11 +238,52 @@ export const usePlayerStore = defineStore("player", () => {
     if (backend) backend.setVolume(m ? 0 : volume.value);
   });
 
+  watch(index, () => {
+    if (nearEndCallback && queue.value.length > 0 && index.value >= queue.value.length - 10) {
+      loadMoreQueue();
+    }
+  });
+
+  async function loadMoreQueue() {
+    if (nearEndCallback && !loadingMore.value) {
+      loadingMore.value = true;
+      try {
+        await nearEndCallback();
+      } finally {
+        loadingMore.value = false;
+      }
+    }
+  }
+
+  let isCrossfading = false;
+
   function startTick() {
     stopTick();
+    isCrossfading = false;
     tickHandle = window.setInterval(() => {
       if (backend && backend.isPlaying()) {
-        currentTime.value = backend.position();
+        const pos = backend.position();
+        const dur = backend.duration();
+        currentTime.value = pos;
+
+        // Crossfade logic
+        if (settings.crossfade && dur > 0 && !isCrossfading) {
+          const cfDur = settings.crossfadeDuration;
+          const remaining = dur - pos;
+          if (remaining <= cfDur && remaining > 0.5 && hasNext.value) {
+            isCrossfading = true;
+            const oldBackend = backend;
+            backend = null;
+            oldBackend.fadeOut(cfDur * 1000);
+
+            if (index.value + 1 < queue.value.length) {
+              index.value += 1;
+            } else if (repeat.value === "all") {
+              index.value = 0;
+            }
+            loadCurrent(true, cfDur * 1000);
+          }
+        }
       }
     }, 250);
   }
@@ -208,7 +303,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function loadCurrent(autoPlay: boolean) {
+  function loadCurrent(autoPlay: boolean, fadeInMs?: number) {
     destroyBackend();
     const track = current.value;
     if (!track || !track.url) {
@@ -220,32 +315,44 @@ export const usePlayerStore = defineStore("player", () => {
     duration.value = track.duration;
 
     const initialVolume = muted.value ? 0 : volume.value;
+    let thisBackend: PlaybackBackend | null = null;
     const callbacks: BackendCallbacks = {
       onLoad: (d) => {
+        if (backend !== thisBackend) return;
         loadingTrack.value = false;
         if (d > 0) duration.value = d;
       },
       onLoadError: () => {
+        if (backend !== thisBackend) return;
         loadingTrack.value = false;
         isPlaying.value = false;
       },
       onPlay: () => {
+        if (backend !== thisBackend) return;
         isPlaying.value = true;
         startTick();
       },
       onPause: () => {
+        if (backend !== thisBackend) return;
         isPlaying.value = false;
       },
       onEnd: () => {
+        if (backend !== thisBackend) return;
         handleEnd();
       },
     };
 
-    backend = isHlsUrl(track.url)
+    thisBackend = isHlsUrl(track.url)
       ? createHlsBackend(track.url, initialVolume, callbacks)
       : createHowlerBackend(track.url, initialVolume, callbacks);
+    backend = thisBackend;
 
-    if (autoPlay) backend.play();
+    if (autoPlay) {
+      backend.play();
+      if (fadeInMs && fadeInMs > 0) {
+        backend.fadeIn(fadeInMs, initialVolume);
+      }
+    }
   }
 
   function handleEnd() {
@@ -268,11 +375,12 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function playQueue(tracks: Track[], startIndex = 0) {
+  function playQueue(tracks: Track[], startIndex = 0, onNearEnd?: () => Promise<void> | void) {
     const filtered = tracks.filter((t) => t.url);
     originalQueue.value = [...filtered];
     queue.value = shuffle.value ? shuffleArray(filtered, startIndex) : [...filtered];
     index.value = shuffle.value ? 0 : Math.min(Math.max(0, startIndex), filtered.length - 1);
+    nearEndCallback = onNearEnd || null;
     loadCurrent(true);
   }
 
@@ -289,6 +397,13 @@ export const usePlayerStore = defineStore("player", () => {
   function appendToQueue(track: Track) {
     if (!track.url) return;
     queue.value.push(track);
+    originalQueue.value = [...queue.value];
+  }
+
+  function appendTracksToQueue(tracks: Track[]) {
+    const valid = tracks.filter((t) => t.url);
+    if (valid.length === 0) return;
+    queue.value.push(...valid);
     originalQueue.value = [...queue.value];
   }
 
@@ -380,6 +495,7 @@ export const usePlayerStore = defineStore("player", () => {
     duration.value = 0;
     currentTime.value = 0;
     isPlaying.value = false;
+    nearEndCallback = null;
   }
 
   function removeFromQueue(target: number) {
@@ -428,6 +544,8 @@ export const usePlayerStore = defineStore("player", () => {
     volume,
     muted,
     loadingTrack,
+    loadingMore,
+    isShuffled: shuffle,
     current,
     hasNext,
     hasPrev,
@@ -435,6 +553,8 @@ export const usePlayerStore = defineStore("player", () => {
     playTrack,
     enqueueNext,
     appendToQueue,
+    appendTracksToQueue,
+    loadMoreQueue,
     togglePlay,
     play,
     pause,

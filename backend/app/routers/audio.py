@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import AlbumList, Artist, RecommendationFeed, Track, TrackList
+from ..models.audio import AlbumList, AlbumSummary, Artist, RecommendationFeed, Track, TrackList
 from ..services.audio import (
     build_virtual_feed,
     parse_albums,
@@ -85,6 +85,7 @@ async def recommendations(
     session: SessionDep,
     target_audio: str | None = Query(None, description="owner_id_audio_id для похожих треков"),
     user_id: int | None = Query(None),
+    offset: int = Query(0, ge=0),
     count: int = Query(50, ge=1, le=200),
     shuffle: bool = Query(False),
 ) -> TrackList:
@@ -94,40 +95,133 @@ async def recommendations(
         session.access_token,
         target_audio=target_audio,
         user_id=user_id or session.user_id,
+        offset=offset,
         count=count,
         shuffle=shuffle,
     )
     return parse_track_list(response)
 
 
-@router.get("/feed", response_model=RecommendationFeed)
-async def feed(vk: VKDep, session: SessionDep) -> RecommendationFeed:
-    """Home-screen 'Собрано алгоритмами' feed.
+@router.get("/algorithms", response_model=AlbumList)
+async def algorithms(vk: VKDep, session: SessionDep) -> AlbumList:
+    # Get Main section
+    catalog = await vk.call("catalog.getAudio", session.access_token)
+    sections = catalog.get("catalog", {}).get("sections", [])
+    
+    main_section_id = None
+    for sec in sections:
+        if sec.get("title") == "Главная":
+            main_section_id = sec.get("id")
+            break
+            
+    if not main_section_id:
+        return AlbumList()
+        
+    section_raw = await vk.call("catalog.getSection", session.access_token, section_id=main_section_id)
+    blocks = section_raw.get("section", {}).get("blocks", [])
+    
+    algo_block = None
+    # We find the header "Собрано алгоритмами", the next block usually contains the playlists
+    found_header = False
+    for b in blocks:
+        if b.get("layout", {}).get("title") == "Собрано алгоритмами":
+            found_header = True
+            continue
+        if found_header and b.get("data_type") == "music_playlists":
+            algo_block = b
+            break
+            
+    if not algo_block:
+        return AlbumList()
+        
+    playlist_ids = algo_block.get("playlists_ids", [])
+    playlists_data = section_raw.get("playlists", [])
+    
+    items = []
+    for pl in playlists_data:
+        pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
+        if pl_id in playlist_ids:
+            cover = None
+            if pl.get("photo"):
+                cover = pl["photo"].get("photo_600") or pl["photo"].get("photo_300")
+            
+            items.append(AlbumSummary(
+                id=str(pl.get("id")),
+                owner_id=pl.get("owner_id"),
+                title=pl.get("title", ""),
+                subtitle=pl.get("description") or pl.get("subtitle") or "",
+                cover=cover,
+                year=pl.get("year"),
+                track_count=pl.get("count", 0),
+            ))
+            
+    return AlbumList(items=items, count=len(items))
 
-    ``audio.getCatalog`` returns the rich catalog used by official VK clients,
-    but it is gated for the OAuth client we use. When it fails we fall back
-    to ``audio.getRecommendations`` and slice the response into cards.
-    """
+@router.get("/moods", response_model=AlbumList)
+async def moods(vk: VKDep, session: SessionDep) -> AlbumList:
+    """Returns moods and activities playlists from VK catalog."""
     try:
-        response = await vk.call("audio.getCatalog", session.access_token, extended=1)
-        feed_obj = parse_recommendation_feed(response)
-        if feed_obj.blocks:
-            return feed_obj
-    except VKError:
-        pass
-
-    try:
-        raw = await vk.call(
-            "audio.getRecommendations",
-            session.access_token,
-            user_id=session.user_id,
-            count=120,
-            shuffle=True,
+        # 1. Fetch catalog root to find "Главная" section id
+        catalog_raw = await vk.call("catalog.getAudio", session.access_token)
+        sections = catalog_raw.get("catalog", {}).get("sections", [])
+        
+        main_section_id = None
+        for sec in sections:
+            if sec.get("title") == "Главная":
+                main_section_id = sec.get("id")
+                break
+        
+        if not main_section_id:
+            # Fallback to the first section if "Главная" is missing
+            if sections:
+                main_section_id = sections[0].get("id")
+            else:
+                return AlbumList(items=[], count=0)
+        
+        # 2. Fetch the section
+        section_raw = await vk.call(
+            "catalog.getSection", 
+            session.access_token, 
+            section_id=main_section_id
         )
+        
+        # 3. Find block with anchor "vibes"
+        blocks = section_raw.get("section", {}).get("blocks", [])
+        vibes_block = None
+        for b in blocks:
+            if b.get("data_type") == "music_playlists" and b.get("meta", {}).get("anchor") == "vibes":
+                vibes_block = b
+                break
+        
+        if not vibes_block:
+            return AlbumList(items=[], count=0)
+            
+        playlist_ids = vibes_block.get("playlists_ids", [])
+        playlists_data = section_raw.get("playlists", [])
+        
+        # 4. Map to AlbumSummary
+        items = []
+        for pl in playlists_data:
+            pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
+            if pl_id in playlist_ids:
+                items.append(
+                    AlbumSummary(
+                        id=str(pl["id"]),
+                        owner_id=pl["owner_id"],
+                        title=pl["title"],
+                        subtitle=pl.get("description") or pl.get("subtitle") or "",
+                        cover=get_playlist_cover(pl),
+                        track_count=pl.get("count", 0),
+                    )
+                )
+        
+        return AlbumList(items=items, count=len(items))
+
     except VKError:
-        return RecommendationFeed(blocks=[])
-    track_list = parse_track_list(raw)
-    return build_virtual_feed(track_list.items)
+        return AlbumList(items=[], count=0)
+
+
+
 
 
 @router.post("/add", response_model=Track)

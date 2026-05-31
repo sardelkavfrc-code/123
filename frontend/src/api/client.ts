@@ -104,13 +104,18 @@ export const api = {
   async recommendations(params: {
     target_audio?: string;
     user_id?: number;
+    offset?: number;
     count?: number;
   } = {}): Promise<TrackList> {
     const { data } = await http.get<TrackList>("/audio/recommendations", { params });
     return data;
   },
-  async feed(): Promise<RecommendationFeed> {
-    const { data } = await http.get<RecommendationFeed>("/audio/feed");
+  async algorithms(): Promise<AlbumList> {
+    const { data } = await http.get<AlbumList>("/audio/algorithms");
+    return data;
+  },
+  async moods(): Promise<AlbumList> {
+    const { data } = await http.get<AlbumList>("/audio/moods");
     return data;
   },
   async addTrack(audio_id: number, owner_id: number): Promise<Track> {
@@ -156,9 +161,11 @@ export const api = {
     return data;
   },
   async coverLookup(artist: string, title: string): Promise<CoverLookup> {
-    const { data } = await http.get<CoverLookup>("/art/lookup", {
-      params: { artist, title },
-    });
+    const { data } = await http.get<CoverLookup>("/art/lookup", { params: { artist, title } });
+    return data;
+  },
+  async coverSearch(artist: string, title: string): Promise<CoverLookup> {
+    const { data } = await http.get<CoverLookup>("/art/search", { params: { artist, title } });
     return data;
   },
 

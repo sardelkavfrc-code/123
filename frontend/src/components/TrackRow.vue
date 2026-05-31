@@ -43,20 +43,16 @@ function playOne() {
   player.playTrack(props.track);
 }
 
-function gotoArtist() {
-  const main = props.track.main_artists[0];
-  if (main?.id) {
+function gotoSpecificArtist(artistId?: string | null, artistName?: string | null) {
+  if (artistId) {
     router.push({
       name: "artist",
-      params: { id: main.id },
-      query: main.name ? { name: main.name } : undefined,
+      params: { id: artistId },
+      query: artistName ? { name: artistName } : undefined,
     });
-    return;
+  } else if (artistName) {
+    router.push({ name: "search", query: { q: artistName } });
   }
-  // VK doesn't expose every credited performer as an artist entity — fall
-  // back to a search query so non-clickable names still drill into music.
-  const name = main?.name || props.track.artist;
-  if (name) router.push({ name: "search", query: { q: name } });
 }
 
 function uncensoredSearch() {
@@ -81,8 +77,8 @@ function addToQueue() {
     ui.notify("Трек недоступен", "error");
     return;
   }
-  player.appendToQueue(props.track);
-  ui.notify("Добавлено в очередь", "success");
+  player.enqueueNext(props.track);
+  ui.notify("Трек будет играть следующим", "success");
 }
 
 // Cover fallback (iTunes) only when VK doesn't ship a cover and the user
@@ -134,7 +130,7 @@ async function toggleLibrary() {
       </button>
     </div>
 
-    <div class="row__cover" :style="displayCover ? { backgroundImage: `url(${displayCover})` } : undefined">
+    <div class="row__cover" v-lazy-bg="displayCover">
       <span v-if="!displayCover" class="row__cover-fallback accent-gradient" />
     </div>
 
@@ -143,7 +139,16 @@ async function toggleLibrary() {
         {{ track.title }}
         <span v-if="track.is_explicit" class="row__explicit" title="Explicit">E</span>
       </div>
-      <button class="row__artist" @click.stop="gotoArtist">{{ track.artist }}</button>
+      <div class="row__artist-wrap" :title="track.artist">
+        <template v-if="track.main_artists?.length">
+          <template v-for="(artist, idx) in track.main_artists" :key="artist.id || artist.name">
+            <button class="row__artist" @click.stop="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < track.main_artists.length - 1" class="row__artist-comma">, </span>
+          </template>
+        </template>
+        <template v-else>
+          <button class="row__artist" @click.stop="gotoSpecificArtist(undefined, track.artist)">{{ track.artist }}</button>
+        </template>
+      </div>
     </div>
 
     <div class="row__actions">
@@ -181,7 +186,7 @@ async function toggleLibrary() {
           <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
-      <button class="row__action" title="В очередь" aria-label="Добавить в очередь" @click.stop="addToQueue">
+      <button class="row__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="6" x2="15" y2="6" />
           <line x1="3" y1="12" x2="15" y2="12" />
@@ -300,16 +305,22 @@ async function toggleLibrary() {
   font-weight: 700;
   letter-spacing: 0.04em;
 }
+.row__artist-wrap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 .row__artist {
   margin-top: 2px;
   font-size: 12px;
   color: var(--text-2);
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: block;
-  max-width: 100%;
+  display: inline-block;
+}
+.row__artist-comma {
+  font-size: 12px;
+  color: var(--text-2);
 }
 .row__artist:hover {
   color: var(--text-0);

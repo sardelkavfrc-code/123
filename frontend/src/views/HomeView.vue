@@ -1,64 +1,99 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { storeToRefs } from "pinia";
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
-import { useAuthStore } from "@/stores/auth";
 import { api } from "@/api/client";
-import type { RecommendationBlock, Track } from "@/api/types";
+import type { AlbumSummary, Track } from "@/api/types";
+
 import RecommendationCard from "@/components/RecommendationCard.vue";
+import MoodCard from "@/components/MoodCard.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import Spinner from "@/components/Spinner.vue";
 
+import { useUIStore } from "@/stores/ui";
+
+const router = useRouter();
 const library = useLibraryStore();
 const player = usePlayerStore();
-const auth = useAuthStore();
+const ui = useUIStore();
 
-const { feed, feedLoading } = storeToRefs(library);
+const moodsScroll = ref<HTMLElement | null>(null);
+const loadingAlbumId = ref<string | null>(null);
+
+// VK Mix state
 const mixTracks = ref<Track[]>([]);
 const mixLoading = ref(false);
 
 onMounted(async () => {
-  void library.loadFeed();
-  mixLoading.value = true;
-  try {
-    const res = await api.recommendations({
-      user_id: auth.status.user_id ?? undefined,
-      count: 60,
-    });
-    // Shuffle so the same login doesn't always start with the same prefix.
-    const arr = [...res.items];
-    for (let i = arr.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    mixTracks.value = arr;
-  } finally {
-    mixLoading.value = false;
+  if (!library.loadFromCache()) {
+    library.loadAlgorithms();
+    library.loadMoods();
   }
 });
 
-const greetings = computed(() => {
-  const hour = new Date().getHours();
-  if (hour < 5) return "Доброй ночи";
-  if (hour < 12) return "Доброе утро";
-  if (hour < 18) return "Добрый день";
-  return "Добрый вечер";
-});
-
-function openBlock(block: RecommendationBlock) {
-  // Backend ships tracks inline when /feed falls back to
-  // audio.getRecommendations, so we can launch the queue without an extra
-  // round-trip. If we ever get a real catalog block (no inline tracks), we
-  // fall back to the personal mix.
-  const tracks = block.tracks?.length ? block.tracks : mixTracks.value;
-  if (tracks.length) player.playQueue(tracks);
+function scrollMoods(direction: number) {
+  const el = document.querySelector('.home__moods') as HTMLElement;
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
 }
 
-function playFeed() {
-  if (mixTracks.value.length) {
-    player.playQueue(mixTracks.value);
+async function playMix() {
+  if (mixLoading.value) return;
+  mixLoading.value = true;
+  try {
+    const res = await api.recommendations();
+    mixTracks.value = res.items;
+    player.playQueue(
+      mixTracks.value,
+      0,
+      async () => {
+        if (mixLoading.value) return;
+        mixLoading.value = true;
+        try {
+          let newTracks: Track[] = [];
+          let attempts = 0;
+          while (newTracks.length < 15 && attempts < 5) {
+            // Pick a random track from the recent half of the mix to branch off
+            const pool = mixTracks.value.slice(Math.floor(mixTracks.value.length / 2));
+            const trackToUse = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : undefined;
+            
+            const res = await api.recommendations({ 
+              target_audio: trackToUse ? `${trackToUse.owner_id}_${trackToUse.id}` : undefined 
+            });
+            const unique = res.items.filter(t => !mixTracks.value.some(ext => ext.id === t.id) && !newTracks.some(ext => ext.id === t.id));
+            if (unique.length > 0) {
+              newTracks.push(...unique);
+            }
+            attempts++;
+          }
+          if (newTracks.length > 0) {
+            mixTracks.value.push(...newTracks);
+            player.appendTracksToQueue(newTracks);
+          }
+        } finally {
+          mixLoading.value = false;
+        }
+      }
+    );
+  } finally {
+    mixLoading.value = false;
+  }
+}
+
+async function playAlbum(album: AlbumSummary) {
+  if (album.owner_id == null) return;
+  try {
+    const res = await api.playlistTracks(album.owner_id, parseInt(album.id), { count: 200 });
+    if (res.items && res.items.length > 0) {
+      player.playQueue(res.items, 0);
+    } else {
+      ui.notify("Плейлист пуст", "error");
+    }
+  } catch (e) {
+    ui.notify("Не удалось загрузить треки", "error");
   }
 }
 </script>
@@ -66,18 +101,12 @@ function playFeed() {
 <template>
   <ScrollArea>
     <PageHeader
-      :eyebrow="greetings + ', ' + (auth.status.first_name ?? '')"
       title="Что послушаем сегодня?"
       subtitle="Алгоритмы ВК подбирают свежий микс под твой вкус и обновляют его автоматически."
     />
 
     <section class="home__hero">
-      <button
-        class="home__mix"
-        :disabled="!mixTracks.length"
-        @click="playFeed"
-        :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'"
-      >
+      <button class="home__mix" :disabled="mixLoading" @click="playMix" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
         <div class="home__mix-glow" />
         <div class="home__mix-body">
           <div class="home__mix-eyebrow">Персональная подборка</div>
@@ -86,10 +115,9 @@ function playFeed() {
             <template v-if="mixLoading">
               <Spinner :size="14" /> Готовим микс…
             </template>
-            <template v-else-if="mixTracks.length">
+            <template v-else>
               Бесконечный поток под твой вкус
             </template>
-            <template v-else>Нет свежих рекомендаций</template>
           </div>
         </div>
         <div class="home__mix-play">
@@ -98,23 +126,41 @@ function playFeed() {
       </button>
     </section>
 
+    <section class="home__section" v-if="library.moods?.items && library.moods.items.length">
+      <div class="home__section-head">
+        <h2>Настроения и занятия</h2>
+      </div>
+      <div class="home__slider-container">
+        <button class="home__slider-btn home__slider-btn--prev" @click="scrollMoods(-1)" aria-label="Листать влево">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <div class="home__moods" ref="moodsScroll">
+          <MoodCard v-for="mood in library.moods.items" :key="mood.id" :mood="mood" :loading="loadingAlbumId === mood.id" @click="playAlbum(mood)" />
+        </div>
+        <button class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+        </button>
+      </div>
+    </section>
+
     <section class="home__feed">
       <div class="home__section-head">
         <h2>Рекомендации для тебя</h2>
       </div>
-      <div v-if="feedLoading" class="home__loading">
-        <Spinner :size="20" /> Загружаем рекомендации…
+      <div v-if="library.albumsLoading" class="home__loading">
+        <Spinner :size="20" /> Загружаем алгоритмы…
       </div>
-      <div v-else-if="!feed || !feed.blocks.length" class="home__loading home__loading--soft">
-        ВК не вернул карточки сегодня. Включи микс выше — в нём подборка под тебя.
+      <div v-else-if="!library.algorithms?.items?.length" class="home__loading home__loading--soft">
+        ВК не вернул карточки алгоритмов сегодня.
       </div>
       <div v-else class="home__cards">
         <RecommendationCard
-          v-for="(block, i) in feed.blocks.slice(0, 12)"
+          v-for="(block, index) in library.algorithms.items.slice(0, 12)"
           :key="block.id"
           :block="block"
-          :index="i"
-          @open="openBlock"
+          :index="index"
+          :loading="loadingAlbumId === block.id"
+          @open="playAlbum"
         />
       </div>
     </section>
@@ -216,6 +262,59 @@ function playFeed() {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
+}
+.home__section {
+  padding: 12px 32px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.home__slider-container {
+  position: relative;
+  margin: 0 -32px;
+  padding: 0 32px;
+}
+.home__slider-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--text-0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+  z-index: 10;
+  border: 1px solid var(--border);
+}
+.home__slider-container:hover .home__slider-btn {
+  opacity: 1;
+}
+.home__slider-btn:hover {
+  background: var(--bg-3);
+  transform: translateY(-50%) scale(1.1);
+}
+.home__slider-btn--prev {
+  left: 16px;
+}
+.home__slider-btn--next {
+  right: 16px;
+}
+.home__moods {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  scroll-behavior: smooth;
+}
+.home__moods::-webkit-scrollbar {
+  display: none;
 }
 .home__loading {
   display: inline-flex;

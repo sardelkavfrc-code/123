@@ -141,3 +141,51 @@ async def lookup(
         _CACHE[key] = result
         _trim_cache()
         return result
+
+
+@router.get("/search", response_model=CoverLookup)
+async def search(
+    artist: str = Query(min_length=1),
+    title: str = Query(min_length=1),
+) -> CoverLookup:
+    """Scrape cover art from Genius as a fallback."""
+    key = _cache_key(artist, title) + "_genius"
+    cached = _CACHE.get(key)
+    if cached is not None:
+        return cached
+
+    lock = _LOCKS.setdefault(key, asyncio.Lock())
+    async with lock:
+        cached = _CACHE.get(key)
+        if cached is not None:
+            return cached
+
+        query = f"{artist} {title}"
+        url = "https://genius.com/api/search/multi"
+        params = {"per_page": 1, "q": query}
+        
+        try:
+            r = await _client().get(url, params=params)
+            cover = None
+            if r.status_code == 200:
+                data = r.json()
+                sections = data.get("response", {}).get("sections", [])
+                for sec in sections:
+                    if sec.get("type") == "song":
+                        hits = sec.get("hits", [])
+                        if hits:
+                            hit = hits[0].get("result", {})
+                            cover = hit.get("song_art_image_url")
+                            break
+        except (httpx.RequestError, ValueError):
+            cover = None
+
+        result = CoverLookup(
+            artist=artist.strip(),
+            title=title.strip(),
+            cover=cover,
+            source="genius" if cover else None,
+        )
+        _CACHE[key] = result
+        _trim_cache()
+        return result

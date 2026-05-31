@@ -7,6 +7,8 @@ import ScrollArea from "@/components/ScrollArea.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import QueueRow from "@/components/QueueRow.vue";
 import { formatDuration } from "@/composables/useFormat";
+import { useIntersectionObserver } from "@vueuse/core";
+import Spinner from "@/components/Spinner.vue";
 
 const player = usePlayerStore();
 const { queue, index, isPlaying } = storeToRefs(player);
@@ -14,6 +16,13 @@ const { queue, index, isPlaying } = storeToRefs(player);
 const dragIndex = ref<number | null>(null);
 const dropTarget = ref<number | null>(null);
 const listRef = ref<HTMLElement | null>(null);
+const loaderRef = ref<HTMLElement | null>(null);
+
+useIntersectionObserver(loaderRef, ([entry]) => {
+  if (entry.isIntersecting) {
+    player.loadMoreQueue();
+  }
+});
 
 function scrollToCurrent() {
   if (!listRef.value) return;
@@ -129,6 +138,9 @@ function clearQueue() {
             @play="playAt"
             @remove="remove"
           />
+        </div>
+        <div ref="loaderRef" class="queue__loader">
+          <Spinner v-if="player.loadingMore" :size="24" color="var(--accent-1)" />
         </div>
       </ol>
     </section>
@@ -308,5 +320,11 @@ function clearQueue() {
 :deep(.queue__remove:hover) {
   background: rgba(255, 94, 126, 0.16);
   color: var(--danger);
+}
+.queue__loader {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

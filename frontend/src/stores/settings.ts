@@ -46,6 +46,8 @@ interface PersistedSettings {
    * subsequent renders are instant.
    */
   externalCovers: boolean;
+  crossfade: boolean;
+  crossfadeDuration: number;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -62,6 +64,8 @@ const defaults: PersistedSettings = {
   startupVolume: 0.5,
   cacheSize: 250,
   externalCovers: true,
+  crossfade: true,
+  crossfadeDuration: 3,
 };
 
 function load(): PersistedSettings {
@@ -89,6 +93,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const startupVolume = ref(initial.startupVolume);
   const cacheSize = ref(initial.cacheSize);
   const externalCovers = ref(initial.externalCovers);
+  const crossfade = ref(initial.crossfade);
+  const crossfadeDuration = ref(initial.crossfadeDuration);
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -113,6 +119,8 @@ export const useSettingsStore = defineStore("settings", () => {
       startupVolume: startupVolume.value,
       cacheSize: cacheSize.value,
       externalCovers: externalCovers.value,
+      crossfade: crossfade.value,
+      crossfadeDuration: crossfadeDuration.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -134,6 +142,8 @@ export const useSettingsStore = defineStore("settings", () => {
       startupVolume,
       cacheSize,
       externalCovers,
+      crossfade,
+      crossfadeDuration,
     ],
     () => {
       applyToDocument();
@@ -173,6 +183,8 @@ export const useSettingsStore = defineStore("settings", () => {
     startupVolume.value = defaults.startupVolume;
     cacheSize.value = defaults.cacheSize;
     externalCovers.value = defaults.externalCovers;
+    crossfade.value = defaults.crossfade;
+    crossfadeDuration.value = defaults.crossfadeDuration;
   }
 
   return {
@@ -187,6 +199,8 @@ export const useSettingsStore = defineStore("settings", () => {
     startupVolume,
     cacheSize,
     externalCovers,
+    crossfade,
+    crossfadeDuration,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,

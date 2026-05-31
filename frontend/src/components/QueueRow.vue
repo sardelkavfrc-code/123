@@ -115,7 +115,7 @@ function addToQueue() {
     <button
       class="queue__cover"
       :title="`Играть «${track.title}»`"
-      :style="displayCover ? { backgroundImage: `url(${displayCover})` } : undefined"
+      v-lazy-bg="displayCover"
       @click="emit('play', index)"
     >
       <span v-if="!displayCover" class="queue__cover-stub">{{ track.title.charAt(0) }}</span>

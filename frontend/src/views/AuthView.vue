@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useAuthStore } from "@/stores/auth";
@@ -12,6 +12,37 @@ const route = useRoute();
 const motion = useMotion();
 
 const { loading, lastError } = storeToRefs(auth);
+
+const showManual = ref(false);
+const manualUrl = ref("");
+
+function parseOAuthFragment(rawUrl: string) {
+  const hashIndex = rawUrl.indexOf("#");
+  if (hashIndex === -1) return null;
+  const params = new URLSearchParams(rawUrl.slice(hashIndex + 1));
+  const error = params.get("error");
+  if (error) return { ok: false, error: params.get("error_description") || error };
+  const token = params.get("access_token");
+  if (!token) return null;
+  return {
+    ok: true,
+    access_token: token,
+    user_id: Number(params.get("user_id") || 0),
+  };
+}
+
+async function submitManual() {
+  const parsed = parseOAuthFragment(manualUrl.value);
+  if (!parsed || !parsed.ok) {
+    lastError.value = parsed?.error || "Неверная ссылка или токен не найден";
+    return;
+  }
+  const ok = await auth.loginWithToken({
+    access_token: parsed.access_token as string,
+    user_id: parsed.user_id,
+  });
+  if (ok) router.replace(redirectTarget());
+}
 
 const cardVariants = computed(() =>
   motion.spring(
@@ -58,8 +89,20 @@ async function submit() {
         <Spinner v-if="loading" :size="18" />
         <span>{{ loading ? "Ждём окно ВК…" : "Войти через ВК" }}</span>
       </button>
-      <div v-else class="auth__error">
-        Это окно появляется только в десктоп-сборке. Запусти приложение из установщика.
+      <div v-if="!showManual" class="auth__fallback-link">
+        <a href="#" @click.prevent="showManual = true">Окно закрывается с ошибкой (network error)?</a>
+      </div>
+
+      <div v-if="showManual" class="auth__manual">
+        <p class="auth__pitch">
+          1. Открой <a target="_blank" href="https://oauth.vk.com/authorize?client_id=6287487&scope=1073737727&redirect_uri=https%3A%2F%2Foauth.vk.com%2Fblank.html&display=page&v=5.131&response_type=token&revoke=1">эту ссылку</a> в браузере.<br/>
+          2. Разреши доступ (откроется белая страница с предупреждением).<br/>
+          3. Скопируй адрес из адресной строки и вставь сюда:
+        </p>
+        <div class="auth__manual-row">
+          <input v-model="manualUrl" class="input auth__manual-input" placeholder="https://oauth.vk.com/blank.html#access_token=..." />
+          <button class="btn btn--primary" :disabled="!manualUrl" @click="submitManual">Ок</button>
+        </div>
       </div>
 
       <p v-if="lastError" class="auth__error">{{ lastError }}</p>
@@ -142,5 +185,42 @@ async function submit() {
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+.auth__fallback-link {
+  text-align: center;
+  font-size: 13px;
+}
+.auth__fallback-link a {
+  color: var(--text-2);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+}
+.auth__fallback-link a:hover {
+  color: var(--text-0);
+  text-decoration-color: var(--text-0);
+}
+.auth__manual {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-2);
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.auth__manual a {
+  color: var(--accent-1);
+}
+.auth__manual a:hover {
+  text-decoration: underline;
+}
+.auth__manual-row {
+  display: flex;
+  gap: 8px;
+}
+.auth__manual-input {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 </style>

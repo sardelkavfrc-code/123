@@ -5,6 +5,7 @@ import App from "./App.vue";
 import { router } from "./router";
 import { setBackendUrl } from "./api/client";
 import { useSettingsStore } from "./stores/settings";
+import { vLazyBg } from "./directives/lazyBg";
 import "./styles/main.css";
 
 async function bootstrap(): Promise<void> {
@@ -27,6 +28,7 @@ async function bootstrap(): Promise<void> {
 
   app.use(router);
   app.use(MotionPlugin);
+  app.directive("lazy-bg", vLazyBg);
 
   app.mount("#app");
 }

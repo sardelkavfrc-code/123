@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useMotion } from "@/composables/useSpring";
-import type { RecommendationBlock } from "@/api/types";
+import type { AlbumSummary } from "@/api/types";
 
 const props = defineProps<{
-  block: RecommendationBlock;
+  block: AlbumSummary;
   index?: number;
+  loading?: boolean;
 }>();
 
-defineEmits<{ open: [block: RecommendationBlock] }>();
+import Spinner from "@/components/Spinner.vue";
+
+defineEmits<{ open: [block: AlbumSummary] }>();
 
 const motion = useMotion();
 const variants = computed(() =>
@@ -23,26 +26,24 @@ const background = computed(() => {
   if (props.block.cover) {
     return `linear-gradient(180deg, rgba(8, 9, 14, 0.05), rgba(8, 9, 14, 0.55)), url(${props.block.cover}) center/cover`;
   }
-  return props.block.accent ?? "linear-gradient(135deg, var(--accent-1), var(--accent-3))";
+  return "linear-gradient(135deg, var(--accent-1), var(--accent-3))";
 });
 </script>
 
 <template>
-  <button v-motion="variants" class="rec-card hover-lift" :style="{ background }" @click="$emit('open', block)">
-    <div class="rec-card__top">
-      <div class="rec-card__title">{{ block.title }}</div>
-      <div v-if="block.subtitle" class="rec-card__subtitle">{{ block.subtitle }}</div>
+  <button v-motion="variants" class="rec-card" :style="{ background }" @click="$emit('open', block)">
+    <div class="rec-card__overlay"></div>
+    <div class="rec-card__play" :class="{ 'rec-card__play--loading': loading }">
+      <Spinner v-if="loading" :size="32" color="#fff" />
+      <svg v-else viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
+        <path d="M8 5v14l11-7z" />
+      </svg>
     </div>
-    <div class="rec-card__bottom">
-      <div class="rec-card__icon">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <rect x="3" y="14" width="3" height="6" rx="1.5" />
-          <rect x="8" y="9" width="3" height="11" rx="1.5" />
-          <rect x="13" y="4" width="3" height="16" rx="1.5" />
-          <rect x="18" y="11" width="3" height="9" rx="1.5" />
-        </svg>
+    <div class="rec-card__content">
+      <div class="rec-card__top">
+        <div class="rec-card__title">{{ block.title }}</div>
+        <div v-if="block.subtitle" class="rec-card__subtitle">{{ block.subtitle }}</div>
       </div>
-      <div v-if="block.track_count" class="rec-card__count">{{ block.track_count }} треков</div>
     </div>
   </button>
 </template>
@@ -51,26 +52,61 @@ const background = computed(() => {
 .rec-card {
   position: relative;
   aspect-ratio: 3 / 4;
+  min-width: 0;
   border-radius: var(--radius-lg);
   background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
   background-size: cover;
   color: #fff;
   text-align: left;
-  padding: 16px 16px 14px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   overflow: hidden;
   border: none;
   box-shadow: var(--shadow-md);
-  min-height: 200px;
+  cursor: pointer;
+  padding: 0;
 }
-.rec-card::after {
-  content: "";
+.rec-card__overlay {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 80% 0%, rgba(255, 255, 255, 0.12), transparent 60%);
-  pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.1) 100%);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+  z-index: 1;
+}
+.rec-card:hover .rec-card__overlay {
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 100%);
+}
+.rec-card__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  opacity: 0;
+  z-index: 2;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(4px);
+  color: #fff;
+}
+.rec-card:hover .rec-card__play, .rec-card__play--loading {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+.rec-card__content {
+  position: relative;
+  z-index: 2;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
 }
 .rec-card__top {
   display: flex;
@@ -78,40 +114,13 @@ const background = computed(() => {
   gap: 4px;
 }
 .rec-card__title {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
-  line-height: 1.1;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  line-height: 1.2;
 }
 .rec-card__subtitle {
   font-size: 13px;
   opacity: 0.85;
   font-weight: 500;
-}
-.rec-card__bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-.rec-card__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.32);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-}
-.rec-card__count {
-  font-size: 11px;
-  opacity: 0.85;
-  background: rgba(0, 0, 0, 0.32);
-  padding: 4px 8px;
-  border-radius: 999px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 </style>

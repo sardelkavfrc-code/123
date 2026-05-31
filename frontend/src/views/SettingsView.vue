@@ -29,6 +29,8 @@ const {
   startupVolume,
   cacheSize,
   externalCovers,
+  crossfade,
+  crossfadeDuration,
 } = storeToRefs(settings);
 
 const startupVolumePct = computed({
@@ -188,12 +190,12 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
           </div>
           <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
         </label>
-        <label class="settings__row">
+        <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
           <div>
             <div class="settings__row-title">Аппаратное ускорение</div>
             <div class="settings__row-sub">Применится при следующем запуске</div>
           </div>
-          <input v-model="hardwareAcceleration" type="checkbox" class="settings__switch" />
+          <input v-model="hardwareAcceleration" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
         </label>
       </article>
 
@@ -209,6 +211,23 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             <span>{{ startupVolumePct }}%</span>
           </div>
         </label>
+        <label class="settings__row">
+          <div>
+            <div class="settings__row-title">Плавный переход (Crossfade)</div>
+            <div class="settings__row-sub">Уменьшать громкость старого трека и плавно включать новый</div>
+          </div>
+          <input v-model="crossfade" type="checkbox" class="settings__switch" />
+        </label>
+        <label class="settings__row" v-if="crossfade">
+          <div>
+            <div class="settings__row-title">Длительность перехода</div>
+            <div class="settings__row-sub">В секундах</div>
+          </div>
+          <div class="settings__range">
+            <input v-model.number="crossfadeDuration" type="range" min="1" max="10" step="1" />
+            <span>{{ crossfadeDuration }} с</span>
+          </div>
+        </label>
       </article>
 
       <article class="settings__card">
@@ -217,7 +236,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
           <div>
             <div class="settings__row-title">Искать обложки в других сервисах</div>
             <div class="settings__row-sub">
-              Если у ВК нет обложки трека, подгружаем её с iTunes. Без задержек, результат
+              Если у ВК нет обложки трека, подгружаем её с iTunes и Genius. Без задержек, результат
               кешируется локально.
             </div>
           </div>
@@ -424,5 +443,11 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   background: var(--bg-2);
   padding: 0 4px;
   border-radius: 4px;
+}
+
+.settings__slider {
+  width: 140px;
+  accent-color: var(--accent-text, var(--primary));
+  cursor: pointer;
 }
 </style>

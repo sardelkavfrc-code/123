@@ -158,6 +158,7 @@ function playMany(tracks: Track[]) {
             В библиотеке
           </button>
         </div>
+        <button class="btn btn--ghost" @click="router.back()">Назад</button>
       </template>
     </PageHeader>
 

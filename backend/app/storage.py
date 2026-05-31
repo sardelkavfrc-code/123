@@ -44,7 +44,9 @@ def load() -> Session | None:
                 user_id=int(data["user_id"]),
                 expires_at=int(data.get("expires_at") or 0),
             )
-    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+    except OSError:
+        return None
+    except (json.JSONDecodeError, TypeError, ValueError):
         pass
     path.unlink(missing_ok=True)
     return None

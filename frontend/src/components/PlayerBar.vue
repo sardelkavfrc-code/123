@@ -129,11 +129,14 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 <template>
   <footer class="player">
     <div class="player__track">
-      <div class="player__cover" :style="displayCover ? { backgroundImage: `url(${displayCover})` } : undefined">
+      <div class="player__cover" v-lazy-bg="displayCover">
         <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
       </div>
       <div v-if="current" class="player__track-info">
-        <div class="player__title" :title="current.title">{{ current.title }}</div>
+        <div class="player__title" :title="current.title + (current.subtitle ? ' ' + current.subtitle : '')">
+          {{ current.title }}
+          <span v-if="current.subtitle" class="player__subtitle">{{ current.subtitle }}</span>
+        </div>
         <div class="player__artist-wrap" :title="current.artist">
           <template v-if="current.main_artists?.length">
             <template v-for="(artist, idx) in current.main_artists" :key="artist.id || artist.name">
@@ -169,72 +172,22 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <path d="M6 6l12 12M18 6 6 18" />
         </svg>
       </button>
-      <button
-        v-if="current"
-        class="player__icon-btn"
-        title="Без цензуры"
-        aria-label="Без цензуры"
-        @click="uncensoredSearch"
-      >
-        <!-- Scissors: same flow as before (search by artist + title), but the
-             icon and tooltip now match what it actually does. -->
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="6" cy="6" r="3" />
-          <circle cx="6" cy="18" r="3" />
-          <line x1="20" y1="4" x2="8.12" y2="15.88" />
-          <line x1="14.47" y1="14.48" x2="20" y2="20" />
-          <line x1="8.12" y1="8.12" x2="12" y2="12" />
-        </svg>
-      </button>
-      <button
-        v-if="current"
-        class="player__icon-btn"
-        title="Похожие (рекомендации ВК)"
-        aria-label="Похожие"
-        @click="openSimilar"
-      >
-        <!-- Sparkles — reserved for VK's recommendation engine. -->
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-          <path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </button>
-      <button
-        v-if="current"
-        class="player__icon-btn"
-        title="Слушать далее"
-        aria-label="Слушать далее"
-        @click="addToQueue"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="15" y2="6" />
-          <line x1="3" y1="12" x2="15" y2="12" />
-          <line x1="3" y1="18" x2="11" y2="18" />
-          <line x1="19" y1="9" x2="19" y2="19" />
-          <line x1="14" y1="14" x2="24" y2="14" />
-        </svg>
-      </button>
-      <button
-        v-if="current"
-        class="player__icon-btn"
-        title="Открыть очередь"
-        aria-label="Очередь"
-        @click="openQueue"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6" />
-          <line x1="8" y1="12" x2="21" y2="12" />
-          <line x1="8" y1="18" x2="21" y2="18" />
-          <line x1="3" y1="6" x2="3.01" y2="6" />
-          <line x1="3" y1="12" x2="3.01" y2="12" />
-          <line x1="3" y1="18" x2="3.01" y2="18" />
-        </svg>
-      </button>
+      <!-- Other actions moved to right side -->
     </div>
 
     <div class="player__controls">
       <div class="player__buttons">
+        <div class="player__actions">
+          <button class="player__icon-btn" :disabled="!current" title="Без цензуры" aria-label="Без цензуры" @click="uncensoredSearch">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" /><line x1="8.12" y1="8.12" x2="12" y2="12" /></svg>
+          </button>
+          <button class="player__icon-btn" :disabled="!current" title="Похожие (рекомендации ВК)" aria-label="Похожие" @click="openSimilar">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4" /><path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" /><circle cx="12" cy="12" r="3" /></svg>
+          </button>
+        </div>
+
+        <div class="player__divider"></div>
+
         <button
           class="player__icon-btn"
           :class="{ 'player__icon-btn--active': shuffle }"
@@ -278,6 +231,17 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           </svg>
           <span v-if="repeat === 'one'" class="player__repeat-badge">1</span>
         </button>
+
+        <div class="player__divider"></div>
+
+        <div class="player__actions">
+          <button class="player__icon-btn" :disabled="!current" title="Слушать далее" aria-label="Слушать далее" @click="addToQueue">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="15" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="11" y2="18" /><line x1="19" y1="9" x2="19" y2="19" /><line x1="14" y1="14" x2="24" y2="14" /></svg>
+          </button>
+          <button class="player__icon-btn" :disabled="!current" title="Открыть очередь" aria-label="Очередь" @click="openQueue">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+          </button>
+        </div>
       </div>
       <div class="player__seek">
         <span class="player__time">{{ formatDuration(displayTime) }}</span>
@@ -301,7 +265,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       </div>
     </div>
 
-    <div class="player__volume">
+    <div class="player__right">
+      <div class="player__volume">
       <button
         class="player__icon-btn"
         :aria-label="muted ? 'Включить звук' : 'Выключить звук'"
@@ -330,6 +295,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           @input="onVolumeInput"
         />
       </div>
+      </div>
     </div>
   </footer>
 </template>
@@ -348,7 +314,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
+  flex: 1 1 30%;
   min-width: 0;
 }
 .player__cover {
@@ -379,6 +345,12 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   text-overflow: ellipsis;
   white-space: normal;
   line-height: 1.3;
+}
+.player__subtitle {
+  color: var(--text-2);
+  font-weight: 400;
+  font-size: 0.9em;
+  margin-left: 4px;
 }
 .player__title--empty {
   color: var(--text-2);
@@ -416,13 +388,25 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  flex: 0 1 500px;
+  flex: 0 0 auto;
   min-width: 0;
+  max-width: 100%;
 }
 .player__buttons {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.player__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.player__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+  margin: 0 16px;
 }
 .player__play {
   width: 40px;
@@ -531,6 +515,14 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   flex: 1;
   min-width: 0;
   justify-content: flex-end;
+}
+.player__right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  justify-content: flex-end;
+  min-width: 0;
+  flex: 1 1 30%;
 }
 .player__volume-track {
   /* The thumb is 14px wide — native range inputs centre the thumb on the

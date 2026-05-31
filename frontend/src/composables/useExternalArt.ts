@@ -110,7 +110,12 @@ export function useExternalArt(
       return;
     }
     try {
-      const res = await api.coverLookup(artist, title);
+      // First try iTunes
+      let res = await api.coverLookup(artist, title);
+      if (!res.cover) {
+        // Fallback to Genius
+        res = await api.coverSearch(artist, title);
+      }
       writeCache(artist, title, res.cover);
       fetched.value = res.cover;
     } catch {
