@@ -187,52 +187,57 @@ async function playAlbum(album: AlbumSummary) {
       </button>
     </section>
 
-    <section class="home__feed">
-      <div class="home__section-head">
-        <h2>Рекомендации для тебя</h2>
-      </div>
-      <div v-if="library.albumsLoading" class="home__loading">
-        <Spinner :size="20" /> Загружаем алгоритмы…
-      </div>
-      <div v-else-if="!library.algorithms?.items?.length" class="home__loading home__loading--soft">
-        ВК не вернул карточки алгоритмов сегодня.
-      </div>
-      <div v-else class="home__slider-container">
-        <button class="home__slider-btn home__slider-btn--prev" @click="scrollAlgorithms(-1)" aria-label="Листать влево">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
-        <div class="home__algorithms">
-          <RecommendationCard
-            v-for="(block, index) in library.algorithms.items.slice(0, 12)"
-            :key="block.id"
-            :block="block"
-            :index="index"
-            :loading="loadingAlbumId === block.id"
-            @open="playAlbum"
-          />
-        </div>
-        <button class="home__slider-btn home__slider-btn--next" @click="scrollAlgorithms(1)" aria-label="Листать вправо">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-        </button>
-      </div>
-    </section>
+    <div v-if="library.albumsLoading || !library.algorithms" class="home__global-loading">
+      <Spinner :size="24" /> Загружаем подборки…
+    </div>
 
-    <section class="home__section" v-if="library.moods?.items && library.moods.items.length">
-      <div class="home__section-head">
-        <h2>Настроения и занятия</h2>
+    <Transition name="content-reveal">
+      <div v-if="!library.albumsLoading && library.algorithms" class="home__content-sections">
+        <section class="home__feed">
+          <div class="home__section-head">
+            <h2>Рекомендации для тебя</h2>
+          </div>
+          <div v-if="library.algorithms && !library.algorithms.items?.length" class="home__loading home__loading--soft">
+            ВК не вернул карточки алгоритмов сегодня.
+          </div>
+          <div v-else-if="library.algorithms" class="home__slider-container">
+            <button class="home__slider-btn home__slider-btn--prev" @click="scrollAlgorithms(-1)" aria-label="Листать влево">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div class="home__algorithms">
+              <RecommendationCard
+                v-for="(block, index) in library.algorithms.items.slice(0, 12)"
+                :key="block.id"
+                :block="block"
+                :index="index"
+                :loading="loadingAlbumId === block.id"
+                @open="playAlbum"
+              />
+            </div>
+            <button class="home__slider-btn home__slider-btn--next" @click="scrollAlgorithms(1)" aria-label="Листать вправо">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="home__section" v-if="library.moods?.items && library.moods.items.length">
+          <div class="home__section-head">
+            <h2>Настроения и занятия</h2>
+          </div>
+          <div class="home__slider-container">
+            <button class="home__slider-btn home__slider-btn--prev" @click="scrollMoods(-1)" aria-label="Листать влево">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div class="home__moods" ref="moodsScroll">
+              <MoodCard v-for="mood in library.moods.items" :key="mood.id" :mood="mood" :loading="loadingAlbumId === mood.id" @click="playAlbum(mood)" />
+            </div>
+            <button class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+        </section>
       </div>
-      <div class="home__slider-container">
-        <button class="home__slider-btn home__slider-btn--prev" @click="scrollMoods(-1)" aria-label="Листать влево">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
-        <div class="home__moods" ref="moodsScroll">
-          <MoodCard v-for="mood in library.moods.items" :key="mood.id" :mood="mood" :loading="loadingAlbumId === mood.id" @click="playAlbum(mood)" />
-        </div>
-        <button class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-        </button>
-      </div>
-    </section>
+    </Transition>
   </ScrollArea>
 </template>
 
@@ -402,5 +407,36 @@ async function playAlbum(album: AlbumSummary) {
 .home__loading--soft {
   color: var(--text-3);
   font-style: italic;
+}
+.home__global-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+.home__content-sections {
+  display: contents;
+}
+
+/* Premium Reveal Animation */
+.content-reveal-enter-active {
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.content-reveal-leave-active {
+  transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+.content-reveal-enter-from {
+  opacity: 0;
+  transform: translateY(30px) scale(0.96);
+  filter: blur(8px);
+}
+.content-reveal-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
 }
 </style>
