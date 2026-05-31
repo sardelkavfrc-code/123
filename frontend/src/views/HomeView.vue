@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -19,7 +19,52 @@ const library = useLibraryStore();
 const player = usePlayerStore();
 const ui = useUIStore();
 
+const algorithmsScroll = ref<HTMLElement | null>(null);
 const moodsScroll = ref<HTMLElement | null>(null);
+const algAtStart = ref(true);
+const algAtEnd = ref(false);
+const moodsAtStart = ref(true);
+const moodsAtEnd = ref(false);
+
+function checkAlgScroll() {
+  if (!algorithmsScroll.value) return;
+  const el = algorithmsScroll.value;
+  algAtStart.value = el.scrollLeft <= 0;
+  algAtEnd.value = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth - 1;
+}
+
+function checkMoodsScroll() {
+  if (!moodsScroll.value) return;
+  const el = moodsScroll.value;
+  moodsAtStart.value = el.scrollLeft <= 0;
+  moodsAtEnd.value = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth - 1;
+}
+
+let resizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  resizeObserver = new ResizeObserver(() => {
+    checkAlgScroll();
+    checkMoodsScroll();
+  });
+});
+onUnmounted(() => {
+  if (resizeObserver) resizeObserver.disconnect();
+});
+
+watch(algorithmsScroll, (el, oldEl) => {
+  if (oldEl) resizeObserver?.unobserve(oldEl);
+  if (el) {
+    resizeObserver?.observe(el);
+    checkAlgScroll();
+  }
+});
+watch(moodsScroll, (el, oldEl) => {
+  if (oldEl) resizeObserver?.unobserve(oldEl);
+  if (el) {
+    resizeObserver?.observe(el);
+    checkMoodsScroll();
+  }
+});
 const loadingAlbumId = ref<string | null>(null);
 
 // VK Mix state
@@ -201,10 +246,10 @@ async function playAlbum(album: AlbumSummary) {
             ВК не вернул карточки алгоритмов сегодня.
           </div>
           <div v-else-if="library.algorithms" class="home__slider-container">
-            <button class="home__slider-btn home__slider-btn--prev" @click="scrollAlgorithms(-1)" aria-label="Листать влево">
+            <button :class="{ 'home__slider-btn--hidden': algAtStart }" class="home__slider-btn home__slider-btn--prev" @click="scrollAlgorithms(-1)" aria-label="Листать влево">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
-            <div class="home__algorithms">
+            <div class="home__algorithms" ref="algorithmsScroll" @scroll="checkAlgScroll">
               <RecommendationCard
                 v-for="(block, index) in library.algorithms.items.slice(0, 12)"
                 :key="block.id"
@@ -214,7 +259,7 @@ async function playAlbum(album: AlbumSummary) {
                 @open="playAlbum"
               />
             </div>
-            <button class="home__slider-btn home__slider-btn--next" @click="scrollAlgorithms(1)" aria-label="Листать вправо">
+            <button :class="{ 'home__slider-btn--hidden': algAtEnd }" class="home__slider-btn home__slider-btn--next" @click="scrollAlgorithms(1)" aria-label="Листать вправо">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
@@ -225,13 +270,13 @@ async function playAlbum(album: AlbumSummary) {
             <h2>Настроения и занятия</h2>
           </div>
           <div class="home__slider-container">
-            <button class="home__slider-btn home__slider-btn--prev" @click="scrollMoods(-1)" aria-label="Листать влево">
+            <button :class="{ 'home__slider-btn--hidden': moodsAtStart }" class="home__slider-btn home__slider-btn--prev" @click="scrollMoods(-1)" aria-label="Листать влево">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
-            <div class="home__moods" ref="moodsScroll">
+            <div class="home__moods" ref="moodsScroll" @scroll="checkMoodsScroll">
               <MoodCard v-for="mood in library.moods.items" :key="mood.id" :mood="mood" :loading="loadingAlbumId === mood.id" @click="playAlbum(mood)" />
             </div>
-            <button class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
+            <button :class="{ 'home__slider-btn--hidden': moodsAtEnd }" class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
@@ -372,12 +417,17 @@ async function playAlbum(album: AlbumSummary) {
   z-index: 10;
   border: 1px solid var(--border);
 }
-.home__slider-container:hover .home__slider-btn {
+.home__slider-container:hover .home__slider-btn:not(.home__slider-btn--hidden) {
   opacity: 1;
 }
-.home__slider-btn:hover {
+.home__slider-btn:hover:not(.home__slider-btn--hidden) {
   background: var(--bg-3);
   transform: translateY(-50%) scale(1.1);
+}
+.home__slider-btn--hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.8) !important;
 }
 .home__slider-btn--prev {
   left: 16px;
