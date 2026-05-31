@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, nextTick } from "vue";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";
@@ -13,6 +13,22 @@ const { queue, index, isPlaying } = storeToRefs(player);
 
 const dragIndex = ref<number | null>(null);
 const dropTarget = ref<number | null>(null);
+const listRef = ref<HTMLElement | null>(null);
+
+function scrollToCurrent() {
+  if (!listRef.value) return;
+  const currentEl = listRef.value.querySelector('.queue__row--current');
+  if (currentEl) {
+    currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+}
+
+onMounted(() => {
+  nextTick(() => {
+    // A tiny timeout ensures the list is fully rendered and layout is calculated
+    setTimeout(scrollToCurrent, 50);
+  });
+});
 
 const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
 
@@ -90,7 +106,7 @@ function clearQueue() {
         title="Очередь пуста"
         subtitle="Откуда угодно нажми Play — добавится сюда. Можно перетягивать и удалять"
       />
-      <ol v-else class="queue__list">
+      <ol v-else class="queue__list" ref="listRef">
         <div
           v-for="(track, i) in queue"
           :key="`${track.owner_id}_${track.id}_${i}`"
@@ -152,9 +168,9 @@ function clearQueue() {
 :deep(.queue__row) {
   position: relative;
   display: grid;
-  grid-template-columns: 18px 28px 40px 1fr auto auto 32px;
+  grid-template-columns: 20px 28px 48px 1fr auto auto 40px;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 8px 12px;
   border-radius: var(--radius-md);
   cursor: grab;
@@ -193,8 +209,8 @@ function clearQueue() {
   color: var(--accent-1);
 }
 :deep(.queue__cover) {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 8px;
   overflow: hidden;
   background-color: var(--bg-3);
@@ -249,7 +265,7 @@ function clearQueue() {
 }
 :deep(.queue__actions) {
   display: inline-flex;
-  gap: 2px;
+  gap: 4px;
   opacity: 0;
   transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
 }
@@ -257,8 +273,8 @@ function clearQueue() {
   opacity: 1;
 }
 :deep(.queue__action) {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;
@@ -273,8 +289,8 @@ function clearQueue() {
   color: var(--text-0);
 }
 :deep(.queue__remove) {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   display: inline-flex;
   align-items: center;

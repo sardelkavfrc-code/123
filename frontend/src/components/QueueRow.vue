@@ -140,20 +140,20 @@ function addToQueue() {
         :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
         @click.stop="toggleLibrary"
       >
-        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
           <path d="M12 5v14M5 12h14" />
         </svg>
         <template v-else>
-          <svg class="queue__lib-check" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+          <svg class="queue__lib-check" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
             <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
           </svg>
-          <svg class="queue__lib-x" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <svg class="queue__lib-x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6 6 18" />
           </svg>
         </template>
       </button>
       <button class="queue__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensored">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="6" cy="6" r="3" />
           <circle cx="6" cy="18" r="3" />
           <line x1="20" y1="4" x2="8.12" y2="15.88" />
@@ -162,14 +162,14 @@ function addToQueue() {
         </svg>
       </button>
       <button class="queue__action" title="Похожие" aria-label="Похожие" @click.stop="similar">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
           <path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" />
           <circle cx="12" cy="12" r="3" />
         </svg>
       </button>
       <button class="queue__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="6" x2="15" y2="6" />
           <line x1="3" y1="12" x2="15" y2="12" />
           <line x1="3" y1="18" x2="11" y2="18" />
@@ -185,7 +185,7 @@ function addToQueue() {
       aria-label="Удалить из очереди"
       @click.stop="emit('remove', index)"
     >
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
         <path d="M6 6l12 12M18 6 6 18" />
       </svg>
     </button>
