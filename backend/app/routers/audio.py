@@ -27,6 +27,15 @@ async def _safe_call(vk, method: str, token: str, **params):
         ) from exc
 
 
+def _get_playlist_cover(pl: dict) -> str | None:
+    thumb = pl.get("thumb") or pl.get("photo") or pl.get("cover")
+    if isinstance(thumb, dict):
+        for size in ["photo_1200", "photo_600", "photo_300", "photo_274", "photo_135", "photo_68"]:
+            if thumb.get(size):
+                return thumb[size]
+    return None
+
+
 @router.get("/my", response_model=TrackList)
 async def my_music(
     vk: VKDep,
@@ -210,7 +219,7 @@ async def moods(vk: VKDep, session: SessionDep) -> AlbumList:
                         owner_id=pl["owner_id"],
                         title=pl["title"],
                         subtitle=pl.get("description") or pl.get("subtitle") or "",
-                        cover=get_playlist_cover(pl),
+                        cover=_get_playlist_cover(pl),
                         track_count=pl.get("count", 0),
                     )
                 )

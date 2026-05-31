@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { useStorage } from "@vueuse/core";
 
 interface Toast {
   id: number;
@@ -10,6 +11,14 @@ interface Toast {
 export const useUIStore = defineStore("ui", () => {
   const toasts = ref<Toast[]>([]);
   let nextId = 1;
+
+  const rawSettings = localStorage.getItem("vkmp:settings");
+  const forceCollapse = rawSettings ? JSON.parse(rawSettings).startSidebarCollapsed === true : false;
+  
+  const sidebarCollapsed = useStorage("vkmp_sidebar_collapsed", forceCollapse);
+  if (forceCollapse) {
+    sidebarCollapsed.value = true;
+  }
 
   function notify(message: string, kind: Toast["kind"] = "info") {
     const id = nextId++;
@@ -23,5 +32,9 @@ export const useUIStore = defineStore("ui", () => {
     toasts.value = toasts.value.filter((t) => t.id !== id);
   }
 
-  return { toasts, notify, dismiss };
+  function toggleSidebar() {
+    sidebarCollapsed.value = !sidebarCollapsed.value;
+  }
+
+  return { toasts, notify, dismiss, sidebarCollapsed, toggleSidebar };
 });

@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
-import { useSettingsStore, type AccentName, type ThemeName } from "@/stores/settings";
+import { useSettingsStore, type AccentName, type ThemeName, FONT_OPTIONS, type FontName } from "@/stores/settings";
 import { useAuthStore } from "@/stores/auth";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -20,10 +20,12 @@ const router = useRouter();
 const {
   theme,
   accent,
+  fontFamily,
   performanceMode,
   reduceMotion,
   closeToTray,
   startMinimized,
+  startSidebarCollapsed,
   hardwareAcceleration,
   autoStart,
   startupVolume,
@@ -144,6 +146,23 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
       </article>
 
       <article class="settings__card">
+        <h2>Шрифт</h2>
+        <div class="settings__grid settings__grid--fonts">
+          <button
+            v-for="f in FONT_OPTIONS"
+            :key="f"
+            class="settings__font"
+            :class="{ 'settings__font--active': fontFamily === f }"
+            :style="{ fontFamily: `'${f}', sans-serif` }"
+            @click="fontFamily = f"
+          >
+            <span class="settings__font-name">{{ f }}</span>
+            <span class="settings__font-sample">Aa</span>
+          </button>
+        </div>
+      </article>
+
+      <article class="settings__card">
         <h2>Анимации и производительность</h2>
         <label class="settings__row">
           <div>
@@ -189,6 +208,13 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             <div class="settings__row-sub">Подходит для автозапуска — не отвлекает</div>
           </div>
           <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
+        </label>
+        <label class="settings__row">
+          <div>
+            <div class="settings__row-title">Запускать со свернутым меню</div>
+            <div class="settings__row-sub">Боковая панель будет свернута при каждом запуске приложения</div>
+          </div>
+          <input v-model="startSidebarCollapsed" type="checkbox" class="settings__switch" />
         </label>
         <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
           <div>
@@ -322,6 +348,9 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
 .settings__grid--accents {
   grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
 }
+.settings__grid--fonts {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
 .settings__tile {
   display: flex;
   flex-direction: column;
@@ -364,6 +393,35 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   border-color: var(--text-0);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
+.settings__font {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+}
+.settings__font:hover {
+  transform: translateY(-1px);
+  background: var(--bg-3);
+}
+.settings__font--active {
+  border-color: var(--accent-1);
+  background: rgba(26, 140, 255, 0.05);
+  box-shadow: 0 0 0 2px rgba(26, 140, 255, 0.18);
+}
+.settings__font-name {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.settings__font-sample {
+  font-size: 24px;
+  color: var(--text-0);
+}
 .settings__row {
   display: flex;
   align-items: center;
@@ -399,6 +457,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   background: var(--bg-3);
   position: relative;
   cursor: pointer;
+  flex-shrink: 0;
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
 }
 .settings__switch::after {
@@ -422,6 +481,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
 }
 .settings__range input[type="range"] {
   width: 140px;

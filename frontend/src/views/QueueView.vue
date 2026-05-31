@@ -104,9 +104,6 @@ function clearQueue() {
           : 'Запусти любой трек — он окажется здесь'
       "
     >
-      <template v-if="queue.length" #actions>
-        <button class="btn btn--ghost" @click="clearQueue">Очистить очередь</button>
-      </template>
     </PageHeader>
 
     <section class="queue">

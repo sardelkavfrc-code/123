@@ -24,13 +24,27 @@ export type AccentName =
   | "sky"
   | "crimson";
 
+export const FONT_OPTIONS = [
+  "Nunito",
+  "Roboto",
+  "Montserrat",
+  "Poppins",
+  "Raleway",
+  "Fira Sans",
+  "Manrope"
+] as const;
+
+export type FontName = typeof FONT_OPTIONS[number];
+
 interface PersistedSettings {
   theme: ThemeName;
   accent: AccentName;
+  fontFamily: string;
   performanceMode: boolean;
   reduceMotion: boolean;
   closeToTray: boolean;
   startMinimized: boolean;
+  startSidebarCollapsed: boolean;
   hardwareAcceleration: boolean;
   autoStart: boolean;
   /**
@@ -55,10 +69,12 @@ const STORAGE_KEY = "vkmp:settings";
 const defaults: PersistedSettings = {
   theme: "dark",
   accent: "blue",
+  fontFamily: "Nunito",
   performanceMode: false,
   reduceMotion: false,
   closeToTray: true,
   startMinimized: false,
+  startSidebarCollapsed: false,
   hardwareAcceleration: true,
   autoStart: false,
   startupVolume: 0.5,
@@ -84,10 +100,12 @@ export const useSettingsStore = defineStore("settings", () => {
 
   const theme = ref<ThemeName>(initial.theme);
   const accent = ref<AccentName>(initial.accent);
+  const fontFamily = ref(initial.fontFamily);
   const performanceMode = ref(initial.performanceMode);
   const reduceMotion = ref(initial.reduceMotion);
   const closeToTray = ref(initial.closeToTray);
   const startMinimized = ref(initial.startMinimized);
+  const startSidebarCollapsed = ref(initial.startSidebarCollapsed);
   const hardwareAcceleration = ref(initial.hardwareAcceleration);
   const autoStart = ref(initial.autoStart);
   const startupVolume = ref(initial.startupVolume);
@@ -104,16 +122,19 @@ export const useSettingsStore = defineStore("settings", () => {
     html.dataset.accent = accent.value;
     html.dataset.perf = performanceMode.value ? "on" : "off";
     html.dataset.reduceMotion = reduceMotion.value ? "on" : "off";
+    html.style.setProperty("--font-family", `"${fontFamily.value || 'Nunito'}", sans-serif`);
   }
 
   function persist() {
     const data: PersistedSettings = {
       theme: theme.value,
       accent: accent.value,
+      fontFamily: fontFamily.value,
       performanceMode: performanceMode.value,
       reduceMotion: reduceMotion.value,
       closeToTray: closeToTray.value,
       startMinimized: startMinimized.value,
+      startSidebarCollapsed: startSidebarCollapsed.value,
       hardwareAcceleration: hardwareAcceleration.value,
       autoStart: autoStart.value,
       startupVolume: startupVolume.value,
@@ -133,10 +154,12 @@ export const useSettingsStore = defineStore("settings", () => {
     [
       theme,
       accent,
+      fontFamily,
       performanceMode,
       reduceMotion,
       closeToTray,
       startMinimized,
+      startSidebarCollapsed,
       hardwareAcceleration,
       autoStart,
       startupVolume,
@@ -178,6 +201,7 @@ export const useSettingsStore = defineStore("settings", () => {
     reduceMotion.value = defaults.reduceMotion;
     closeToTray.value = defaults.closeToTray;
     startMinimized.value = defaults.startMinimized;
+    startSidebarCollapsed.value = defaults.startSidebarCollapsed;
     hardwareAcceleration.value = defaults.hardwareAcceleration;
     autoStart.value = defaults.autoStart;
     startupVolume.value = defaults.startupVolume;
@@ -190,10 +214,12 @@ export const useSettingsStore = defineStore("settings", () => {
   return {
     theme,
     accent,
+    fontFamily,
     performanceMode,
     reduceMotion,
     closeToTray,
     startMinimized,
+    startSidebarCollapsed,
     hardwareAcceleration,
     autoStart,
     startupVolume,

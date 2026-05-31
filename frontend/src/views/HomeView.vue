@@ -28,10 +28,9 @@ const mixTracks = ref<Track[]>([]);
 const mixLoading = ref(false);
 
 onMounted(async () => {
-  if (!library.loadFromCache()) {
-    library.loadAlgorithms();
-    library.loadMoods();
-  }
+  library.loadFromCache();
+  library.loadAlgorithms(true);
+  library.loadMoods(true);
   // Начинаем фоновую накачку кэша сразу при загрузке приложения
   ensureCacheBuffer().catch(console.error);
 });
@@ -69,6 +68,13 @@ async function ensureCacheBuffer() {
 
 function scrollMoods(direction: number) {
   const el = document.querySelector('.home__moods') as HTMLElement;
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
+}
+
+function scrollAlgorithms(direction: number) {
+  const el = document.querySelector('.home__algorithms') as HTMLElement;
   if (el) {
     el.scrollLeft += direction * 600;
   }
@@ -181,6 +187,36 @@ async function playAlbum(album: AlbumSummary) {
       </button>
     </section>
 
+    <section class="home__feed">
+      <div class="home__section-head">
+        <h2>Рекомендации для тебя</h2>
+      </div>
+      <div v-if="library.albumsLoading" class="home__loading">
+        <Spinner :size="20" /> Загружаем алгоритмы…
+      </div>
+      <div v-else-if="!library.algorithms?.items?.length" class="home__loading home__loading--soft">
+        ВК не вернул карточки алгоритмов сегодня.
+      </div>
+      <div v-else class="home__slider-container">
+        <button class="home__slider-btn home__slider-btn--prev" @click="scrollAlgorithms(-1)" aria-label="Листать влево">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+        <div class="home__algorithms">
+          <RecommendationCard
+            v-for="(block, index) in library.algorithms.items.slice(0, 12)"
+            :key="block.id"
+            :block="block"
+            :index="index"
+            :loading="loadingAlbumId === block.id"
+            @open="playAlbum"
+          />
+        </div>
+        <button class="home__slider-btn home__slider-btn--next" @click="scrollAlgorithms(1)" aria-label="Листать вправо">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+        </button>
+      </div>
+    </section>
+
     <section class="home__section" v-if="library.moods?.items && library.moods.items.length">
       <div class="home__section-head">
         <h2>Настроения и занятия</h2>
@@ -195,28 +231,6 @@ async function playAlbum(album: AlbumSummary) {
         <button class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
         </button>
-      </div>
-    </section>
-
-    <section class="home__feed">
-      <div class="home__section-head">
-        <h2>Рекомендации для тебя</h2>
-      </div>
-      <div v-if="library.albumsLoading" class="home__loading">
-        <Spinner :size="20" /> Загружаем алгоритмы…
-      </div>
-      <div v-else-if="!library.algorithms?.items?.length" class="home__loading home__loading--soft">
-        ВК не вернул карточки алгоритмов сегодня.
-      </div>
-      <div v-else class="home__cards">
-        <RecommendationCard
-          v-for="(block, index) in library.algorithms.items.slice(0, 12)"
-          :key="block.id"
-          :block="block"
-          :index="index"
-          :loading="loadingAlbumId === block.id"
-          @open="playAlbum"
-        />
       </div>
     </section>
   </ScrollArea>
@@ -303,10 +317,16 @@ async function playAlbum(album: AlbumSummary) {
   flex-direction: column;
   gap: 14px;
 }
-.home__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+.home__algorithms {
+  display: flex;
   gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  scroll-behavior: smooth;
+}
+.home__algorithms::-webkit-scrollbar {
+  display: none;
 }
 .home__section-head {
   display: flex;

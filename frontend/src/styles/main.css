@@ -14,7 +14,7 @@ body,
   padding: 0;
   height: 100%;
   font-family:
-    "Inter",
+    var(--font-family, "Nunito"),
     "SF Pro Display",
     -apple-system,
     BlinkMacSystemFont,
@@ -128,7 +128,8 @@ img {
 }
 .btn--primary {
   background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
-  border-color: transparent;
+  border: 0;
+  padding: 11px 19px;
   color: var(--accent-text);
 }
 .btn--ghost {

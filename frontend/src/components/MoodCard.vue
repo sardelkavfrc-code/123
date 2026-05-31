@@ -24,7 +24,6 @@ const emit = defineEmits<{ click: [] }>();
     </div>
     <div class="mood-card__content">
       <div class="mood-card__title">{{ mood.title }}</div>
-      <div v-if="mood.subtitle" class="mood-card__subtitle">{{ mood.subtitle }}</div>
     </div>
   </button>
 </template>
@@ -48,12 +47,13 @@ const emit = defineEmits<{ click: [] }>();
 .mood-card__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.2) 60%, rgba(0, 0, 0, 0.1) 100%);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.4) 0%, transparent 60%);
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
-  z-index: 1;
+  z-index: 2;
+  pointer-events: none;
 }
 .mood-card:hover .mood-card__overlay {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 100%);
+  background: rgba(0, 0, 0, 0.4);
 }
 .mood-card__play {
   position: absolute;
@@ -61,7 +61,7 @@ const emit = defineEmits<{ click: [] }>();
   left: 50%;
   transform: translate(-50%, -50%) scale(0.8);
   opacity: 0;
-  z-index: 2;
+  z-index: 3;
   transition: all var(--motion-duration-fast) var(--motion-ease-out);
   display: flex;
   align-items: center;
@@ -83,24 +83,17 @@ const emit = defineEmits<{ click: [] }>();
   padding: 10px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: flex-start;
   color: #fff;
+  z-index: 1;
 }
 .mood-card__title {
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 700;
   line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.mood-card__subtitle {
-  font-size: 11px;
-  opacity: 0.8;
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 </style>

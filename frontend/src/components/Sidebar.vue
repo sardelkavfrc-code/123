@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { RouterLink } from "vue-router";
+import { RouterLink, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useUIStore } from "@/stores/ui";
 
 const auth = useAuthStore();
+const ui = useUIStore();
 const photo = computed(() => auth.status.photo);
 const name = computed(() => auth.displayName);
 
@@ -15,32 +17,47 @@ const items = [
   { to: { name: "queue" }, label: "Очередь", icon: "queue" },
   { to: { name: "settings" }, label: "Настройки", icon: "settings" },
 ];
+
+const route = useRoute();
+const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.name));
 </script>
 
 <template>
-  <aside class="sidebar">
-    <RouterLink :to="{ name: 'settings' }" class="sidebar__profile">
+  <aside class="sidebar" :class="{ 'sidebar--collapsed': ui.sidebarCollapsed }">
+    <RouterLink :to="{ name: 'settings' }" class="sidebar__profile" :title="ui.sidebarCollapsed ? 'Настройки профиля' : ''">
       <div class="sidebar__avatar" :style="photo ? { backgroundImage: `url(${photo})` } : undefined">
         <span v-if="!photo">{{ name.charAt(0) }}</span>
       </div>
       <div class="sidebar__profile-text">
         <div class="sidebar__profile-name">{{ name }}</div>
-        <div class="sidebar__profile-sub">ВКонтакте</div>
       </div>
     </RouterLink>
 
     <nav class="sidebar__nav">
+      <div 
+        class="sidebar__indicator" 
+        :style="{ transform: `translateY(${activeIndex * 44}px)`, opacity: activeIndex >= 0 ? 1 : 0 }"
+      ></div>
       <RouterLink
         v-for="item in items"
         :key="item.label"
         :to="item.to"
         class="sidebar__link"
         active-class="sidebar__link--active"
+        :title="ui.sidebarCollapsed ? item.label : ''"
       >
         <span class="sidebar__icon" :data-icon="item.icon" />
         <span class="sidebar__label">{{ item.label }}</span>
       </RouterLink>
     </nav>
+
+    <div class="sidebar__footer">
+      <button class="sidebar__toggle" @click="ui.toggleSidebar()" :aria-label="ui.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline :points="ui.sidebarCollapsed ? '9 18 15 12 9 6' : '15 18 9 12 15 6'" />
+        </svg>
+      </button>
+    </div>
   </aside>
 </template>
 
@@ -57,10 +74,16 @@ const items = [
 .sidebar__profile {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
   padding: 8px 8px;
   border-radius: var(--radius-md);
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+  transition:
+    padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
+    background var(--motion-duration-fast) var(--motion-ease-out);
+}
+.sidebar--collapsed .sidebar__profile {
+  padding-left: 4px;
 }
 .sidebar__profile:hover {
   background: var(--bg-2);
@@ -82,6 +105,15 @@ const items = [
 }
 .sidebar__profile-text {
   min-width: 0;
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), width var(--motion-duration-slow) var(--motion-ease-out), margin var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar--collapsed .sidebar__profile-text {
+  opacity: 0;
+  width: 0;
+  margin-left: -12px;
+  transform: translateX(-10px);
 }
 .sidebar__profile-name {
   font-weight: 600;
@@ -91,21 +123,28 @@ const items = [
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sidebar__profile-sub {
-  font-size: 11px;
-  color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
 .sidebar__nav {
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex: 1 1 auto;
+  position: relative;
+}
+.sidebar__indicator {
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  width: 3px;
+  height: 20px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent-1), var(--accent-3));
+  transition: transform var(--motion-duration-slow) cubic-bezier(0.34, 1.56, 0.64, 1), opacity var(--motion-duration-fast);
+  pointer-events: none;
 }
 .sidebar__link {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 12px;
   padding: 10px 12px;
   border-radius: var(--radius-md);
@@ -113,8 +152,22 @@ const items = [
   font-weight: 500;
   font-size: 14px;
   transition:
+    padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
     background var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.sidebar--collapsed .sidebar__link {
+  padding-left: 14px; /* Centers 20px icon inside 48px inner width */
+}
+.sidebar__label {
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), width var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar--collapsed .sidebar__label {
+  opacity: 0;
+  width: 0;
+  transform: translateX(-10px);
 }
 .sidebar__link:hover {
   background: var(--bg-2);
@@ -123,17 +176,6 @@ const items = [
 .sidebar__link--active {
   background: linear-gradient(135deg, rgba(26, 140, 255, 0.18), rgba(109, 60, 255, 0.18));
   color: var(--text-0);
-  position: relative;
-}
-.sidebar__link--active::before {
-  content: "";
-  position: absolute;
-  left: 4px;
-  top: 10px;
-  bottom: 10px;
-  width: 3px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--accent-1), var(--accent-3));
 }
 .sidebar__icon {
   width: 20px;
@@ -171,5 +213,30 @@ const items = [
 .sidebar__icon[data-icon="settings"] {
   -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 8a4 4 0 1 0 4 4 4 4 0 0 0-4-4Zm9.4 4 1.6 2-1 1.7-2.5-.4a8 8 0 0 1-1.7 1l-.4 2.5h-2L15 16.3a8 8 0 0 1-1.7-1l-2.5.4-1-1.7 1.6-2-1.6-2 1-1.7L13.3 9a8 8 0 0 1 1.7-1l.4-2.5h2L17.8 8a8 8 0 0 1 1.7 1l2.5-.4 1 1.7-1.6 2Z'/%3E%3C/svg%3E");
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 8a4 4 0 1 0 4 4 4 4 0 0 0-4-4Zm9.4 4 1.6 2-1 1.7-2.5-.4a8 8 0 0 1-1.7 1l-.4 2.5h-2L15 16.3a8 8 0 0 1-1.7-1l-2.5.4-1-1.7 1.6-2-1.6-2 1-1.7L13.3 9a8 8 0 0 1 1.7-1l.4-2.5h2L17.8 8a8 8 0 0 1 1.7 1l2.5-.4 1 1.7-1.6 2Z'/%3E%3C/svg%3E");
+}
+
+.sidebar__footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  transition: justify-content var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sidebar--collapsed .sidebar__footer {
+  justify-content: center;
+}
+.sidebar__toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  transition: background 0.2s, color 0.2s;
+}
+.sidebar__toggle:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
 }
 </style>

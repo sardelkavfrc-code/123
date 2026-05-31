@@ -6,10 +6,12 @@ import Sidebar from "@/components/Sidebar.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
 import ToastHost from "@/components/ToastHost.vue";
 import { usePlayerStore } from "@/stores/player";
+import { useUIStore } from "@/stores/ui";
 
 const route = useRoute();
 const isBlank = computed(() => route.meta.layout === "blank");
 const player = usePlayerStore();
+const ui = useUIStore();
 
 let detachMediaKey: (() => void) | null = null;
 
@@ -45,7 +47,7 @@ watch(
 </script>
 
 <template>
-  <div class="app-root" :class="{ blank: isBlank }">
+  <div class="app-root" :class="{ blank: isBlank, 'app-root--collapsed': ui.sidebarCollapsed }">
     <TitleBar />
     <div v-if="isBlank" class="blank-host">
       <router-view v-slot="{ Component }">
@@ -89,7 +91,7 @@ watch(
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-columns: auto 1fr;
   grid-template-rows: 1fr var(--player-height);
   grid-template-areas:
     "sidebar main"
@@ -98,6 +100,12 @@ watch(
 .app-grid__sidebar {
   grid-area: sidebar;
   min-height: 0;
+  width: 240px;
+  transition: width var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: width;
+}
+.app-root--collapsed .app-grid__sidebar {
+  width: 76px;
 }
 .app-grid__main {
   grid-area: main;

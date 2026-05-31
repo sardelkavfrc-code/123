@@ -24,7 +24,7 @@ const variants = computed(() =>
 
 const background = computed(() => {
   if (props.block.cover) {
-    return `linear-gradient(180deg, rgba(8, 9, 14, 0.05), rgba(8, 9, 14, 0.55)), url(${props.block.cover}) center/cover`;
+    return `linear-gradient(180deg, rgba(8, 9, 14, 0.4), rgba(8, 9, 14, 0.0) 50%), url(${props.block.cover}) center/cover`;
   }
   return "linear-gradient(135deg, var(--accent-1), var(--accent-3))";
 });
@@ -44,6 +44,29 @@ const background = computed(() => {
         <div class="rec-card__title">{{ block.title }}</div>
         <div v-if="block.subtitle" class="rec-card__subtitle">{{ block.subtitle }}</div>
       </div>
+      <div class="rec-card__bottom">
+        <div class="rec-card__icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <clipPath id="vk-round-corners">
+                <rect x="1.1" y="1.1" width="21.8" height="21.8" rx="6.4"/>
+              </clipPath>
+              <mask id="vk-music-cutout">
+                <rect x="0" y="0" width="24" height="24" fill="white"/>
+                <rect x="3.25" y="15" width="2.5" height="3.5" rx="1.25" fill="black"/>
+                <rect x="7" y="13.5" width="2.5" height="5.5" rx="1.25" fill="black"/>
+                <rect x="10.75" y="10" width="2.5" height="9.5" rx="1.25" fill="black"/>
+                <rect x="14.5" y="11.5" width="2.5" height="7.5" rx="1.25" fill="black"/>
+                <rect x="18.25" y="14.5" width="2.5" height="4" rx="1.25" fill="black"/>
+              </mask>
+            </defs>
+            <g mask="url(#vk-music-cutout)">
+              <rect x="2" y="2" width="20" height="20" rx="5.5" stroke="currentColor" stroke-width="1.8"/>
+              <path d="M0 14.5 C 6 14.5, 10 7.5, 16 7.5 C 19 7.5, 24 9, 24 9 L 24 24 L 0 24 Z" fill="currentColor" clip-path="url(#vk-round-corners)"/>
+            </g>
+          </svg>
+        </div>
+      </div>
     </div>
   </button>
 </template>
@@ -52,7 +75,8 @@ const background = computed(() => {
 .rec-card {
   position: relative;
   aspect-ratio: 3 / 4;
-  min-width: 0;
+  flex: 0 0 170px;
+  width: 170px;
   border-radius: var(--radius-lg);
   background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
   background-size: cover;
@@ -70,12 +94,13 @@ const background = computed(() => {
 .rec-card__overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.1) 100%);
+  background: transparent;
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
-  z-index: 1;
+  z-index: 2;
+  pointer-events: none;
 }
 .rec-card:hover .rec-card__overlay {
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 100%);
+  background: rgba(0, 0, 0, 0.4);
 }
 .rec-card__play {
   position: absolute;
@@ -83,7 +108,7 @@ const background = computed(() => {
   left: 50%;
   transform: translate(-50%, -50%) scale(0.8);
   opacity: 0;
-  z-index: 2;
+  z-index: 3;
   transition: all var(--motion-duration-fast) var(--motion-ease-out);
   display: flex;
   align-items: center;
@@ -101,11 +126,11 @@ const background = computed(() => {
 }
 .rec-card__content {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   padding: 16px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: space-between;
   height: 100%;
 }
 .rec-card__top {
@@ -114,13 +139,32 @@ const background = computed(() => {
   gap: 4px;
 }
 .rec-card__title {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.15;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 .rec-card__subtitle {
   font-size: 13px;
   opacity: 0.85;
   font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.rec-card__bottom {
+  display: flex;
+  justify-content: flex-start;
+}
+.rec-card__icon {
+  color: #fff;
+  opacity: 0.9;
+  display: flex;
 }
 </style>
