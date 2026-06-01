@@ -50,10 +50,18 @@ const tabs = [
   { id: "account", label: "Аккаунт" },
 ] as const;
 
+function volumeToGain(x: number): number {
+  const clamped = Math.max(0, Math.min(1, x));
+  return clamped * clamped * clamped;
+}
+
 const startupVolumePct = computed({
-  get: () => Math.round(startupVolume.value * 100),
+  get: () => {
+    const pos = Math.cbrt(Math.max(0, Math.min(1, startupVolume.value)));
+    return Math.round(pos * 100);
+  },
   set: (v: number) => {
-    startupVolume.value = Math.max(0, Math.min(1, v / 100));
+    startupVolume.value = volumeToGain(v / 100);
   },
 });
 
