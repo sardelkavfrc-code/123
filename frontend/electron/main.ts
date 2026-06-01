@@ -34,8 +34,8 @@ function findBackendBinary(): string | null {
     // Packaged builds copy the binary into resources/backend/<exe> via electron-builder extraResources.
     path.join(process.resourcesPath, "backend", exe),
     // Local "dist" runs without electron-builder still pick up the PyInstaller output.
-    path.join(__dirname, "..", "..", "backend", "dist", exe),
-    path.join(__dirname, "..", "backend", "dist", exe),
+    path.join(__dirname, "..", "..", "backend", "dist", "vkmp-backend", exe),
+    path.join(__dirname, "..", "backend", "dist", "vkmp-backend", exe),
   ];
   for (const candidate of candidates) {
     if (existsSync(candidate)) return candidate;
