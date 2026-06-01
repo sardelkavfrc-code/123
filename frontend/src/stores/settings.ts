@@ -96,7 +96,7 @@ const defaults: PersistedSettings = {
   cacheSize: 250,
   externalCovers: true,
   crossfade: true,
-  crossfadeDuration: 3,
+  crossfadeDuration: 2,
   autoScrollQueue: true,
 };
 
