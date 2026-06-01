@@ -91,4 +91,5 @@ class Artist(APIModel):
     name: str
     domain: str | None = None
     photo: str | None = None
+    banner: str | None = None
     is_followed: bool = False

@@ -382,14 +382,17 @@ def parse_artist(payload: Any) -> Artist | None:
     if not isinstance(artist, dict):
         return None
     photo = None
+    banner = None
     photos = artist.get("photo") or []
     if isinstance(photos, list) and photos:
         # photos are sorted by size ascending in VK responses
-        photo = str(photos[-1].get("url") or photos[0].get("url") or "") or None
+        banner = str(photos[-1].get("url") or photos[0].get("url") or "") or None
+        photo = banner  # fallback: CSS object-fit: cover will square it for avatars
     return Artist(
         id=str(artist.get("id") or artist.get("domain") or ""),
         name=str(artist.get("name") or "Артист"),
         domain=str(artist.get("domain") or "") or None,
         photo=photo,
+        banner=banner,
         is_followed=bool(artist.get("is_followed") or False),
     )

@@ -473,11 +473,12 @@ async def artist_info(
     name: str | None = Query(None, description="Имя артиста для stub-карточки если VK метод недоступен"),
 ) -> Artist:
     """Artist meta.
-
-    ``audio.getArtistById`` is also gated on the vk.com web token; if
-    it fails we return a stub so the artist screen still renders (just
-    without photo / follow-state).
+    
+    Tries audio.getArtistById (works for Kate Mobile). If it fails, falls back
+    to catalog.getAudioArtist -> catalog.getSection to get the banner/photo,
+    which works for web tokens (vk1.a...).
     """
+    last_exc = None
     try:
         response = await vk.call(
             "audio.getArtistById",
@@ -485,27 +486,40 @@ async def artist_info(
             artist_id=artist_id,
             extended=1,
         )
+        parsed = parse_artist(response)
+        if parsed:
+            return parsed
     except VKError as exc:
-        if exc.code in (3, 4, 15, 100):
-            return Artist(
-                id=artist_id,
-                name=name or _slug_to_name(artist_id),
-                domain=None,
-                photo=None,
-                is_followed=False,
-            )
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
-        ) from exc
+        last_exc = exc
+        if exc.code not in (3, 4, 15, 100):
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+            ) from exc
 
-    artist = parse_artist(response)
-    if artist is None:
-        return Artist(
-            id=artist_id,
-            name=name or _slug_to_name(artist_id),
-            domain=None,
-            photo=None,
-            is_followed=False,
-        )
-    return artist
+    # Fallback to catalog
+    try:
+        cat = await vk.call("catalog.getAudioArtist", session.access_token, artist_id=artist_id)
+        sections = cat.get("catalog", {}).get("sections", [])
+        if sections and sections[0].get("id"):
+            sec_id = sections[0]["id"]
+            sec = await vk.call("catalog.getSection", session.access_token, section_id=sec_id)
+            artists = sec.get("artists", [])
+            if artists:
+                # find exact match or just use the first one
+                artist_data = next((a for a in artists if str(a.get("id")) == artist_id), artists[0])
+                parsed = parse_artist(artist_data)
+                if parsed:
+                    return parsed
+    except VKError:
+        pass
+
+    # Complete fallback stub
+    return Artist(
+        id=artist_id,
+        name=name or _slug_to_name(artist_id),
+        domain=None,
+        photo=None,
+        banner=None,
+        is_followed=False,
+    )

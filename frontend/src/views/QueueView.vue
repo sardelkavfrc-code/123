@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, ref, onMounted, onActivated, nextTick, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";
@@ -30,21 +30,38 @@ useIntersectionObserver(loaderRef, ([entry]) => {
 });
 
 function scrollToCurrent() {
-  if (!listRef.value) return;
-  const currentEl = listRef.value.querySelector('.queue__row--current');
+  if (!listRef.value) return false;
+  const currentEl = listRef.value.querySelector('.queue__row--current') as HTMLElement | null;
   if (currentEl) {
-    currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const container = currentEl.closest('.scroll-area');
+    if (container) {
+      const top = currentEl.offsetTop - container.clientHeight / 2 + currentEl.clientHeight / 2;
+      container.scrollTo({ top, behavior: 'smooth' });
+    } else {
+      currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    return true;
   }
+  return false;
 }
 
-onMounted(() => {
+const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
+
+function initScroll() {
+  // wait for transition and layout
+  setTimeout(() => {
+    scrollToCurrent();
+  }, 300);
+}
+
+onMounted(initScroll);
+onActivated(initScroll);
+
+watch(index, () => {
   nextTick(() => {
-    // A tiny timeout ensures the list is fully rendered and layout is calculated
-    setTimeout(scrollToCurrent, 50);
+    scrollToCurrent();
   });
 });
-
-const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
 
 function playAt(i: number) {
   if (i === index.value) {
@@ -74,7 +91,7 @@ function remove(i: number) {
     >
     </PageHeader>
 
-    <section class="queue" @wheel.stop>
+    <section class="queue" ref="listRef" @wheel.stop>
       <EmptyState
         v-if="!queue.length"
         title="Очередь пуста"

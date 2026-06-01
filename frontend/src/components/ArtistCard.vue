@@ -50,7 +50,8 @@ function openArtist() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px;
+  padding: 16px 12px;
+  gap: 8px;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -116,6 +117,6 @@ function openArtist() {
 .artist-card__sub {
   font-size: 12px;
   color: var(--text-2);
-  margin-top: -8px;
+  margin-top: -6px;
 }
 </style>

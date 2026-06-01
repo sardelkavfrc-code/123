@@ -49,6 +49,7 @@ export interface Artist {
   name: string;
   domain: string | null;
   photo: string | null;
+  banner: string | null;
   is_followed: boolean;
 }
 

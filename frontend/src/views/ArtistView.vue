@@ -185,7 +185,7 @@ function playAll() {
   <ScrollArea @reach-end="loadMoreTracks">
     <section
       class="artist__hero"
-      :style="artist?.photo ? { backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.photo})` } : undefined"
+      :style="(artist?.banner || artist?.photo) ? { backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.banner || artist.photo})` } : undefined"
     >
       <div class="artist__hero-inner">
         <div class="artist__hero-content">
