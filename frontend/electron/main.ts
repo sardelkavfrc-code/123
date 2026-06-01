@@ -28,19 +28,20 @@ let backendProc: ChildProcessByStdio<Writable, Readable, Readable> | null = null
 let backendPort = 0;
 let backendReady = false;
 
-function findBackendBinary(): string | null {
-  const exe = process.platform === "win32" ? "vkmp-backend.exe" : "vkmp-backend";
-  const candidates = [
-    // Packaged builds copy the binary into resources/backend/<exe> via electron-builder extraResources.
-    path.join(process.resourcesPath, "backend", exe),
-    // Local "dist" runs without electron-builder still pick up the PyInstaller output.
-    path.join(__dirname, "..", "..", "backend", "dist", "vkmp-backend", exe),
-    path.join(__dirname, "..", "backend", "dist", "vkmp-backend", exe),
-  ];
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+function findBackendBinary(): string {
+  const binaryName = process.platform === "win32" ? "vkmp-backend.exe" : "vkmp-backend";
+  // Try dev path
+  const devPath = path.join(__dirname, "../../backend/dist/vkmp-backend", binaryName);
+  // Try packaged path
+  const packagedPath = path.join(process.resourcesPath, "backend", binaryName);
+
+  if (existsSync(packagedPath)) {
+    return packagedPath;
   }
-  return null;
+  if (existsSync(devPath)) {
+    return devPath;
+  }
+  throw new Error("Backend binary not found. Did you run PyInstaller?");
 }
 
 function pickFreePort(): Promise<number> {
