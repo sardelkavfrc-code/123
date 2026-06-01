@@ -92,13 +92,14 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   border-radius: var(--radius-md);
   transition:
     padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
-    background var(--motion-duration-fast) var(--motion-ease-out);
+    background-color var(--motion-duration-fast) var(--motion-ease-out);
+  background-color: transparent;
 }
 .sidebar--collapsed .sidebar__profile {
   padding-left: 4px;
 }
 .sidebar__profile:hover {
-  background: var(--bg-2);
+  background-color: var(--bg-2);
 }
 .sidebar__avatar {
   width: 40px;
@@ -166,8 +167,9 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   font-size: 14px;
   transition:
     padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
-    background var(--motion-duration-fast) var(--motion-ease-out),
+    background-color var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
+  background-color: transparent;
 }
 .sidebar--collapsed .sidebar__link {
   padding-left: 14px; /* Centers 20px icon inside 48px inner width */
@@ -184,7 +186,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   transform: translateX(-10px);
 }
 .sidebar__link:hover {
-  background: var(--bg-2);
+  background-color: var(--bg-2);
   color: var(--text-0);
 }
 .sidebar__link--active {
