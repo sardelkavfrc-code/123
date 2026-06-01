@@ -51,25 +51,53 @@ const libraryMatches = computed(() => {
   );
 });
 
-const searchArtists = computed(() => {
+const searchArtistsRaw = computed(() => {
   if (scope.value !== "global") return [];
-  const map = new Map<string, Artist>();
+  const map = new Map<string, { id: string; name: string }>();
   for (const t of results.value) {
     if (t.main_artists) {
       for (const a of t.main_artists) {
         if (a.id && !map.has(a.id)) {
-          map.set(a.id, {
-            id: a.id,
-            name: a.name,
-            domain: a.domain || null,
-            photo: null,
-            is_followed: false,
-          });
+          map.set(a.id, { id: a.id, name: a.name });
         }
       }
     }
   }
   return Array.from(map.values()).slice(0, 8);
+});
+
+const searchArtists = ref<Artist[]>([]);
+
+watch(searchArtistsRaw, async (rawArtists) => {
+  // Reset or update searchArtists
+  // We keep existing ones to prevent flicker, and fetch new ones
+  const currentMap = new Map(searchArtists.value.map(a => [a.id, a]));
+  const newList: Artist[] = [];
+  
+  for (const raw of rawArtists) {
+    if (currentMap.has(raw.id)) {
+      newList.push(currentMap.get(raw.id)!);
+    } else {
+      // push a stub first
+      const stub: Artist = {
+        id: raw.id,
+        name: raw.name,
+        domain: null,
+        photo: null,
+        banner: null,
+        is_followed: false,
+      };
+      newList.push(stub);
+      // fetch actual
+      api.artist(raw.id, { name: raw.name }).then(fullArtist => {
+        const idx = searchArtists.value.findIndex(a => a.id === fullArtist.id);
+        if (idx !== -1) {
+          searchArtists.value[idx] = fullArtist;
+        }
+      }).catch(() => {});
+    }
+  }
+  searchArtists.value = newList;
 });
 
 async function runGlobal() {

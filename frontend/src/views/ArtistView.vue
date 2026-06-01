@@ -70,12 +70,22 @@ async function load() {
 
   if (infoRes.status === "fulfilled") {
     artist.value = infoRes.value;
+    const bgUrl = artist.value.banner || artist.value.photo;
+    if (bgUrl) {
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = resolve;
+        img.onerror = resolve;
+        img.src = bgUrl;
+      });
+    }
   } else {
     artist.value = {
       id: props.id,
       name: name ?? props.id,
       domain: null,
       photo: null,
+      banner: null,
       is_followed: false,
     };
   }
@@ -183,53 +193,59 @@ function playAll() {
 
 <template>
   <ScrollArea @reach-end="loadMoreTracks">
-    <section
-      class="artist__hero"
-      :style="(artist?.banner || artist?.photo) ? { backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.banner || artist.photo})` } : undefined"
-    >
-      <div class="artist__hero-inner">
-        <div class="artist__hero-content">
-          <div class="artist__eyebrow">Артист</div>
-          <h1 class="artist__name">{{ artist?.name ?? "Загрузка…" }}</h1>
-          <div class="artist__meta">
-            <span v-if="tracks.length">{{ tracksLabel(tracksTotal || tracks.length) }}</span>
-            <span v-if="artist?.is_followed" class="chip chip--active">Подписка</span>
+    <div v-if="loading" class="artist__loading-full">
+      <Spinner :size="32" /> 
+      <div style="margin-top: 16px; color: var(--text-2);">Загружаем артиста…</div>
+    </div>
+    <div v-else-if="error" class="artist__error-full">{{ error }}</div>
+    
+    <template v-else>
+      <section
+        class="artist__hero"
+        :style="(artist?.banner || artist?.photo) ? { backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.banner || artist.photo})` } : undefined"
+      >
+        <div class="artist__hero-inner">
+          <div class="artist__hero-content">
+            <div class="artist__eyebrow">Артист</div>
+            <h1 class="artist__name">{{ artist?.name ?? "Загрузка…" }}</h1>
+            <div class="artist__meta">
+              <span v-if="tracks.length">{{ tracksLabel(tracksTotal || tracks.length) }}</span>
+              <span v-if="artist?.is_followed" class="chip chip--active">Подписка</span>
+            </div>
+          </div>
+          <div class="artist__actions">
+            <button class="btn btn--primary" :disabled="!tracks.length" @click="playAll">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+              Слушать всё
+            </button>
+            <button class="btn btn--ghost" @click="router.back()">Назад</button>
           </div>
         </div>
-        <div class="artist__actions">
-          <button class="btn btn--primary" :disabled="!tracks.length" @click="playAll">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-            Слушать всё
-          </button>
-          <button class="btn btn--ghost" @click="router.back()">Назад</button>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <nav class="artist__tabs" role="tablist">
-      <button
-        class="artist__tab"
-        :class="{ 'artist__tab--active': tab === 'all' }"
-        role="tab"
-        :aria-selected="tab === 'all'"
-        @click="tab = 'all'"
-      >
-        Все треки
-      </button>
-      <button
-        class="artist__tab"
-        :class="{ 'artist__tab--active': tab === 'albums' }"
-        role="tab"
-        :aria-selected="tab === 'albums'"
-        @click="tab = 'albums'"
-      >
-        Альбомы
-      </button>
-    </nav>
+      <nav class="artist__tabs" role="tablist">
+        <button
+          class="artist__tab"
+          :class="{ 'artist__tab--active': tab === 'all' }"
+          role="tab"
+          :aria-selected="tab === 'all'"
+          @click="tab = 'all'"
+        >
+          Все треки
+        </button>
+        <button
+          class="artist__tab"
+          :class="{ 'artist__tab--active': tab === 'albums' }"
+          role="tab"
+          :aria-selected="tab === 'albums'"
+          @click="tab = 'albums'"
+        >
+          Альбомы
+        </button>
+      </nav>
 
-    <section class="artist__body">
-      <div v-if="loading" class="artist__loading"><Spinner :size="20" /> Загружаем артиста…</div>
-      <div v-else-if="error" class="artist__error">{{ error }}</div>
+      <section class="artist__body">
+
       
       <Transition name="fade-slide" mode="out-in">
         <div :key="tab" class="artist__tab-pane">
@@ -280,11 +296,25 @@ function playAll() {
           </template>
         </div>
       </Transition>
-    </section>
+      </section>
+    </template>
   </ScrollArea>
 </template>
 
 <style scoped>
+.artist__loading-full {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 400px;
+}
+.artist__error-full {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-2);
+}
 .artist__hero {
   position: relative;
   margin: 16px 32px 0;
