@@ -24,6 +24,11 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
 
 <template>
   <aside class="sidebar" :class="{ 'sidebar--collapsed': ui.sidebarCollapsed }">
+    <div class="sidebar__logo-wrap">
+      <img src="/logo.png" alt="VK Music" class="sidebar__logo" />
+      <span class="sidebar__logo-text" v-if="!ui.sidebarCollapsed">VK Music</span>
+    </div>
+
     <RouterLink :to="{ name: 'settings' }" class="sidebar__profile" :title="ui.sidebarCollapsed ? 'Настройки профиля' : ''">
       <div class="sidebar__avatar" :style="photo ? { backgroundImage: `url(${photo})` } : undefined">
         <span v-if="!photo">{{ name.charAt(0) }}</span>
@@ -82,6 +87,29 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
   z-index: 10;
+}
+.sidebar__logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.sidebar--collapsed .sidebar__logo-wrap {
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+.sidebar__logo {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+.sidebar__logo-text {
+  font-weight: 800;
+  font-size: 16px;
+  color: var(--text-primary);
 }
 .sidebar__profile {
   display: flex;

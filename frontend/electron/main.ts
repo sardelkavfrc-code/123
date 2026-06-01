@@ -224,7 +224,14 @@ function buildTrayMenu(info: { title: string; artist: string; isPlaying: boolean
 }
 
 function createTray() {
-  const icon = nativeImage.createEmpty();
+  const publicIcon = path.join(__dirname, "../public/icon.png");
+  const distIcon = path.join(__dirname, "../dist/icon.png");
+  let icon = nativeImage.createEmpty();
+  if (existsSync(publicIcon)) {
+    icon = nativeImage.createFromPath(publicIcon);
+  } else if (existsSync(distIcon)) {
+    icon = nativeImage.createFromPath(distIcon);
+  }
   tray = new Tray(icon);
   tray.setToolTip(APP_NAME);
   tray.setContextMenu(buildTrayMenu(null));

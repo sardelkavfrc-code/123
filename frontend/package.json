@@ -55,6 +55,7 @@
       "target": [
         "nsis"
       ],
+      "icon": "build/icon.ico",
       "artifactName": "VK-Music-Setup-${version}.${ext}"
     },
     "nsis": {

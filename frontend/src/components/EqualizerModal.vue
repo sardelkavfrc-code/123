@@ -3,7 +3,7 @@ import { useEqualizerStore } from "@/stores/equalizer";
 import { storeToRefs } from "pinia";
 import { computed, ref, nextTick } from "vue";
 
-const props = defineProps<{ show: boolean }>();
+defineProps<{ show: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 
 const eq = useEqualizerStore();
