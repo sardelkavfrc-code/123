@@ -286,7 +286,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
               <div class="settings__row-sub">В секундах</div>
             </div>
             <div class="settings__range">
-              <input v-model.number="crossfadeDuration" type="range" min="1" max="10" step="1" />
+              <input v-model.number="crossfadeDuration" type="range" min="1" max="5" step="1" />
               <span>{{ crossfadeDuration }} с</span>
             </div>
           </label>
