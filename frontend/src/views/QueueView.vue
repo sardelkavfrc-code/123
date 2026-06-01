@@ -215,7 +215,6 @@ function remove(i: number) {
   background: none;
   padding: 0;
   border: none;
-  cursor: pointer;
   width: 100%;
 }
 :deep(.queue__artist) {

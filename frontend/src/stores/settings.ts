@@ -248,6 +248,7 @@ export const useSettingsStore = defineStore("settings", () => {
     customAccentType.value = defaults.customAccentType;
     customAccentColor1.value = defaults.customAccentColor1;
     customAccentColor2.value = defaults.customAccentColor2;
+    fontFamily.value = defaults.fontFamily;
     performanceMode.value = defaults.performanceMode;
     reduceMotion.value = defaults.reduceMotion;
     closeToTray.value = defaults.closeToTray;

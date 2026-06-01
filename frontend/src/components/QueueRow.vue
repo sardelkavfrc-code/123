@@ -112,16 +112,14 @@ function addToQueue() {
       </template>
       <template v-else>{{ index + 1 }}</template>
     </span>
-    <button
+    <div
       class="queue__cover"
-      :title="`Играть «${track.title}»`"
       v-lazy-bg="displayCover"
-      @click="emit('play', index)"
     >
       <span v-if="!displayCover" class="queue__cover-stub">{{ track.title.charAt(0) }}</span>
-    </button>
+    </div>
     <div class="queue__meta">
-      <button class="queue__title" @click="emit('play', index)">{{ track.title }}</button>
+      <div class="queue__title" :title="track.title">{{ track.title }}</div>
       <div class="queue__artist-wrap" :title="track.artist">
         <template v-if="track.main_artists?.length">
           <template v-for="(artist, idx) in track.main_artists" :key="artist.id || artist.name">
