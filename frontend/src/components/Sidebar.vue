@@ -27,7 +27,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
     <div class="sidebar__logo-wrap">
       <img src="/logo.png" alt="VK Music" class="sidebar__logo" />
       <div class="sidebar__logo-text-wrapper">
-        <div class="sidebar__logo-text">VK Music</div>
+        <div class="sidebar__logo-text">VK&nbsp;Music</div>
       </div>
     </div>
 
@@ -98,7 +98,6 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
   transition: padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
-  overflow: hidden;
 }
 .sidebar__logo {
   width: 32px;
