@@ -71,6 +71,7 @@ interface PersistedSettings {
   externalCovers: boolean;
   crossfade: boolean;
   crossfadeDuration: number;
+  autoScrollQueue: boolean;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -96,6 +97,7 @@ const defaults: PersistedSettings = {
   externalCovers: true,
   crossfade: true,
   crossfadeDuration: 3,
+  autoScrollQueue: true,
 };
 
 function load(): PersistedSettings {
@@ -132,6 +134,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const externalCovers = ref(initial.externalCovers);
   const crossfade = ref(initial.crossfade);
   const crossfadeDuration = ref(initial.crossfadeDuration);
+  const autoScrollQueue = ref(initial.autoScrollQueue ?? true);
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -183,6 +186,7 @@ export const useSettingsStore = defineStore("settings", () => {
       externalCovers: externalCovers.value,
       crossfade: crossfade.value,
       crossfadeDuration: crossfadeDuration.value,
+      autoScrollQueue: autoScrollQueue.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -284,6 +288,7 @@ export const useSettingsStore = defineStore("settings", () => {
     externalCovers,
     crossfade,
     crossfadeDuration,
+    autoScrollQueue,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,

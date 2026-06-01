@@ -12,12 +12,21 @@ import Spinner from "@/components/Spinner.vue";
 import draggable from "vuedraggable";
 import type { Track } from "@/api/types";
 
+import { useSettingsStore } from "@/stores/settings";
+
 const player = usePlayerStore();
+const settings = useSettingsStore();
 const { queue, index, isPlaying } = storeToRefs(player);
+
+let isSettingQueue = false;
 
 const draggableQueue = computed({
   get: () => queue.value,
-  set: (val: Track[]) => player.setQueue(val)
+  set: (val: Track[]) => {
+    isSettingQueue = true;
+    player.setQueue(val);
+    setTimeout(() => { isSettingQueue = false; }, 100);
+  }
 });
 
 const listRef = ref<HTMLElement | null>(null);
@@ -48,8 +57,10 @@ function scrollToCurrent() {
 const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
 
 function initScroll() {
+  if (!settings.autoScrollQueue) return;
   // wait for transition and layout
   setTimeout(() => {
+    if (!settings.autoScrollQueue) return;
     scrollToCurrent();
   }, 300);
 }
@@ -58,6 +69,7 @@ onMounted(initScroll);
 onActivated(initScroll);
 
 watch(index, () => {
+  if (!settings.autoScrollQueue || isSettingQueue) return;
   nextTick(() => {
     scrollToCurrent();
   });

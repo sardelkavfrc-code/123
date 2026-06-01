@@ -39,6 +39,7 @@ const {
   externalCovers,
   crossfade,
   crossfadeDuration,
+  autoScrollQueue,
 } = storeToRefs(settings);
 
 const activeTab = ref<"appearance" | "playback" | "app" | "account">("appearance");
@@ -280,6 +281,13 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
               <input v-model.number="crossfadeDuration" type="range" min="1" max="10" step="1" />
               <span>{{ crossfadeDuration }} с</span>
             </div>
+          </label>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Автоскролл в очереди</div>
+              <div class="settings__row-sub">Скроллить список к текущему треку при смене песни</div>
+            </div>
+            <input v-model="autoScrollQueue" type="checkbox" class="settings__switch" />
           </label>
         </article>
 
