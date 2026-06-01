@@ -73,7 +73,7 @@ jobs:
 
       - name: Install frontend deps
         working-directory: frontend
-        run: npm ci
+        run: npm install
 
       - name: Build & package installer
         working-directory: frontend
