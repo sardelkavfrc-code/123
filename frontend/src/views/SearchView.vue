@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { api, APIError } from "@/api/client";
@@ -41,6 +41,17 @@ let runToken = 0;
 onMounted(() => {
   void library.loadMyMusic();
   if (query.value.trim()) void runGlobal();
+
+  resizeObserver = new ResizeObserver(() => {
+    checkArtistsScroll();
+  });
+  if (artistsScroll.value) {
+    resizeObserver.observe(artistsScroll.value);
+  }
+});
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
 });
 
 const libraryMatches = computed(() => {
@@ -98,7 +109,38 @@ watch(searchArtistsRaw, async (rawArtists) => {
     }
   }
   searchArtists.value = newList;
+  nextTick(() => {
+    checkArtistsScroll();
+  });
+}, { immediate: true });
+
+const artistsScroll = ref<HTMLElement | null>(null);
+const artistsAtStart = ref(true);
+const artistsAtEnd = ref(false);
+
+function checkArtistsScroll() {
+  const el = artistsScroll.value;
+  if (!el) return;
+  artistsAtStart.value = el.scrollLeft <= 10;
+  artistsAtEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
+}
+
+let resizeObserver: ResizeObserver | null = null;
+
+watch(artistsScroll, (el, oldEl) => {
+  if (oldEl) resizeObserver?.unobserve(oldEl);
+  if (el) {
+    resizeObserver?.observe(el);
+    checkArtistsScroll();
+  }
 });
+
+function scrollArtists(direction: number) {
+  const el = artistsScroll.value;
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
+}
 
 async function runGlobal() {
   const q = query.value.trim();
@@ -222,8 +264,16 @@ function playMany(tracks: Track[]) {
         <div v-else class="search__pane">
           <div v-if="searchArtists.length" class="search__artists-section">
             <h3 class="search__section-title">Артисты</h3>
-            <div class="search__artists">
-              <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
+            <div class="search__slider-container">
+              <button :class="{ 'search__slider-btn--hidden': artistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollArtists(-1)" aria-label="Листать влево">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <div class="search__artists" ref="artistsScroll" @scroll="checkArtistsScroll">
+                <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
+              </div>
+              <button :class="{ 'search__slider-btn--hidden': artistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollArtists(1)" aria-label="Листать вправо">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
             </div>
           </div>
           <div class="search__head">
@@ -329,9 +379,51 @@ function playMany(tracks: Track[]) {
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 4px;
+  scroll-behavior: smooth;
 }
 .search__artists::-webkit-scrollbar {
   display: none;
+}
+.search__slider-container {
+  position: relative;
+  margin: 0 -32px;
+  padding: 0 32px;
+}
+.search__slider-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--text-0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+  z-index: 10;
+  border: 1px solid var(--border);
+}
+.search__slider-container:hover .search__slider-btn:not(.search__slider-btn--hidden) {
+  opacity: 1;
+}
+.search__slider-btn:hover:not(.search__slider-btn--hidden) {
+  background: var(--bg-3);
+  transform: translateY(-50%) scale(1.1);
+}
+.search__slider-btn--hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+  transform: translateY(-50%) scale(0.8) !important;
+}
+.search__slider-btn--prev {
+  left: 16px;
+}
+.search__slider-btn--next {
+  right: 16px;
 }
 .search__head {
   display: flex;
