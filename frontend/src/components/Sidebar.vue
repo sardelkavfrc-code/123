@@ -26,7 +26,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   <aside class="sidebar" :class="{ 'sidebar--collapsed': ui.sidebarCollapsed }">
     <div class="sidebar__logo-wrap">
       <img src="/logo.png" alt="VK Music" class="sidebar__logo" />
-      <span class="sidebar__logo-text" v-if="!ui.sidebarCollapsed">VK Music</span>
+      <span class="sidebar__logo-text">VK Music</span>
     </div>
 
     <RouterLink :to="{ name: 'settings' }" class="sidebar__profile" :title="ui.sidebarCollapsed ? 'Настройки профиля' : ''">
@@ -95,21 +95,29 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   padding: 4px 8px 12px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 8px;
-}
-.sidebar--collapsed .sidebar__logo-wrap {
-  justify-content: center;
-  padding: 4px 0 12px;
+  transition: padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
 }
 .sidebar__logo {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-sm);
   object-fit: contain;
+  flex: 0 0 32px;
 }
 .sidebar__logo-text {
   font-weight: 800;
   font-size: 16px;
   color: var(--text-primary);
+  max-width: 200px;
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), max-width var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.sidebar--collapsed .sidebar__logo-text {
+  opacity: 0;
+  max-width: 0;
+  transform: translateX(-10px);
 }
 .sidebar__profile {
   display: flex;
