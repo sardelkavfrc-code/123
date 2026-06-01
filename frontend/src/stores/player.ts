@@ -1,9 +1,9 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { Howl } from "howler";
 import Hls from "hls.js";
 import type { Track } from "@/api/types";
 import { useSettingsStore } from "./settings";
+import { useEqualizerStore } from "./equalizer";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -36,52 +36,91 @@ export function isHlsUrl(url: string): boolean {
   return lower.includes(".m3u8") || lower.includes("/hls/");
 }
 
-function createHowlerBackend(
+function createHtml5Backend(
   url: string,
   initialVolume: number,
   cb: BackendCallbacks,
+  eq: any
 ): PlaybackBackend {
-  const sound = new Howl({
-    src: [url],
-    html5: true,
-    volume: initialVolume,
-    onload: () => cb.onLoad(sound.duration()),
-    onloaderror: () => cb.onLoadError(),
-    onplayerror: () => cb.onLoadError(),
-    onplay: () => cb.onPlay(),
-    onpause: () => cb.onPause(),
-    onstop: () => cb.onPause(),
-    onend: () => cb.onEnd(),
+  const audio = new Audio();
+  audio.crossOrigin = "anonymous";
+  eq.connectAudioElement(audio);
+
+  audio.preload = "auto";
+  audio.volume = initialVolume;
+
+  let loaded = false;
+  const markLoaded = () => {
+    if (loaded) return;
+    loaded = true;
+    cb.onLoad(Number.isFinite(audio.duration) ? audio.duration : 0);
+  };
+
+  audio.addEventListener("loadedmetadata", markLoaded);
+  audio.addEventListener("canplay", markLoaded);
+  audio.addEventListener("play", () => cb.onPlay());
+  audio.addEventListener("pause", () => {
+    if (audio.ended) return;
+    cb.onPause();
   });
+  audio.addEventListener("ended", () => cb.onEnd());
+  audio.addEventListener("error", () => cb.onLoadError());
+
+  audio.src = url;
+
   return {
     play: () => {
-      sound.play();
+      void audio.play().catch(() => cb.onLoadError());
     },
-    pause: () => sound.pause(),
-    isPlaying: () => sound.playing(),
+    pause: () => audio.pause(),
+    isPlaying: () => !audio.paused && !audio.ended,
     seek: (s) => {
-      sound.seek(s);
+      try {
+        audio.currentTime = s;
+      } catch {}
     },
-    position: () => (sound.seek() as number) || 0,
-    duration: () => sound.duration(),
-    setVolume: (v) => sound.volume(v),
+    position: () => audio.currentTime || 0,
+    duration: () => (Number.isFinite(audio.duration) ? audio.duration : 0),
+    setVolume: (v) => {
+      audio.volume = Math.max(0, Math.min(1, v));
+    },
     fadeOut: (ms) => {
-      const v = sound.volume();
-      sound.fade(v, 0, ms);
-      window.setTimeout(() => {
-        sound.off();
-        sound.stop();
-        sound.unload();
-      }, ms + 50);
+      let v = audio.volume;
+      const steps = 20;
+      const stepTime = ms / steps;
+      const stepVol = v / steps;
+      const iv = setInterval(() => {
+        v -= stepVol;
+        if (v <= 0) {
+          clearInterval(iv);
+          audio.pause();
+          audio.removeAttribute("src");
+          audio.load();
+        } else {
+          audio.volume = v;
+        }
+      }, stepTime);
     },
     fadeIn: (ms, targetV) => {
-      sound.volume(0);
-      sound.fade(0, targetV, ms);
+      let v = 0;
+      audio.volume = v;
+      const steps = 20;
+      const stepTime = ms / steps;
+      const stepVol = targetV / steps;
+      const iv = setInterval(() => {
+        v += stepVol;
+        if (v >= targetV) {
+          audio.volume = targetV;
+          clearInterval(iv);
+        } else {
+          audio.volume = v;
+        }
+      }, stepTime);
     },
     destroy: () => {
-      sound.off();
-      sound.stop();
-      sound.unload();
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
     },
   };
 }
@@ -90,11 +129,13 @@ function createHlsBackend(
   url: string,
   initialVolume: number,
   cb: BackendCallbacks,
+  eq: any
 ): PlaybackBackend {
   const audio = new Audio();
   audio.preload = "auto";
   audio.volume = initialVolume;
   audio.crossOrigin = "anonymous";
+  eq.connectAudioElement(audio);
 
   let hls: Hls | null = null;
   let loaded = false;
@@ -201,6 +242,7 @@ function createHlsBackend(
 
 export const usePlayerStore = defineStore("player", () => {
   const settings = useSettingsStore();
+  const eq = useEqualizerStore();
 
   const queue = ref<Track[]>([]);
   const originalQueue = ref<Track[]>([]); // for un-shuffle
@@ -343,8 +385,8 @@ export const usePlayerStore = defineStore("player", () => {
     };
 
     thisBackend = isHlsUrl(track.url)
-      ? createHlsBackend(track.url, initialVolume, callbacks)
-      : createHowlerBackend(track.url, initialVolume, callbacks);
+      ? createHlsBackend(track.url, initialVolume, callbacks, eq)
+      : createHtml5Backend(track.url, initialVolume, callbacks, eq);
     backend = thisBackend;
 
     if (autoPlay) {

@@ -5,12 +5,15 @@ import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
+import { useEqualizerStore } from "@/stores/equalizer";
 import { formatDuration } from "@/composables/useFormat";
 import { useExternalArt } from "@/composables/useExternalArt";
+import EqualizerModal from "./EqualizerModal.vue";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
 const ui = useUIStore();
+const eq = useEqualizerStore();
 const router = useRouter();
 
 const { current, isPlaying, currentTime, duration, repeat, shuffle, volume, muted, loadingTrack } =
@@ -91,6 +94,9 @@ function addToQueue() {
 function openQueue() {
   router.push({ name: "queue" });
 }
+
+const showEqModal = ref(false);
+const eqEnabled = computed(() => eq.enabled);
 
 // Cover-art fallback (iTunes) when VK doesn't ship a cover. The composable
 // no-ops when the setting is off or when VK already has artwork.
@@ -246,10 +252,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       </div>
       <div class="player__seek">
         <span class="player__time">{{ formatDuration(displayTime) }}</span>
-        <div class="player__scrubber">
-          <div class="player__scrubber-track">
-            <div class="player__scrubber-fill" :style="{ width: progressPct + '%' }" />
-          </div>
+        <div class="player__scrubber" :style="{ '--progress-pct': progressPct }">
+          <div class="player__scrubber-track" />
+          <div class="player__scrubber-fill" :class="{ 'player__scrubber-fill--seeking': isSeeking }" />
           <input
             class="player__scrubber-input"
             type="range"
@@ -268,8 +273,22 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 
     <div class="player__right">
       <div class="player__volume">
-      <button
-        class="player__icon-btn"
+        <button 
+          class="player__icon-btn" 
+          :class="{ 'player__icon-btn--active': eqEnabled }"
+          title="Эквалайзер" 
+          aria-label="Эквалайзер" 
+          @click="showEqModal = true"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 22v-8M4 10V2M12 22v-4M12 14V2M20 22v-12M20 6V2" />
+            <line x1="2" y1="14" x2="6" y2="14" />
+            <line x1="10" y1="18" x2="14" y2="18" />
+            <line x1="18" y1="10" x2="22" y2="10" />
+          </svg>
+        </button>
+        <button
+          class="player__icon-btn"
         :aria-label="muted ? 'Включить звук' : 'Выключить звук'"
         @click="player.toggleMute()"
       >
@@ -298,6 +317,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       </div>
       </div>
     </div>
+    
+    <EqualizerModal :show="showEqModal" @close="showEqModal = false" />
   </footer>
 </template>
 
@@ -494,31 +515,77 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   text-align: center;
 }
 .player__scrubber {
+  --scrubber-thumb: 14px;
   position: relative;
   flex: 1 1 auto;
   height: 24px;
   display: flex;
   align-items: center;
+  padding: 0 calc(var(--scrubber-thumb) / 2);
 }
 .player__scrubber-track {
   position: absolute;
-  inset: 11px 0 auto 0;
+  left: calc(var(--scrubber-thumb) / 2);
+  right: calc(var(--scrubber-thumb) / 2);
+  top: 0;
+  bottom: 0;
+  margin: auto;
   height: 4px;
   background: var(--bg-3);
   border-radius: 2px;
-  overflow: hidden;
 }
 .player__scrubber-fill {
-  height: 100%;
+  position: absolute;
+  left: calc(var(--scrubber-thumb) / 2);
+  top: 0;
+  bottom: 0;
+  margin: auto;
+  height: 4px;
+  width: calc((100% - var(--scrubber-thumb)) * (var(--progress-pct) / 100));
   background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
+  border-radius: 2px;
   transition: width 0.1s linear;
+  pointer-events: none;
+}
+.player__scrubber-fill--seeking {
+  transition: none !important;
 }
 .player__scrubber-input {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  margin: auto;
   width: 100%;
-  height: 100%;
+  height: 14px;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
   opacity: 0;
+}
+.player__scrubber-input::-webkit-slider-runnable-track {
+  height: 14px;
+  background: transparent;
+}
+.player__scrubber-input::-moz-range-track {
+  height: 14px;
+  background: transparent;
+}
+.player__scrubber-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  cursor: pointer;
+  margin-top: 0;
+}
+.player__scrubber-input::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
   cursor: pointer;
 }
 .player__volume {
@@ -528,6 +595,11 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   flex: 1;
   min-width: 0;
   justify-content: flex-end;
+}
+.player__actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .player__right {
   display: flex;

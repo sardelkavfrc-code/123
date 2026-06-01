@@ -158,13 +158,8 @@ function remove(i: number) {
   background: var(--bg-2);
 }
 :deep(.queue__row--current) {
-  background: linear-gradient(135deg, rgba(26, 140, 255, 0.12), rgba(109, 60, 255, 0.08));
-  color: var(--accent-1);
-}
-:deep(.queue__row--current .queue__artist),
-:deep(.queue__row--current .queue__duration) {
-  color: var(--accent-1);
-  opacity: 0.85;
+  background: linear-gradient(90deg, rgba(26, 140, 255, 0.12), rgba(109, 60, 255, 0.12));
+  color: var(--text-0);
 }
 :deep(.queue__handle) {
   display: inline-flex;

@@ -9,6 +9,7 @@ import { usePlayerStore } from "@/stores/player";
 import { useUIStore } from "@/stores/ui";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
+import EqualizerModal from "@/components/EqualizerModal.vue";
 
 const settings = useSettingsStore();
 const auth = useAuthStore();
@@ -131,6 +132,8 @@ async function onAutoStartChange(event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
   await settings.setAutoStart(enabled);
 }
+
+const showEqModal = ref(false);
 
 const electronAvailable = computed(() => Boolean(window.vkmp));
 </script>
@@ -279,6 +282,17 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             </div>
           </label>
         </article>
+
+        <article class="settings__card">
+          <h2>Эквалайзер</h2>
+          <div class="settings__row">
+            <div>
+              <div class="settings__row-title">Настроить звук</div>
+              <div class="settings__row-sub">Усиление басов, пресеты или ручная настройка частот</div>
+            </div>
+            <button class="btn btn--primary" style="padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: var(--bg-3); color: var(--text-0);" @click="showEqModal = true">Открыть эквалайзер</button>
+          </div>
+        </article>
       </template>
 
       <!-- Приложение -->
@@ -399,6 +413,8 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
         </div>
       </Transition>
     </section>
+
+    <EqualizerModal :show="showEqModal" @close="showEqModal = false" />
   </ScrollArea>
 </template>
 

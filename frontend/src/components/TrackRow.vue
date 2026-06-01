@@ -181,9 +181,7 @@ async function toggleLibrary() {
       </button>
       <button class="row__action" title="Похожие" aria-label="Похожие" @click.stop="openSimilar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
-          <path d="M5 5l2.5 2.5M16.5 16.5 19 19M19 5l-2.5 2.5M7.5 16.5 5 19" />
-          <circle cx="12" cy="12" r="3" />
+          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
         </svg>
       </button>
       <button class="row__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
