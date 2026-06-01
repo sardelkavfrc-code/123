@@ -109,14 +109,16 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   font-weight: 800;
   font-size: 16px;
   color: var(--text-primary);
+  min-width: 0;
   max-width: 200px;
-  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), max-width var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), max-width var(--motion-duration-slow) var(--motion-ease-out), margin var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
   white-space: nowrap;
   overflow: hidden;
 }
 .sidebar--collapsed .sidebar__logo-text {
   opacity: 0;
   max-width: 0;
+  margin-left: -12px;
   transform: translateX(-10px);
 }
 .sidebar__profile {
@@ -211,14 +213,16 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   padding-left: 14px; /* Centers 20px icon inside 48px inner width */
 }
 .sidebar__label {
+  min-width: 0;
   max-width: 200px;
-  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), max-width var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
+  transition: opacity var(--motion-duration-slow) var(--motion-ease-out), max-width var(--motion-duration-slow) var(--motion-ease-out), margin var(--motion-duration-slow) var(--motion-ease-out), transform var(--motion-duration-slow) var(--motion-ease-out);
   white-space: nowrap;
   overflow: hidden;
 }
 .sidebar--collapsed .sidebar__label {
   opacity: 0;
   max-width: 0;
+  margin-left: -12px;
   transform: translateX(-10px);
 }
 .sidebar__link:hover {
