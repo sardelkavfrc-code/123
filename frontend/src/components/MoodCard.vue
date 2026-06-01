@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import type { AlbumSummary } from "@/api/types";
-import { useRouter } from "vue-router";
 
 import Spinner from "@/components/Spinner.vue";
 
-const props = defineProps<{
+defineProps<{
   mood: AlbumSummary;
   loading?: boolean;
 }>();
@@ -32,7 +30,7 @@ const emit = defineEmits<{ click: [] }>();
 .mood-card {
   position: relative;
   width: 150px;
-  height: 120px;
+  height: 96px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   position: relative;
@@ -42,6 +40,8 @@ const emit = defineEmits<{ click: [] }>();
   cursor: pointer;
   border: none;
   padding: 0;
+  background-size: cover;
+  background-position: center;
 }
 .mood-card__overlay {
   position: absolute;

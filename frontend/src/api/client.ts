@@ -5,10 +5,10 @@ import type {
   AuthStatus,
   CoverLookup,
   FriendList,
-  FriendList,
   Track,
   TrackList,
   User,
+  ArtistAlbumsResponse,
 } from "./types";
 
 const defaultBaseURL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8765";
@@ -151,10 +151,8 @@ export const api = {
     const { data } = await http.get<AlbumList>(`/audio/albums/${ownerId}`, { params });
     return data;
   },
-  async artistAlbums(
-    artistId: string
-  ): Promise<AlbumList> {
-    const { data } = await http.get<AlbumList>(`/audio/artist_albums/${encodeURIComponent(artistId)}`);
+  async artistAlbums(artistId: string): Promise<ArtistAlbumsResponse> {
+    const { data } = await http.get<ArtistAlbumsResponse>(`/audio/artist_albums/${encodeURIComponent(artistId)}`);
     return data;
   },
   async playlistTracks(

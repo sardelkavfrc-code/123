@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
+import type { Track } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
@@ -24,7 +25,7 @@ const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (!q) return myMusic.value;
   return myMusic.value.filter(
-    (t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
+    (t: Track) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
   );
 });
 

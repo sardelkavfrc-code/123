@@ -281,60 +281,77 @@ def _slug_to_name(slug: str) -> str:
     return slug.replace("-", " ").replace("_", " ").strip().title() or slug
 
 
-@router.get("/artist_albums/{artist_id}", response_model=AlbumList)
+@router.get("/artist_albums/{artist_id}")
 async def artist_albums(
     artist_id: str,
     vk: VKDep,
     session: SessionDep,
-) -> AlbumList:
+):
     """Albums for a VK artist via catalog."""
     try:
         # Get artist catalog
         catalog_raw = await vk.call("catalog.getAudioArtist", session.access_token, artist_id=artist_id)
         sections = catalog_raw.get("catalog", {}).get("sections", [])
         if not sections:
-            return AlbumList(items=[], count=0)
+            return {"blocks": []}
             
         section_id = sections[0].get("id")
         if not section_id:
-            return AlbumList(items=[], count=0)
+            return {"blocks": []}
             
         # Get section
         section_raw = await vk.call("catalog.getSection", session.access_token, section_id=section_id)
         blocks = section_raw.get("section", {}).get("blocks", [])
         playlists_data = section_raw.get("playlists", [])
         
-        albums = []
+        result_blocks = []
+        block_titles = ["Релизы", "Участие в релизах"]
+        block_idx = 0
+        
         for b in blocks:
             if b.get("data_type") == "music_playlists":
+                title = b.get("layout", {}).get("title") or b.get("title")
+                if not title or title == "Альбомы":
+                    title = block_titles[block_idx] if block_idx < len(block_titles) else "Альбомы"
+                
                 playlists_ids = b.get("playlists_ids", [])
+                
+                albums = []
                 for pl in playlists_data:
                     pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
                     if pl_id in playlists_ids:
-                        albums.append(
-                            AlbumSummary(
-                                id=str(pl["id"]),
-                                owner_id=pl["owner_id"],
-                                title=pl["title"],
-                                subtitle=pl.get("description") or pl.get("subtitle") or "",
-                                cover=_get_playlist_cover(pl),
-                                year=pl.get("year"),
-                                track_count=pl.get("count", 0),
-                            )
-                        )
-                        
-        # Deduplicate while preserving order
-        seen = set()
-        unique_albums = []
-        for a in albums:
-            key = f"{a.owner_id}_{a.id}"
-            if key not in seen:
-                seen.add(key)
-                unique_albums.append(a)
+                        albums.append({
+                            "id": str(pl["id"]),
+                            "owner_id": pl["owner_id"],
+                            "title": pl["title"],
+                            "subtitle": pl.get("description") or pl.get("subtitle") or "",
+                            "cover": _get_playlist_cover(pl),
+                            "year": pl.get("year"),
+                            "track_count": pl.get("count", 0),
+                        })
                 
-        return AlbumList(items=unique_albums, count=len(unique_albums))
+                if albums:
+                    # Deduplicate while preserving order
+                    seen = set()
+                    unique_albums = []
+                    for a in albums:
+                        key = f"{a['owner_id']}_{a['id']}"
+                        if key not in seen:
+                            seen.add(key)
+                            unique_albums.append(a)
+                    
+                    result_blocks.append({
+                        "title": title,
+                        "albums": unique_albums
+                    })
+                    block_idx += 1
+                    
+                    if len(result_blocks) >= 2:
+                        break
+                    
+        return {"blocks": result_blocks}
     except VKError:
-        return AlbumList(items=[], count=0)
+        return {"blocks": []}
 
     return slug.replace("-", " ").replace("_", " ").strip().title() or slug
 

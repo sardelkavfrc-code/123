@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { useMotion } from "@/composables/useSpring";
+import type { User } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import EmptyState from "@/components/EmptyState.vue";
@@ -22,10 +23,10 @@ const visibleFriends = computed(() => {
   if (!friends.value) return [];
   // VK never exposes audio of friends who hide it, so showing locked profiles
   // is just noise — drop them unconditionally.
-  const base = friends.value.items.filter((u) => u.audio_visible);
+  const base = friends.value.items.filter((u: User) => u.audio_visible);
   const q = query.value.trim().toLowerCase();
   if (!q) return base;
-  return base.filter((u) =>
+  return base.filter((u: User) =>
     `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
   );
 });

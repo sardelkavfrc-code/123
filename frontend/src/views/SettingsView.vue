@@ -152,8 +152,10 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
     </div>
 
     <section class="settings">
-      <!-- Внешний вид -->
-      <template v-if="activeTab === 'appearance'">
+      <Transition name="fade-slide" mode="out-in">
+        <div :key="activeTab" class="settings__tab-pane">
+          <!-- Внешний вид -->
+          <template v-if="activeTab === 'appearance'">
         <article class="settings__card">
           <h2>Тема</h2>
           <div class="settings__grid settings__grid--themes">
@@ -393,8 +395,9 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             с правами 600.
           </p>
         </article>
-      </template>
-
+          </template>
+        </div>
+      </Transition>
     </section>
   </ScrollArea>
 </template>
@@ -434,6 +437,13 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   gap: 16px;
   max-width: 800px;
 }
+.settings__tab-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
 .settings__card {
   padding: 22px 22px 18px;
   background: var(--bg-1);
@@ -708,5 +718,18 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   background: var(--bg-2);
   padding: 0 4px;
   border-radius: 4px;
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.25s var(--motion-ease-out), transform 0.25s var(--motion-ease-out);
+}
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

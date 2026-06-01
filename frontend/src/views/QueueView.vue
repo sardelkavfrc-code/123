@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick } from "vue";
+import { computed, ref, onMounted, nextTick } from "vue";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";

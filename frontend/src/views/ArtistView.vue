@@ -2,17 +2,18 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { api, APIError } from "@/api/client";
-import type { AlbumSummary, Artist, Track } from "@/api/types";
+import type { ArtistAlbumBlock, Artist, Track, AlbumSummary } from "@/api/types";
 import { usePlayerStore } from "@/stores/player";
 import { useUIStore } from "@/stores/ui";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
 import Spinner from "@/components/Spinner.vue";
+import RecommendationCard from "@/components/RecommendationCard.vue";
 import { tracksLabel } from "@/composables/useFormat";
 
 const PAGE_SIZE = 100;
 
-type ArtistTab = "all" | "albums" | "similar";
+type ArtistTab = "all" | "albums";
 
 const props = defineProps<{ id: string }>();
 const router = useRouter();
@@ -24,15 +25,13 @@ const artist = ref<Artist | null>(null);
 const tracks = ref<Track[]>([]);
 const tracksTotal = ref(0);
 const tracksLoadingMore = ref(false);
-const similar = ref<Track[]>([]);
-const similarLoading = ref(false);
-const albums = ref<AlbumSummary[]>([]);
+
+const albumsBlocks = ref<ArtistAlbumBlock[]>([]);
 const albumsLoading = ref(false);
 const albumsLoaded = ref(false);
 const albumsError = ref<string | null>(null);
-const openAlbumId = ref<string | null>(null);
-const albumTracks = ref<Record<string, Track[]>>({});
-const albumTracksLoading = ref<Record<string, boolean>>({});
+const loadingAlbumId = ref<string | null>(null);
+
 const tab = ref<ArtistTab>("all");
 
 const loading = ref(false);
@@ -55,18 +54,13 @@ async function load() {
   artist.value = null;
   tracks.value = [];
   tracksTotal.value = 0;
-  similar.value = [];
-  albums.value = [];
+  
+  albumsBlocks.value = [];
   albumsLoaded.value = false;
   albumsError.value = null;
-  openAlbumId.value = null;
-  albumTracks.value = {};
-  albumTracksLoading.value = {};
+  loadingAlbumId.value = null;
   tab.value = "all";
 
-  // Run both calls independently — under the vk.com web token from
-  // vkhost.github.io, artist methods may partially fail. Each side
-  // falls back to a stub so the screen still renders something useful.
   const name = hintedName.value ?? undefined;
 
   const [infoRes, listRes] = await Promise.allSettled([
@@ -97,8 +91,6 @@ async function load() {
         : (reason as Error).message || "Не удалось загрузить треки артиста";
   }
 
-  loadSimilar();
-
   if (!artist.value && !tracks.value.length) {
     error.value = "Артист не найден";
   }
@@ -122,29 +114,9 @@ async function loadMoreTracks() {
     tracks.value = [...tracks.value, ...fresh];
     if (list.count > 0) tracksTotal.value = list.count;
   } catch {
-    // swallow — retry on next scroll
+    // swallow
   } finally {
     tracksLoadingMore.value = false;
-  }
-}
-
-async function loadSimilar() {
-  if (!tracks.value.length) return;
-  if (similar.value.length || similarLoading.value) return;
-  similarLoading.value = true;
-  try {
-    const first = tracks.value.find((t) => !!t.url) ?? tracks.value[0];
-    const sim = await api.recommendations({
-      target_audio: `${first.owner_id}_${first.id}`,
-      count: 60,
-    });
-    similar.value = sim.items.filter(
-      (t) => !tracks.value.some((tt) => tt.id === t.id && tt.owner_id === t.owner_id)
-    );
-  } catch {
-    // recommendations are nice-to-have, swallow
-  } finally {
-    similarLoading.value = false;
   }
 }
 
@@ -154,7 +126,7 @@ async function ensureAlbums() {
   albumsError.value = null;
   try {
     const res = await api.artistAlbums(props.id);
-    albums.value = res.items;
+    albumsBlocks.value = res.blocks || [];
   } catch (err) {
     albumsError.value =
       err instanceof APIError
@@ -166,37 +138,38 @@ async function ensureAlbums() {
   }
 }
 
-async function toggleAlbum(album: AlbumSummary) {
+async function playAlbum(album: AlbumSummary) {
   if (album.owner_id == null) {
     ui.notify("Неверный альбом", "error");
     return;
   }
-  if (openAlbumId.value === album.id) {
-    openAlbumId.value = null;
-    return;
-  }
-  openAlbumId.value = album.id;
-  if (albumTracks.value[album.id]) return;
-  albumTracksLoading.value = { ...albumTracksLoading.value, [album.id]: true };
+  if (loadingAlbumId.value) return;
+  
+  loadingAlbumId.value = album.id;
   try {
-    const numericId = Number(album.id.split("_").pop());
-    const list = await api.playlistTracks(album.owner_id, numericId, { count: 100 });
-    albumTracks.value = { ...albumTracks.value, [album.id]: list.items };
+    const numericId = Number(album.id.split("_").pop() || album.id);
+    const list = await api.playlistTracks(album.owner_id, numericId, { count: 200 });
+    if (list.items && list.items.length > 0) {
+      player.playQueue(list.items, 0);
+    } else {
+      ui.notify("Альбом пуст", "error");
+    }
   } catch {
     ui.notify("Не удалось открыть альбом", "error");
   } finally {
-    albumTracksLoading.value = { ...albumTracksLoading.value, [album.id]: false };
+    loadingAlbumId.value = null;
   }
 }
 
-function playAlbum(album: AlbumSummary) {
-  const list = albumTracks.value[album.id];
-  if (list && list.length) player.playQueue(list);
+function scrollSlider(idx: number, direction: number) {
+  const el = document.getElementById(`artist-slider-${idx}`);
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
 }
 
 watch(tab, (next) => {
   if (next === "albums") void ensureAlbums();
-  if (next === "similar" && !similar.value.length) void loadSimilar();
 });
 
 onMounted(load);
@@ -252,94 +225,61 @@ function playAll() {
       >
         Альбомы
       </button>
-      <button
-        class="artist__tab"
-        :class="{ 'artist__tab--active': tab === 'similar' }"
-        role="tab"
-        :aria-selected="tab === 'similar'"
-        @click="tab = 'similar'"
-      >
-        Похожие
-      </button>
     </nav>
 
     <section class="artist__body">
       <div v-if="loading" class="artist__loading"><Spinner :size="20" /> Загружаем артиста…</div>
       <div v-else-if="error" class="artist__error">{{ error }}</div>
-      <template v-else>
-        <template v-if="tab === 'all'">
-          <div v-if="tracksWarning" class="artist__warn">{{ tracksWarning }}</div>
-          <TrackList
-            :tracks="tracks"
-            show-index
-            empty-title="У артиста пока нет треков"
-          />
-          <div v-if="tracksLoadingMore" class="artist__loading">
-            <Spinner :size="16" /> Подгружаем ещё…
-          </div>
-        </template>
+      
+      <Transition name="fade-slide" mode="out-in">
+        <div :key="tab" class="artist__tab-pane">
+          <template v-if="tab === 'all'">
+            <div v-if="tracksWarning" class="artist__warn">{{ tracksWarning }}</div>
+            <TrackList
+              :tracks="tracks"
+              show-index
+              empty-title="У артиста пока нет треков"
+            />
+            <div v-if="tracksLoadingMore" class="artist__loading">
+              <Spinner :size="16" /> Подгружаем ещё…
+            </div>
+          </template>
 
-        <template v-else-if="tab === 'albums'">
-          <div v-if="albumsLoading" class="artist__loading"><Spinner :size="16" /> Грузим альбомы…</div>
-          <div v-else-if="albumsError" class="artist__warn">{{ albumsError }}</div>
-          <div v-else-if="!albums.length" class="artist__warn">
-            У артиста нет альбомов, либо ВК их не отдал.
-          </div>
-          <div v-else class="artist__albums">
-            <div
-              v-for="album in albums"
-              :key="album.id"
-              class="artist__album"
-              :class="{ 'artist__album--open': openAlbumId === album.id }"
-            >
-              <button class="artist__album-head" @click="toggleAlbum(album)">
-                <div class="artist__album-cover">
-                  <img v-if="album.cover" :src="album.cover" :alt="album.title" loading="lazy" />
-                  <span v-else>{{ album.title.charAt(0) }}</span>
+          <template v-else-if="tab === 'albums'">
+            <div v-if="albumsLoading" class="artist__loading"><Spinner :size="16" /> Грузим альбомы…</div>
+            <div v-else-if="albumsError" class="artist__warn">{{ albumsError }}</div>
+            <div v-else-if="!albumsBlocks.length" class="artist__warn">
+              У артиста нет альбомов, либо ВК их не отдал.
+            </div>
+            <div v-else class="artist__albums-blocks">
+              <div v-for="(block, idx) in albumsBlocks" :key="idx" class="artist__album-section">
+                <div class="artist__section-head">
+                  <h2>{{ block.title }}</h2>
                 </div>
-                <div class="artist__album-meta">
-                  <div class="artist__album-title">{{ album.title }}</div>
-                  <div class="artist__album-sub">
-                    <span v-if="album.year">{{ album.year }}</span>
-                    <span v-if="album.track_count">· {{ tracksLabel(album.track_count) }}</span>
-                    <span v-if="album.subtitle">· {{ album.subtitle }}</span>
+                <div class="artist__slider-container">
+                  <button class="artist__slider-btn artist__slider-btn--prev" @click="scrollSlider(idx, -1)" aria-label="Листать влево">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                  </button>
+                  <div :id="`artist-slider-${idx}`" class="artist__slider">
+                    <RecommendationCard
+                      v-for="(album, i) in block.albums"
+                      :key="album.id"
+                      :block="album"
+                      :index="i"
+                      :show-hover-meta="true"
+                      :loading="loadingAlbumId === album.id"
+                      @open="playAlbum"
+                    />
                   </div>
+                  <button class="artist__slider-btn artist__slider-btn--next" @click="scrollSlider(idx, 1)" aria-label="Листать вправо">
+                    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                  </button>
                 </div>
-                <span class="artist__album-caret" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                    <path :d="openAlbumId === album.id ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'" />
-                  </svg>
-                </span>
-              </button>
-              <div v-if="openAlbumId === album.id" class="artist__album-body">
-                <div v-if="albumTracksLoading[album.id]" class="artist__loading">
-                  <Spinner :size="16" /> Открываем альбом…
-                </div>
-                <template v-else-if="albumTracks[album.id]?.length">
-                  <div class="artist__album-actions">
-                    <button class="btn btn--ghost" @click="playAlbum(album)">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-                      Слушать весь альбом
-                    </button>
-                  </div>
-                  <TrackList :tracks="albumTracks[album.id]" show-index />
-                </template>
-                <div v-else class="artist__warn">Пусто</div>
               </div>
             </div>
-          </div>
-        </template>
-
-        <template v-else>
-          <div v-if="similarLoading" class="artist__loading"><Spinner :size="16" /> Подбираем похожее…</div>
-          <TrackList
-            v-else
-            :tracks="similar"
-            show-index
-            empty-title="Похожих треков не нашлось"
-          />
-        </template>
-      </template>
+          </template>
+        </div>
+      </Transition>
     </section>
   </ScrollArea>
 </template>
@@ -478,84 +418,87 @@ function playAll() {
   background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
   color: var(--accent-text, #fff);
 }
-.artist__albums {
+.artist__tab-pane {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-.artist__album {
-  background: var(--bg-2);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  overflow: hidden;
-}
-.artist__album--open {
-  background: var(--bg-3);
-}
-.artist__album-head {
-  display: grid;
-  grid-template-columns: 56px 1fr auto;
-  gap: 14px;
-  align-items: center;
-  padding: 10px 14px;
   width: 100%;
-  text-align: left;
+}
+
+.artist__albums-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-top: 8px;
+}
+.artist__album-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.artist__section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text-0);
-  background: transparent;
-  border: none;
-  cursor: pointer;
 }
-.artist__album-head:hover {
-  background: var(--bg-3);
+.artist__slider-container {
+  position: relative;
+  margin: 0 -32px;
+  padding: 0 32px;
 }
-.artist__album-cover {
-  width: 56px;
-  height: 56px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--bg-1);
-  display: inline-flex;
+.artist__slider-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  color: var(--text-0);
+  display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-2);
-  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+  z-index: 10;
+  border: 1px solid var(--border);
 }
-.artist__album-cover img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.artist__slider-container:hover .artist__slider-btn {
+  opacity: 1;
 }
-.artist__album-meta {
-  min-width: 0;
+.artist__slider-btn:hover {
+  background: var(--bg-3);
+  transform: translateY(-50%) scale(1.1);
+}
+.artist__slider-btn--prev {
+  left: 16px;
+}
+.artist__slider-btn--next {
+  right: 16px;
+}
+.artist__slider {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+  scroll-behavior: smooth;
 }
-.artist__album-title {
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.artist__slider::-webkit-scrollbar {
+  display: none;
 }
-.artist__album-sub {
-  font-size: 12px;
-  color: var(--text-2);
-  display: inline-flex;
-  gap: 4px;
-  align-items: center;
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.25s var(--motion-ease-out), transform 0.25s var(--motion-ease-out);
 }
-.artist__album-caret {
-  color: var(--text-2);
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
 }
-.artist__album-body {
-  padding: 8px 14px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.artist__album-actions {
-  display: flex;
-  justify-content: flex-end;
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

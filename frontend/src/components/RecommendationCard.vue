@@ -2,11 +2,13 @@
 import { computed } from "vue";
 import { useMotion } from "@/composables/useSpring";
 import type { AlbumSummary } from "@/api/types";
+import { tracksLabel } from "@/composables/useFormat";
 
 const props = defineProps<{
   block: AlbumSummary;
   index?: number;
   loading?: boolean;
+  showHoverMeta?: boolean;
 }>();
 
 import Spinner from "@/components/Spinner.vue";
@@ -31,13 +33,18 @@ const background = computed(() => {
 </script>
 
 <template>
-  <button v-motion="variants" class="rec-card" :style="{ background }" @click="$emit('open', block)">
+  <button v-motion="variants" class="rec-card" :class="{'rec-card--hover-meta': showHoverMeta}" :style="{ background }" @click="$emit('open', block)">
     <div class="rec-card__overlay"></div>
     <div class="rec-card__play" :class="{ 'rec-card__play--loading': loading }">
       <Spinner v-if="loading" :size="32" color="#fff" />
       <svg v-else viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
         <path d="M8 5v14l11-7z" />
       </svg>
+    </div>
+    <div v-if="(block.year || block.track_count) && showHoverMeta" class="rec-card__hover-meta">
+      <span v-if="block.year">{{ block.year }}</span>
+      <span v-if="block.year && block.track_count">&bull;</span>
+      <span v-if="block.track_count">{{ tracksLabel(block.track_count) }}</span>
     </div>
     <div class="rec-card__content">
       <div class="rec-card__top">
@@ -161,6 +168,37 @@ const background = computed(() => {
 .rec-card__bottom {
   display: flex;
   justify-content: flex-start;
+}
+.rec-card--hover-meta .rec-card__bottom {
+  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+}
+.rec-card--hover-meta:hover .rec-card__bottom {
+  opacity: 0;
+}
+.rec-card__hover-meta {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+  z-index: 3;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+.rec-card--hover-meta:hover .rec-card__hover-meta {
+  opacity: 1;
+  transform: translateY(0);
 }
 .rec-card__icon {
   color: #fff;

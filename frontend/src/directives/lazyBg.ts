@@ -1,4 +1,4 @@
-import type { DirectiveBinding, ObjectDirective } from 'vue';
+import type { ObjectDirective } from 'vue';
 
 const observer = new IntersectionObserver(
   (entries) => {

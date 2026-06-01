@@ -62,9 +62,22 @@ export interface AlbumSummary {
   track_count: number | null;
 }
 
+export interface ArtistAlbumBlock {
+  title: string;
+  albums: AlbumSummary[];
+}
+
+export interface ArtistAlbumsResponse {
+  blocks: ArtistAlbumBlock[];
+}
+
 export interface AlbumList {
   items: AlbumSummary[];
   count: number;
+}
+
+export interface ArtistAlbumsResponse {
+  blocks: ArtistAlbumBlock[];
 }
 
 export interface CoverLookup {

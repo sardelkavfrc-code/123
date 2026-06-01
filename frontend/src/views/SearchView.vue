@@ -47,7 +47,7 @@ const libraryMatches = computed(() => {
   const q = query.value.trim().toLowerCase();
   if (!q) return [];
   return myMusic.value.filter(
-    (t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
+    (t: Track) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
   );
 });
 
