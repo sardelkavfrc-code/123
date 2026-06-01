@@ -42,9 +42,11 @@ function scrollToCurrent() {
   if (!listRef.value) return false;
   const currentEl = listRef.value.querySelector('.queue__row--current') as HTMLElement | null;
   if (currentEl) {
-    const container = currentEl.closest('.scroll-area');
+    const container = currentEl.closest('.scroll-area') as HTMLElement | null;
     if (container) {
-      const top = currentEl.offsetTop - container.clientHeight / 2 + currentEl.clientHeight / 2;
+      const cRect = container.getBoundingClientRect();
+      const eRect = currentEl.getBoundingClientRect();
+      const top = container.scrollTop + (eRect.top - cRect.top) - container.clientHeight / 2 + eRect.height / 2;
       container.scrollTo({ top, behavior: 'smooth' });
     } else {
       currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -80,9 +82,7 @@ function playAt(i: number) {
     player.togglePlay();
     return;
   }
-  player.index = i;
-  // Reload the backend for the freshly-pointed-at track.
-  player.playQueue(queue.value, i);
+  player.playAtIndex(i);
 }
 
 function remove(i: number) {

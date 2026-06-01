@@ -426,6 +426,12 @@ export const usePlayerStore = defineStore("player", () => {
     loadCurrent(true);
   }
 
+  function playAtIndex(i: number) {
+    if (i < 0 || i >= queue.value.length) return;
+    index.value = i;
+    loadCurrent(true);
+  }
+
   function playTrack(track: Track) {
     playQueue([track]);
   }
@@ -604,6 +610,7 @@ export const usePlayerStore = defineStore("player", () => {
     hasNext,
     hasPrev,
     playQueue,
+    playAtIndex,
     playTrack,
     enqueueNext,
     appendToQueue,
