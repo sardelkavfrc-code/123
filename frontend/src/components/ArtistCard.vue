@@ -55,9 +55,7 @@ function openArtist() {
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--app-shadow, 0 4px 14px rgba(0, 0, 0, 0.05));
   transition: transform var(--motion-duration-fast) var(--motion-ease-out),
-              box-shadow var(--motion-duration-fast) var(--motion-ease-out),
               border-color var(--motion-duration-fast) var(--motion-ease-out);
   cursor: pointer;
   width: 140px;
@@ -65,7 +63,6 @@ function openArtist() {
 .artist-card:hover {
   border-color: var(--primary);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 .artist-card__photo {
   position: relative;
