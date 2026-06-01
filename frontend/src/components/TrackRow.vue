@@ -215,7 +215,7 @@ async function toggleLibrary() {
   background: var(--bg-2);
 }
 .row--playing {
-  background: linear-gradient(90deg, rgba(26, 140, 255, 0.12), rgba(109, 60, 255, 0.12));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 12%, transparent), color-mix(in srgb, var(--accent-3) 12%, transparent));
   color: var(--text-0);
 }
 .row--off {

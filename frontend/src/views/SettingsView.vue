@@ -511,7 +511,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
 }
 .settings__tile--active {
   border-color: var(--accent-1);
-  box-shadow: 0 0 0 2px rgba(26, 140, 255, 0.18);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-1) 18%, transparent);
 }
 .settings__tile-preview {
   display: block;
@@ -540,8 +540,8 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
 }
 .settings__style-btn--active {
   border-color: var(--accent-1);
-  background: rgba(26, 140, 255, 0.05);
-  box-shadow: 0 0 0 2px rgba(26, 140, 255, 0.18);
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-1) 18%, transparent);
 }
 .settings__style-title {
   font-size: 14px;
@@ -640,8 +640,8 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
 }
 .settings__font--active {
   border-color: var(--accent-1);
-  background: rgba(26, 140, 255, 0.05);
-  box-shadow: 0 0 0 2px rgba(26, 140, 255, 0.18);
+  background: color-mix(in srgb, var(--accent-1) 5%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-1) 18%, transparent);
 }
 .settings__font-name {
   font-size: 11px;

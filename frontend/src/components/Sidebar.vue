@@ -188,7 +188,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   color: var(--text-0);
 }
 .sidebar__link--active {
-  background: linear-gradient(135deg, rgba(26, 140, 255, 0.18), rgba(109, 60, 255, 0.18));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-1) 18%, transparent), color-mix(in srgb, var(--accent-3) 18%, transparent));
   color: var(--text-0);
 }
 .sidebar__icon {

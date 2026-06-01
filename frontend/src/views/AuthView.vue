@@ -125,8 +125,8 @@ async function submit() {
   justify-content: center;
   padding: 24px;
   background-image:
-    radial-gradient(900px 540px at 20% 10%, rgba(26, 140, 255, 0.22), transparent 60%),
-    radial-gradient(700px 540px at 80% 100%, rgba(201, 48, 255, 0.18), transparent 60%);
+    radial-gradient(900px 540px at 20% 10%, color-mix(in srgb, var(--accent-1) 22%, transparent), transparent 60%),
+    radial-gradient(700px 540px at 80% 100%, color-mix(in srgb, var(--accent-3) 18%, transparent), transparent 60%);
 }
 .auth__card {
   width: 100%;

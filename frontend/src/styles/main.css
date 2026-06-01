@@ -43,8 +43,8 @@ body,
 
 body {
   background-image:
-    radial-gradient(1100px 600px at 0% 0%, rgba(109, 60, 255, 0.18), transparent 60%),
-    radial-gradient(900px 600px at 100% 0%, rgba(26, 140, 255, 0.14), transparent 60%);
+    radial-gradient(1100px 600px at 0% 0%, color-mix(in srgb, var(--accent-3) 18%, transparent), transparent 60%),
+    radial-gradient(900px 600px at 100% 0%, color-mix(in srgb, var(--accent-1) 14%, transparent), transparent 60%);
   background-attachment: fixed;
 }
 
