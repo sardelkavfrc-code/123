@@ -378,7 +378,10 @@ function playMany(tracks: Track[]) {
   gap: 16px;
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 4px;
+  padding-top: 16px;
+  padding-bottom: 24px;
+  margin-top: -16px;
+  margin-bottom: -24px;
   scroll-behavior: smooth;
 }
 .search__artists::-webkit-scrollbar {
