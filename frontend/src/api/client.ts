@@ -5,7 +5,7 @@ import type {
   AuthStatus,
   CoverLookup,
   FriendList,
-  RecommendationFeed,
+  FriendList,
   Track,
   TrackList,
   User,
@@ -149,6 +149,12 @@ export const api = {
     params: { offset?: number; count?: number } = {}
   ): Promise<AlbumList> {
     const { data } = await http.get<AlbumList>(`/audio/albums/${ownerId}`, { params });
+    return data;
+  },
+  async artistAlbums(
+    artistId: string
+  ): Promise<AlbumList> {
+    const { data } = await http.get<AlbumList>(`/audio/artist_albums/${encodeURIComponent(artistId)}`);
     return data;
   },
   async playlistTracks(

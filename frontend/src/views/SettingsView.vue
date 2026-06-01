@@ -2,7 +2,7 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
-import { useSettingsStore, type AccentName, type ThemeName, FONT_OPTIONS, type FontName } from "@/stores/settings";
+import { useSettingsStore, type AccentName, type ThemeName, type StyleName, FONT_OPTIONS } from "@/stores/settings";
 import { useAuthStore } from "@/stores/auth";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -20,6 +20,11 @@ const router = useRouter();
 const {
   theme,
   accent,
+  style,
+  customAccent,
+  customAccentType,
+  customAccentColor1,
+  customAccentColor2,
   fontFamily,
   performanceMode,
   reduceMotion,
@@ -34,6 +39,14 @@ const {
   crossfade,
   crossfadeDuration,
 } = storeToRefs(settings);
+
+const activeTab = ref<"appearance" | "playback" | "app" | "account">("appearance");
+const tabs = [
+  { id: "appearance", label: "Внешний вид" },
+  { id: "playback", label: "Воспроизведение" },
+  { id: "app", label: "Приложение" },
+  { id: "account", label: "Аккаунт" },
+] as const;
 
 const startupVolumePct = computed({
   get: () => Math.round(startupVolume.value * 100),
@@ -52,7 +65,15 @@ const themes: { value: ThemeName; label: string; preview: string }[] = [
   { value: "mocha", label: "Кофе", preview: "linear-gradient(135deg, #342a24, #161210)" },
 ];
 
-const accents: { value: AccentName; label: string; preview: string }[] = [
+const styles: { value: StyleName; label: string; desc: string }[] = [
+  { value: "default", label: "Стандартный", desc: "Базовый вид интерфейса" },
+  { value: "matte", label: "Матовый", desc: "Мягкий фон с легким размытием" },
+  { value: "flat", label: "Плоский", desc: "Сплошные цвета, минимализм" },
+  { value: "noise", label: "Зерно", desc: "Эстетика пленки с текстурой шума" },
+  { value: "glow", label: "Свечение", desc: "Неоновая подсветка цветом акцента" },
+];
+
+const accents: { value: AccentName | "custom"; label: string; preview: string }[] = [
   { value: "blue", label: "Синий", preview: "linear-gradient(135deg, #1a8cff, #6d3cff)" },
   { value: "magenta", label: "Розовый", preview: "linear-gradient(135deg, #c930ff, #ff5e7e)" },
   { value: "cyan", label: "Бирюзовый", preview: "linear-gradient(135deg, #16d1cf, #1e90ff)" },
@@ -66,11 +87,11 @@ const accents: { value: AccentName; label: string; preview: string }[] = [
   { value: "coral", label: "Коралл", preview: "linear-gradient(135deg, #ff7766, #c930ff)" },
   { value: "sky", label: "Небо", preview: "linear-gradient(135deg, #5cd0ff, #6d3cff)" },
   { value: "crimson", label: "Бордо", preview: "linear-gradient(135deg, #ff2f7a, #5b1a8a)" },
+  { value: "custom", label: "Свой", preview: "conic-gradient(from 180deg, #ff3b3b, #c930ff, #1a8cff, #2bc48a, #ffc24a, #ff3b3b)" },
 ];
 
 const cacheUsage = ref<number>(estimateCache());
 function estimateCache(): number {
-  // localStorage size approximation in MB
   let bytes = 0;
   for (let i = 0; i < localStorage.length; i += 1) {
     const key = localStorage.key(i);
@@ -97,8 +118,13 @@ async function logout() {
 function pickTheme(value: ThemeName) {
   theme.value = value;
 }
-function pickAccent(value: AccentName) {
-  accent.value = value;
+function pickAccent(value: AccentName | "custom") {
+  if (value === "custom") {
+    customAccent.value = true;
+  } else {
+    customAccent.value = false;
+    accent.value = value;
+  }
 }
 
 async function onAutoStartChange(event: Event) {
@@ -111,214 +137,302 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
 
 <template>
   <ScrollArea>
-    <PageHeader eyebrow="Настройки" title="Под себя" subtitle="Темы, производительность и поведение приложения. Всё сохраняется локально." />
+    <PageHeader eyebrow="Настройки" title="Под себя" subtitle="Всё сохраняется локально." />
+
+    <div class="settings__tabs">
+      <button 
+        v-for="tab in tabs" 
+        :key="tab.id"
+        class="settings__tab" 
+        :class="{ 'settings__tab--active': activeTab === tab.id }"
+        @click="activeTab = tab.id"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
 
     <section class="settings">
-      <article class="settings__card">
-        <h2>Тема</h2>
-        <div class="settings__grid settings__grid--themes">
-          <button
-            v-for="t in themes"
-            :key="t.value"
-            class="settings__tile"
-            :class="{ 'settings__tile--active': theme === t.value }"
-            @click="pickTheme(t.value)"
-          >
-            <span class="settings__tile-preview" :style="{ background: t.preview }" />
-            <span class="settings__tile-label">{{ t.label }}</span>
-          </button>
-        </div>
-      </article>
+      <!-- Внешний вид -->
+      <template v-if="activeTab === 'appearance'">
+        <article class="settings__card">
+          <h2>Тема</h2>
+          <div class="settings__grid settings__grid--themes">
+            <button
+              v-for="t in themes"
+              :key="t.value"
+              class="settings__tile"
+              :class="{ 'settings__tile--active': theme === t.value }"
+              @click="pickTheme(t.value)"
+            >
+              <span class="settings__tile-preview" :style="{ background: t.preview }" />
+              <span class="settings__tile-label">{{ t.label }}</span>
+            </button>
+          </div>
+        </article>
 
-      <article class="settings__card">
-        <h2>Акцент</h2>
-        <div class="settings__grid settings__grid--accents">
-          <button
-            v-for="a in accents"
-            :key="a.value"
-            class="settings__accent"
-            :class="{ 'settings__accent--active': accent === a.value }"
-            :style="{ background: a.preview }"
-            :aria-label="a.label"
-            @click="pickAccent(a.value)"
-          />
-        </div>
-      </article>
+        <article class="settings__card">
+          <h2>Стиль (Материалы)</h2>
+          <div class="settings__grid settings__grid--styles">
+            <button
+              v-for="s in styles"
+              :key="s.value"
+              class="settings__style-btn"
+              :class="{ 'settings__style-btn--active': style === s.value }"
+              @click="style = s.value"
+            >
+              <div class="settings__style-title">{{ s.label }}</div>
+              <div class="settings__style-desc">{{ s.desc }}</div>
+            </button>
+          </div>
+        </article>
 
-      <article class="settings__card">
-        <h2>Шрифт</h2>
-        <div class="settings__grid settings__grid--fonts">
-          <button
-            v-for="f in FONT_OPTIONS"
-            :key="f"
-            class="settings__font"
-            :class="{ 'settings__font--active': fontFamily === f }"
-            :style="{ fontFamily: `'${f}', sans-serif` }"
-            @click="fontFamily = f"
-          >
-            <span class="settings__font-name">{{ f }}</span>
-            <span class="settings__font-sample">Aa</span>
-          </button>
-        </div>
-      </article>
+        <article class="settings__card">
+          <h2>Акцент</h2>
+          <div class="settings__grid settings__grid--accents">
+            <button
+              v-for="a in accents"
+              :key="a.value"
+              class="settings__accent"
+              :class="{ 'settings__accent--active': (a.value === 'custom' ? customAccent : !customAccent && accent === a.value) }"
+              :style="{ background: a.preview }"
+              :title="a.label"
+              @click="pickAccent(a.value)"
+            />
+          </div>
 
-      <article class="settings__card">
-        <h2>Анимации и производительность</h2>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Режим производительности</div>
-            <div class="settings__row-sub">Убирает spring-анимации, ускоряет UI на слабых ПК</div>
-          </div>
-          <input v-model="performanceMode" type="checkbox" class="settings__switch" />
-        </label>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Уменьшить движение</div>
-            <div class="settings__row-sub">Уважает системный prefers-reduced-motion и отключает декоративные эффекты</div>
-          </div>
-          <input v-model="reduceMotion" type="checkbox" class="settings__switch" />
-        </label>
-      </article>
+          <div v-if="customAccent" class="settings__custom-accent-pane">
+            <h3 class="settings__sub-title">Настройка своего акцента</h3>
+            
+            <div class="settings__custom-row">
+              <label class="settings__radio">
+                <input type="radio" v-model="customAccentType" value="gradient" />
+                <span>Градиент</span>
+              </label>
+              <label class="settings__radio">
+                <input type="radio" v-model="customAccentType" value="solid" />
+                <span>Сплошной цвет</span>
+              </label>
+            </div>
 
-      <article class="settings__card">
-        <h2>Приложение</h2>
-        <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
-          <div>
-            <div class="settings__row-title">Автозапуск при старте системы</div>
-            <div class="settings__row-sub">{{ electronAvailable ? "Запускать VK Music вместе с ОС" : "Доступно только в десктоп-версии" }}</div>
-          </div>
-          <input
-            :checked="autoStart"
-            type="checkbox"
-            class="settings__switch"
-            :disabled="!electronAvailable"
-            @change="onAutoStartChange"
-          />
-        </label>
-        <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
-          <div>
-            <div class="settings__row-title">Закрытие в трей</div>
-            <div class="settings__row-sub">Кнопка × сворачивает в трей, а не закрывает приложение</div>
-          </div>
-          <input v-model="closeToTray" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
-        </label>
-        <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
-          <div>
-            <div class="settings__row-title">Запуск свернутым</div>
-            <div class="settings__row-sub">Подходит для автозапуска — не отвлекает</div>
-          </div>
-          <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
-        </label>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Запускать со свернутым меню</div>
-            <div class="settings__row-sub">Боковая панель будет свернута при каждом запуске приложения</div>
-          </div>
-          <input v-model="startSidebarCollapsed" type="checkbox" class="settings__switch" />
-        </label>
-        <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
-          <div>
-            <div class="settings__row-title">Аппаратное ускорение</div>
-            <div class="settings__row-sub">Применится при следующем запуске</div>
-          </div>
-          <input v-model="hardwareAcceleration" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
-        </label>
-      </article>
-
-      <article class="settings__card">
-        <h2>Воспроизведение</h2>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Громкость при старте</div>
-            <div class="settings__row-sub">С какой громкости запускать плеер при каждом включении</div>
-          </div>
-          <div class="settings__range">
-            <input v-model.number="startupVolumePct" type="range" min="0" max="100" step="1" />
-            <span>{{ startupVolumePct }}%</span>
-          </div>
-        </label>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Плавный переход (Crossfade)</div>
-            <div class="settings__row-sub">Уменьшать громкость старого трека и плавно включать новый</div>
-          </div>
-          <input v-model="crossfade" type="checkbox" class="settings__switch" />
-        </label>
-        <label class="settings__row" v-if="crossfade">
-          <div>
-            <div class="settings__row-title">Длительность перехода</div>
-            <div class="settings__row-sub">В секундах</div>
-          </div>
-          <div class="settings__range">
-            <input v-model.number="crossfadeDuration" type="range" min="1" max="10" step="1" />
-            <span>{{ crossfadeDuration }} с</span>
-          </div>
-        </label>
-      </article>
-
-      <article class="settings__card">
-        <h2>Обложки</h2>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Искать обложки в других сервисах</div>
-            <div class="settings__row-sub">
-              Если у ВК нет обложки трека, подгружаем её с iTunes и Genius. Без задержек, результат
-              кешируется локально.
+            <div class="settings__custom-row settings__custom-colors">
+              <label class="settings__color-picker">
+                <span>{{ customAccentType === 'gradient' ? 'Цвет 1' : 'Цвет' }}</span>
+                <input type="color" v-model="customAccentColor1" />
+              </label>
+              <label v-if="customAccentType === 'gradient'" class="settings__color-picker">
+                <span>Цвет 2</span>
+                <input type="color" v-model="customAccentColor2" />
+              </label>
             </div>
           </div>
-          <input v-model="externalCovers" type="checkbox" class="settings__switch" />
-        </label>
-      </article>
+        </article>
 
-      <article class="settings__card">
-        <h2>Кеш</h2>
-        <p class="settings__hint">Сейчас используется ≈ {{ cacheUsage }} MB на этом ПК.</p>
-        <label class="settings__row">
-          <div>
-            <div class="settings__row-title">Лимит локального кеша</div>
-            <div class="settings__row-sub">Цели хранения: индекс библиотеки, рекомендации, последние треки</div>
+        <article class="settings__card">
+          <h2>Шрифт</h2>
+          <div class="settings__grid settings__grid--fonts">
+            <button
+              v-for="f in FONT_OPTIONS"
+              :key="f"
+              class="settings__font"
+              :class="{ 'settings__font--active': fontFamily === f }"
+              :style="{ fontFamily: `'${f}', sans-serif` }"
+              @click="fontFamily = f"
+            >
+              <span class="settings__font-name">{{ f }}</span>
+              <span class="settings__font-sample">Aa</span>
+            </button>
           </div>
-          <div class="settings__range">
-            <input v-model.number="cacheSize" type="range" min="50" max="2000" step="50" />
-            <span>{{ cacheSize }} MB</span>
-          </div>
-        </label>
-        <div class="settings__row settings__row--actions">
-          <button class="btn btn--ghost" @click="clearCache">Очистить кеш</button>
-        </div>
-      </article>
+        </article>
+      </template>
 
-      <article class="settings__card settings__card--danger">
-        <h2>Аккаунт</h2>
-        <div class="settings__row">
-          <div>
-            <div class="settings__row-title">{{ auth.displayName }}</div>
-            <div class="settings__row-sub">
-              {{ auth.status.authenticated ? `id ${auth.status.user_id}` : "Не авторизован" }}
+      <!-- Воспроизведение -->
+      <template v-if="activeTab === 'playback'">
+        <article class="settings__card">
+          <h2>Воспроизведение</h2>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Громкость при старте</div>
+              <div class="settings__row-sub">С какой громкости запускать плеер при каждом включении</div>
             </div>
-          </div>
-          <button class="btn btn--ghost" @click="logout">Выйти</button>
-        </div>
-      </article>
+            <div class="settings__range">
+              <input v-model.number="startupVolumePct" type="range" min="0" max="100" step="1" />
+              <span>{{ startupVolumePct }}%</span>
+            </div>
+          </label>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Плавный переход (Crossfade)</div>
+              <div class="settings__row-sub">Уменьшать громкость старого трека и плавно включать новый</div>
+            </div>
+            <input v-model="crossfade" type="checkbox" class="settings__switch" />
+          </label>
+          <label class="settings__row" v-if="crossfade">
+            <div>
+              <div class="settings__row-title">Длительность перехода</div>
+              <div class="settings__row-sub">В секундах</div>
+            </div>
+            <div class="settings__range">
+              <input v-model.number="crossfadeDuration" type="range" min="1" max="10" step="1" />
+              <span>{{ crossfadeDuration }} с</span>
+            </div>
+          </label>
+        </article>
+      </template>
 
-      <article class="settings__card">
-        <h2>О приложении</h2>
-        <p class="settings__hint">
-          VK Music Player — десктоп-плеер на Vue 3 + Electron с FastAPI бэкендом, который проксирует
-          VK API. Авторизация — через официальный OAuth ВК, токен хранится локально
-          с правами 600. Открытые исходники: <code>backend/</code> + <code>frontend/</code>.
-        </p>
-      </article>
+      <!-- Приложение -->
+      <template v-if="activeTab === 'app'">
+        <article class="settings__card">
+          <h2>Анимации и производительность</h2>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Режим производительности</div>
+              <div class="settings__row-sub">Убирает spring-анимации, ускоряет UI на слабых ПК</div>
+            </div>
+            <input v-model="performanceMode" type="checkbox" class="settings__switch" />
+          </label>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Уменьшить движение</div>
+              <div class="settings__row-sub">Уважает системный prefers-reduced-motion и отключает декоративные эффекты</div>
+            </div>
+            <input v-model="reduceMotion" type="checkbox" class="settings__switch" />
+          </label>
+        </article>
+
+        <article class="settings__card">
+          <h2>Поведение</h2>
+          <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
+            <div>
+              <div class="settings__row-title">Автозапуск при старте системы</div>
+              <div class="settings__row-sub">{{ electronAvailable ? "Запускать VK Music вместе с ОС" : "Доступно только в десктоп-версии" }}</div>
+            </div>
+            <input
+              :checked="autoStart"
+              type="checkbox"
+              class="settings__switch"
+              :disabled="!electronAvailable"
+              @change="onAutoStartChange"
+            />
+          </label>
+          <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
+            <div>
+              <div class="settings__row-title">Закрытие в трей</div>
+              <div class="settings__row-sub">Кнопка × сворачивает в трей, а не закрывает приложение</div>
+            </div>
+            <input v-model="closeToTray" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
+          </label>
+          <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
+            <div>
+              <div class="settings__row-title">Запуск свернутым</div>
+              <div class="settings__row-sub">Подходит для автозапуска — не отвлекает</div>
+            </div>
+            <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
+          </label>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Запускать со свернутым меню</div>
+              <div class="settings__row-sub">Боковая панель будет свернута при каждом запуске приложения</div>
+            </div>
+            <input v-model="startSidebarCollapsed" type="checkbox" class="settings__switch" />
+          </label>
+          <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
+            <div>
+              <div class="settings__row-title">Аппаратное ускорение</div>
+              <div class="settings__row-sub">Применится при следующем запуске</div>
+            </div>
+            <input v-model="hardwareAcceleration" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
+          </label>
+        </article>
+
+        <article class="settings__card">
+          <h2>Кеш и Сеть</h2>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Искать обложки в других сервисах</div>
+              <div class="settings__row-sub">Подгружаем обложки из iTunes, если их нет в ВК</div>
+            </div>
+            <input v-model="externalCovers" type="checkbox" class="settings__switch" />
+          </label>
+          <p class="settings__hint" style="margin-top: 16px;">Сейчас используется ≈ {{ cacheUsage }} MB на этом ПК.</p>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Лимит локального кеша</div>
+              <div class="settings__row-sub">Цели хранения: индекс библиотеки, рекомендации, последние треки</div>
+            </div>
+            <div class="settings__range">
+              <input v-model.number="cacheSize" type="range" min="50" max="2000" step="50" />
+              <span>{{ cacheSize }} MB</span>
+            </div>
+          </label>
+          <div class="settings__row settings__row--actions">
+            <button class="btn btn--ghost" @click="clearCache">Очистить кеш</button>
+          </div>
+        </article>
+      </template>
+
+      <!-- Аккаунт -->
+      <template v-if="activeTab === 'account'">
+        <article class="settings__card settings__card--danger">
+          <h2>Аккаунт</h2>
+          <div class="settings__row">
+            <div>
+              <div class="settings__row-title">{{ auth.displayName }}</div>
+              <div class="settings__row-sub">
+                {{ auth.status.authenticated ? `id ${auth.status.user_id}` : "Не авторизован" }}
+              </div>
+            </div>
+            <button class="btn btn--ghost" @click="logout">Выйти</button>
+          </div>
+        </article>
+
+        <article class="settings__card">
+          <h2>О приложении</h2>
+          <p class="settings__hint">
+            VK Music Player — десктоп-плеер на Vue 3 + Electron с FastAPI бэкендом, который проксирует
+            VK API. Авторизация — через официальный OAuth ВК, токен хранится локально
+            с правами 600.
+          </p>
+        </article>
+      </template>
+
     </section>
   </ScrollArea>
 </template>
 
 <style scoped>
+.settings__tabs {
+  margin: 0 32px 24px;
+  display: flex;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+.settings__tab {
+  padding: 8px 16px;
+  background: transparent;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+}
+.settings__tab:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+.settings__tab--active {
+  background: var(--bg-2);
+  color: var(--accent-1);
+}
+
 .settings {
   padding: 0 32px 32px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
+  max-width: 800px;
 }
 .settings__card {
   padding: 22px 22px 18px;
@@ -328,6 +442,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-shadow: var(--app-shadow, none);
 }
 .settings__card h2 {
   margin: 0;
@@ -343,7 +458,10 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   gap: 12px;
 }
 .settings__grid--themes {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.settings__grid--styles {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 .settings__grid--accents {
   grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
@@ -380,6 +498,35 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   text-align: center;
   color: var(--text-1);
 }
+.settings__style-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color var(--motion-duration-fast), transform var(--motion-duration-fast);
+  text-align: left;
+}
+.settings__style-btn:hover {
+  transform: translateY(-1px);
+}
+.settings__style-btn--active {
+  border-color: var(--accent-1);
+  background: rgba(26, 140, 255, 0.05);
+  box-shadow: 0 0 0 2px rgba(26, 140, 255, 0.18);
+}
+.settings__style-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.settings__style-desc {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
 .settings__accent {
   height: 48px;
   border-radius: 12px;
@@ -393,6 +540,62 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   border-color: var(--text-0);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
 }
+
+.settings__custom-accent-pane {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--bg-2);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.settings__sub-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-1);
+}
+.settings__custom-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.settings__custom-row:last-child {
+  margin-bottom: 0;
+}
+.settings__radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-0);
+  cursor: pointer;
+}
+.settings__radio input {
+  accent-color: var(--accent-1);
+}
+.settings__color-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-0);
+}
+.settings__color-picker input[type="color"] {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.settings__color-picker input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.settings__color-picker input[type="color"]::-webkit-color-swatch {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 .settings__font {
   display: flex;
   flex-direction: column;
@@ -422,6 +625,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   font-size: 24px;
   color: var(--text-0);
 }
+
 .settings__row {
   display: flex;
   align-items: center;
@@ -446,8 +650,9 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
 .settings__row-sub {
   color: var(--text-2);
   font-size: 12px;
-  max-width: 320px;
+  max-width: 360px;
 }
+
 .settings__switch {
   -webkit-appearance: none;
   appearance: none;
@@ -503,11 +708,5 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   background: var(--bg-2);
   padding: 0 4px;
   border-radius: 4px;
-}
-
-.settings__slider {
-  width: 140px;
-  accent-color: var(--accent-text, var(--primary));
-  cursor: pointer;
 }
 </style>

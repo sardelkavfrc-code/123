@@ -150,19 +150,10 @@ async function loadSimilar() {
 
 async function ensureAlbums() {
   if (albumsLoaded.value || albumsLoading.value) return;
-  // Albums live under the artist's owner_id — we extract it from the first
-  // known track. Some artist IDs are non-numeric (slugs), so without a track
-  // we can't query VK's audio.getAlbums.
-  const firstWithOwner = tracks.value.find((t) => typeof t.owner_id === "number");
-  if (!firstWithOwner) {
-    albumsError.value = "Не удалось определить владельца альбомов";
-    albumsLoaded.value = true;
-    return;
-  }
   albumsLoading.value = true;
   albumsError.value = null;
   try {
-    const res = await api.albums(firstWithOwner.owner_id, { count: 100, offset: 0 });
+    const res = await api.artistAlbums(props.id);
     albums.value = res.items;
   } catch (err) {
     albumsError.value =
@@ -221,19 +212,21 @@ function playAll() {
   <ScrollArea @reach-end="loadMoreTracks">
     <section
       class="artist__hero"
-      :style="artist?.photo ? { backgroundImage: `linear-gradient(180deg, rgba(8,9,14,0.15), rgba(8,9,14,0.7)), url(${artist.photo})` } : undefined"
+      :style="artist?.photo ? { backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.photo})` } : undefined"
     >
       <div class="artist__hero-inner">
-        <div class="artist__eyebrow">Артист</div>
-        <h1 class="artist__name">{{ artist?.name ?? "Загрузка…" }}</h1>
-        <div class="artist__meta">
-          <span v-if="tracks.length">{{ tracksLabel(tracksTotal || tracks.length) }}</span>
-          <span v-if="artist?.is_followed" class="chip chip--active">Подписка</span>
+        <div class="artist__hero-content">
+          <div class="artist__eyebrow">Артист</div>
+          <h1 class="artist__name">{{ artist?.name ?? "Загрузка…" }}</h1>
+          <div class="artist__meta">
+            <span v-if="tracks.length">{{ tracksLabel(tracksTotal || tracks.length) }}</span>
+            <span v-if="artist?.is_followed" class="chip chip--active">Подписка</span>
+          </div>
         </div>
         <div class="artist__actions">
           <button class="btn btn--primary" :disabled="!tracks.length" @click="playAll">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-            Слушать
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            Слушать всё
           </button>
           <button class="btn btn--ghost" @click="router.back()">Назад</button>
         </div>
@@ -358,42 +351,83 @@ function playAll() {
   border-radius: var(--radius-xl);
   background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
   background-size: cover;
-  background-position: center;
+  background-position: center 30%;
   color: #fff;
   overflow: hidden;
-  min-height: 240px;
+  min-height: 280px;
   display: flex;
-  align-items: flex-end;
+  align-items: stretch;
+}
+.artist__hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(0,0,0,0.6) 0%, transparent 100%);
+  z-index: 1;
 }
 .artist__hero-inner {
-  padding: 28px 28px 24px;
+  position: relative;
+  z-index: 2;
+  padding: 32px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 24px;
+  width: 100%;
+}
+.artist__hero-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .artist__eyebrow {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  opacity: 0.85;
+  letter-spacing: 0.15em;
+  opacity: 0.9;
+  font-weight: 700;
 }
 .artist__name {
   margin: 0;
-  font-size: 38px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 .artist__meta {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 13px;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  font-weight: 500;
 }
 .artist__actions {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+}
+.artist__actions .btn {
+  border-radius: 999px;
+  padding: 0 24px;
+  height: 44px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.artist__actions .btn--primary {
+  background: var(--text-0);
+  color: var(--bg-0);
+}
+.artist__actions .btn--primary:hover {
+  transform: scale(1.02);
+  background: #fff;
+}
+.artist__actions .btn--ghost {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.artist__actions .btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 .artist__body {
   padding: 0 32px 24px;

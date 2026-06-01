@@ -32,13 +32,12 @@ const emit = defineEmits<{ click: [] }>();
 .mood-card {
   position: relative;
   width: 150px;
-  height: 90px;
+  height: 120px;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  text-align: left;
-  background-color: var(--surface-2);
-  background-size: cover;
-  background-position: center;
+  position: relative;
+  box-shadow: var(--app-shadow, var(--shadow-sm));
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out), box-shadow var(--motion-duration-fast) var(--motion-ease-out);
   flex-shrink: 0;
   cursor: pointer;
   border: none;

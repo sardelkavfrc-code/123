@@ -281,6 +281,64 @@ def _slug_to_name(slug: str) -> str:
     return slug.replace("-", " ").replace("_", " ").strip().title() or slug
 
 
+@router.get("/artist_albums/{artist_id}", response_model=AlbumList)
+async def artist_albums(
+    artist_id: str,
+    vk: VKDep,
+    session: SessionDep,
+) -> AlbumList:
+    """Albums for a VK artist via catalog."""
+    try:
+        # Get artist catalog
+        catalog_raw = await vk.call("catalog.getAudioArtist", session.access_token, artist_id=artist_id)
+        sections = catalog_raw.get("catalog", {}).get("sections", [])
+        if not sections:
+            return AlbumList(items=[], count=0)
+            
+        section_id = sections[0].get("id")
+        if not section_id:
+            return AlbumList(items=[], count=0)
+            
+        # Get section
+        section_raw = await vk.call("catalog.getSection", session.access_token, section_id=section_id)
+        blocks = section_raw.get("section", {}).get("blocks", [])
+        playlists_data = section_raw.get("playlists", [])
+        
+        albums = []
+        for b in blocks:
+            if b.get("data_type") == "music_playlists":
+                playlists_ids = b.get("playlists_ids", [])
+                for pl in playlists_data:
+                    pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
+                    if pl_id in playlists_ids:
+                        albums.append(
+                            AlbumSummary(
+                                id=str(pl["id"]),
+                                owner_id=pl["owner_id"],
+                                title=pl["title"],
+                                subtitle=pl.get("description") or pl.get("subtitle") or "",
+                                cover=_get_playlist_cover(pl),
+                                year=pl.get("year"),
+                                track_count=pl.get("count", 0),
+                            )
+                        )
+                        
+        # Deduplicate while preserving order
+        seen = set()
+        unique_albums = []
+        for a in albums:
+            key = f"{a.owner_id}_{a.id}"
+            if key not in seen:
+                seen.add(key)
+                unique_albums.append(a)
+                
+        return AlbumList(items=unique_albums, count=len(unique_albums))
+    except VKError:
+        return AlbumList(items=[], count=0)
+
+    return slug.replace("-", " ").replace("_", " ").strip().title() or slug
+
+
 @router.get("/by_artist/{artist_id}", response_model=TrackList)
 async def by_artist(
     artist_id: str,

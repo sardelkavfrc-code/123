@@ -87,7 +87,7 @@ const background = computed(() => {
   justify-content: flex-end;
   overflow: hidden;
   border: none;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--app-shadow, var(--shadow-md));
   cursor: pointer;
   padding: 0;
 }

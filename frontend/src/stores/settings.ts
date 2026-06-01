@@ -22,7 +22,11 @@ export type AccentName =
   | "electric"
   | "coral"
   | "sky"
-  | "crimson";
+  | "crimson"
+  | "custom";
+
+export type StyleName = "default" | "matte" | "flat" | "noise" | "glow";
+export type CustomAccentType = "solid" | "gradient";
 
 export const FONT_OPTIONS = [
   "Nunito",
@@ -39,6 +43,11 @@ export type FontName = typeof FONT_OPTIONS[number];
 interface PersistedSettings {
   theme: ThemeName;
   accent: AccentName;
+  style: StyleName;
+  customAccent: boolean;
+  customAccentType: CustomAccentType;
+  customAccentColor1: string;
+  customAccentColor2: string;
   fontFamily: string;
   performanceMode: boolean;
   reduceMotion: boolean;
@@ -69,6 +78,11 @@ const STORAGE_KEY = "vkmp:settings";
 const defaults: PersistedSettings = {
   theme: "dark",
   accent: "blue",
+  style: "default",
+  customAccent: false,
+  customAccentType: "gradient",
+  customAccentColor1: "#1a8cff",
+  customAccentColor2: "#6d3cff",
   fontFamily: "Nunito",
   performanceMode: false,
   reduceMotion: false,
@@ -100,6 +114,11 @@ export const useSettingsStore = defineStore("settings", () => {
 
   const theme = ref<ThemeName>(initial.theme);
   const accent = ref<AccentName>(initial.accent);
+  const style = ref<StyleName>(initial.style || "default");
+  const customAccent = ref<boolean>(initial.customAccent || false);
+  const customAccentType = ref<CustomAccentType>(initial.customAccentType || "gradient");
+  const customAccentColor1 = ref<string>(initial.customAccentColor1 || "#1a8cff");
+  const customAccentColor2 = ref<string>(initial.customAccentColor2 || "#6d3cff");
   const fontFamily = ref(initial.fontFamily);
   const performanceMode = ref(initial.performanceMode);
   const reduceMotion = ref(initial.reduceMotion);
@@ -119,16 +138,38 @@ export const useSettingsStore = defineStore("settings", () => {
   function applyToDocument() {
     const html = document.documentElement;
     html.dataset.theme = theme.value;
-    html.dataset.accent = accent.value;
+    html.dataset.style = style.value;
+    html.dataset.accent = customAccent.value ? "custom" : accent.value;
     html.dataset.perf = performanceMode.value ? "on" : "off";
     html.dataset.reduceMotion = reduceMotion.value ? "on" : "off";
     html.style.setProperty("--font-family", `"${fontFamily.value || 'Nunito'}", sans-serif`);
+
+    if (customAccent.value) {
+      if (customAccentType.value === "solid") {
+        html.style.setProperty("--accent-1", customAccentColor1.value);
+        html.style.setProperty("--accent-2", customAccentColor1.value);
+        html.style.setProperty("--accent-3", customAccentColor1.value);
+      } else {
+        html.style.setProperty("--accent-1", customAccentColor1.value);
+        html.style.setProperty("--accent-2", customAccentColor2.value);
+        html.style.setProperty("--accent-3", customAccentColor2.value);
+      }
+    } else {
+      html.style.removeProperty("--accent-1");
+      html.style.removeProperty("--accent-2");
+      html.style.removeProperty("--accent-3");
+    }
   }
 
   function persist() {
     const data: PersistedSettings = {
       theme: theme.value,
       accent: accent.value,
+      style: style.value,
+      customAccent: customAccent.value,
+      customAccentType: customAccentType.value,
+      customAccentColor1: customAccentColor1.value,
+      customAccentColor2: customAccentColor2.value,
       fontFamily: fontFamily.value,
       performanceMode: performanceMode.value,
       reduceMotion: reduceMotion.value,
@@ -154,6 +195,11 @@ export const useSettingsStore = defineStore("settings", () => {
     [
       theme,
       accent,
+      style,
+      customAccent,
+      customAccentType,
+      customAccentColor1,
+      customAccentColor2,
       fontFamily,
       performanceMode,
       reduceMotion,
@@ -197,6 +243,11 @@ export const useSettingsStore = defineStore("settings", () => {
   function reset() {
     theme.value = defaults.theme;
     accent.value = defaults.accent;
+    style.value = defaults.style;
+    customAccent.value = defaults.customAccent;
+    customAccentType.value = defaults.customAccentType;
+    customAccentColor1.value = defaults.customAccentColor1;
+    customAccentColor2.value = defaults.customAccentColor2;
     performanceMode.value = defaults.performanceMode;
     reduceMotion.value = defaults.reduceMotion;
     closeToTray.value = defaults.closeToTray;
@@ -214,6 +265,11 @@ export const useSettingsStore = defineStore("settings", () => {
   return {
     theme,
     accent,
+    style,
+    customAccent,
+    customAccentType,
+    customAccentColor1,
+    customAccentColor2,
     fontFamily,
     performanceMode,
     reduceMotion,

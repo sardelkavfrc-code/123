@@ -236,3 +236,31 @@
   --accent-2: #c91a4a;
   --accent-3: #5b1a8a;
 }
+
+/* Styles (Materials) */
+:root {
+  --app-blur: none;
+  --bg-sidebar: var(--bg-1);
+  --bg-player: var(--bg-1);
+  --app-noise-display: none;
+  --app-shadow: none;
+}
+
+[data-style="matte"] {
+  --app-blur: blur(12px) contrast(0.95);
+  --bg-sidebar: var(--bg-elev);
+  --bg-player: var(--bg-elev);
+}
+
+[data-style="flat"] {
+  --bg-sidebar: var(--bg-0);
+  --bg-player: var(--bg-0);
+}
+
+[data-style="noise"] {
+  --app-noise-display: block;
+}
+
+[data-style="glow"] {
+  --app-shadow: 0 0 40px -5px color-mix(in srgb, var(--accent-1) 15%, transparent);
+}

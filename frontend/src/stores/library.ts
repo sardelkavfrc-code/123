@@ -1,11 +1,10 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { api, APIError } from "@/api/client";
-import type { AlbumList, FriendList, RecommendationFeed, Track, TrackList } from "@/api/types";
+import type { AlbumList, FriendList, Track, TrackList } from "@/api/types";
 
 /** VK rejects audio.get requests with count > 200 — keep page size below that. */
 const PAGE_SIZE = 100;
-const CACHE_KEY = "vkplayer_cache";
 
 export const useLibraryStore = defineStore("library", () => {
   const myMusic = ref<Track[]>([]);

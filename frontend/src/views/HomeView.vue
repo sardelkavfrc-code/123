@@ -14,7 +14,6 @@ import Spinner from "@/components/Spinner.vue";
 
 import { useUIStore } from "@/stores/ui";
 
-const router = useRouter();
 const library = useLibraryStore();
 const player = usePlayerStore();
 const ui = useUIStore();
@@ -302,7 +301,7 @@ async function playAlbum(album: AlbumSummary) {
   background: linear-gradient(135deg, var(--accent-1), var(--accent-2) 55%, var(--accent-3));
   color: var(--accent-text, #fff);
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--app-shadow, var(--shadow-md));
   transition: transform var(--motion-duration-fast) var(--motion-ease-out);
 }
 .home__mix:hover:not(:disabled) {

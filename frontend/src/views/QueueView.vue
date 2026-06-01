@@ -20,8 +20,6 @@ const draggableQueue = computed({
   set: (val: Track[]) => player.setQueue(val)
 });
 
-const dragIndex = ref<number | null>(null);
-const dropTarget = ref<number | null>(null);
 const listRef = ref<HTMLElement | null>(null);
 const loaderRef = ref<HTMLElement | null>(null);
 
@@ -39,30 +37,14 @@ function scrollToCurrent() {
   }
 }
 
-function globalDragOver(e: DragEvent) {
-  e.preventDefault();
-  if (e.dataTransfer) {
-    e.dataTransfer.dropEffect = "move";
-  }
-}
-
 onMounted(() => {
-  window.addEventListener("dragover", globalDragOver);
   nextTick(() => {
     // A tiny timeout ensures the list is fully rendered and layout is calculated
     setTimeout(scrollToCurrent, 50);
   });
 });
 
-onUnmounted(() => {
-  window.removeEventListener("dragover", globalDragOver);
-});
-
-
-
 const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
-
-// Native drag states removed since we use vuedraggable now
 
 function playAt(i: number) {
   if (i === index.value) {
@@ -76,10 +58,6 @@ function playAt(i: number) {
 
 function remove(i: number) {
   player.removeFromQueue(i);
-}
-
-function clearQueue() {
-  player.clear();
 }
 </script>
 

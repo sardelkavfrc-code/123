@@ -5,10 +5,11 @@ import { storeToRefs } from "pinia";
 import { api, APIError } from "@/api/client";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
-import type { Track } from "@/api/types";
+import type { Artist, Track } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
+import ArtistCard from "@/components/ArtistCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import Spinner from "@/components/Spinner.vue";
 
@@ -48,6 +49,27 @@ const libraryMatches = computed(() => {
   return myMusic.value.filter(
     (t) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
   );
+});
+
+const searchArtists = computed(() => {
+  if (scope.value !== "global") return [];
+  const map = new Map<string, Artist>();
+  for (const t of results.value) {
+    if (t.main_artists) {
+      for (const a of t.main_artists) {
+        if (a.id && !map.has(a.id)) {
+          map.set(a.id, {
+            id: a.id,
+            name: a.name,
+            domain: a.domain || null,
+            photo: null,
+            is_followed: false,
+          });
+        }
+      }
+    }
+  }
+  return Array.from(map.values()).slice(0, 8);
 });
 
 async function runGlobal() {
@@ -170,8 +192,14 @@ function playMany(tracks: Track[]) {
           <EmptyState title="Начни печатать" subtitle="Введи название или исполнителя — поиск стартует автоматически" />
         </div>
         <div v-else class="search__pane">
+          <div v-if="searchArtists.length" class="search__artists-section">
+            <h3 class="search__section-title">Артисты</h3>
+            <div class="search__artists">
+              <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
+            </div>
+          </div>
           <div class="search__head">
-            <span>Найдено {{ total || results.length }}</span>
+            <span>Найдено треков: {{ total || results.length }}</span>
             <button class="btn btn--ghost" :disabled="!results.length" @click="playMany(results)">
               Слушать всё
             </button>
@@ -254,6 +282,28 @@ function playMany(tracks: Track[]) {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+.search__artists-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.search__section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-0);
+}
+.search__artists {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.search__artists::-webkit-scrollbar {
+  display: none;
 }
 .search__head {
   display: flex;
