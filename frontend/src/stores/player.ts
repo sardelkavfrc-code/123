@@ -309,7 +309,7 @@ export const usePlayerStore = defineStore("player", () => {
         currentTime.value = pos;
 
         // Crossfade logic
-        if (settings.crossfade && dur > 0 && !isCrossfading) {
+        if (settings.crossfade && dur > 0 && !isCrossfading && repeat.value !== "one") {
           const cfDur = settings.crossfadeDuration;
           const remaining = dur - pos;
           if (remaining <= cfDur && remaining > 0.5 && hasNext.value) {

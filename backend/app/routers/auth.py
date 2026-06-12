@@ -37,8 +37,13 @@ async def _resolve_user(vk: VKDep, token: str, *, has_audio: bool) -> AuthStatus
         response = await vk.call("users.get", token, fields="photo_200")
         user = parse_user(response)
     except VKError as exc:
+        if exc.code == 5:
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                detail={"kind": "vk_error", "message": exc.message},
+            ) from exc
         raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
+            status.HTTP_502_BAD_GATEWAY,
             detail={"kind": "vk_error", "message": exc.message},
         ) from exc
 
@@ -66,8 +71,9 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
     try:
         has_audio = await _probe_audio(vk, session.access_token)
         return await _resolve_user(vk, session.access_token, has_audio=has_audio)
-    except HTTPException:
-        storage.clear()
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+            storage.clear()
         return AuthStatus(authenticated=False)
 
 
