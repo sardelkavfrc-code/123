@@ -17,7 +17,7 @@ interface PlaybackBackend {
   position(): number;
   duration(): number;
   setVolume(volume: number): void;
-  fadeOut(durationMs: number): void;
+  fadeOut(durationMs: number, justPause?: boolean): void;
   fadeIn(durationMs: number, targetVolume: number): void;
   destroy(): void;
 }
@@ -69,6 +69,14 @@ function createHtml5Backend(
 
   audio.src = url;
 
+  let fadeInterval: ReturnType<typeof setInterval> | null = null;
+  const clearFade = () => {
+    if (fadeInterval) {
+      clearInterval(fadeInterval);
+      fadeInterval = null;
+    }
+  };
+
   return {
     play: () => {
       void audio.play().catch(() => cb.onLoadError());
@@ -87,40 +95,45 @@ function createHtml5Backend(
     setVolume: (v) => {
       audio.volume = Math.max(0, Math.min(1, v));
     },
-    fadeOut: (ms) => {
+    fadeOut: (ms, justPause = false) => {
+      clearFade();
       let v = audio.volume;
       const steps = 20;
-      const stepTime = ms / steps;
+      const stepTime = Math.max(10, ms / steps);
       const stepVol = v / steps;
-      const iv = setInterval(() => {
+      fadeInterval = setInterval(() => {
         v -= stepVol;
         if (v <= 0) {
-          clearInterval(iv);
+          clearFade();
           audio.pause();
-          audio.removeAttribute("src");
-          audio.load();
+          if (!justPause) {
+            audio.removeAttribute("src");
+            audio.load();
+          }
         } else {
           audio.volume = v;
         }
       }, stepTime);
     },
     fadeIn: (ms, targetV) => {
+      clearFade();
       let v = 0;
       audio.volume = v;
       const steps = 20;
-      const stepTime = ms / steps;
+      const stepTime = Math.max(10, ms / steps);
       const stepVol = targetV / steps;
-      const iv = setInterval(() => {
+      fadeInterval = setInterval(() => {
         v += stepVol;
         if (v >= targetV) {
           audio.volume = targetV;
-          clearInterval(iv);
+          clearFade();
         } else {
           audio.volume = v;
         }
       }, stepTime);
     },
     destroy: () => {
+      clearFade();
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
@@ -177,6 +190,14 @@ function createHlsBackend(
     audio.src = url;
   }
 
+  let fadeInterval: ReturnType<typeof setInterval> | null = null;
+  const clearFade = () => {
+    if (fadeInterval) {
+      clearInterval(fadeInterval);
+      fadeInterval = null;
+    }
+  };
+
   return {
     play: () => {
       void audio.play().catch(() => cb.onLoadError());
@@ -195,21 +216,24 @@ function createHlsBackend(
     setVolume: (v) => {
       audio.volume = Math.max(0, Math.min(1, v));
     },
-    fadeOut: (ms) => {
+    fadeOut: (ms, justPause = false) => {
+      clearFade();
       let v = audio.volume;
       const steps = 20;
-      const stepTime = ms / steps;
+      const stepTime = Math.max(10, ms / steps);
       const stepVol = v / steps;
-      const iv = setInterval(() => {
+      fadeInterval = setInterval(() => {
         v -= stepVol;
         if (v <= 0) {
-          clearInterval(iv);
+          clearFade();
           audio.pause();
-          audio.removeAttribute("src");
-          audio.load();
-          if (hls) {
-            hls.destroy();
-            hls = null;
+          if (!justPause) {
+            audio.removeAttribute("src");
+            audio.load();
+            if (hls) {
+              hls.destroy();
+              hls = null;
+            }
           }
         } else {
           audio.volume = v;
@@ -217,22 +241,24 @@ function createHlsBackend(
       }, stepTime);
     },
     fadeIn: (ms, targetV) => {
+      clearFade();
       let v = 0;
       audio.volume = v;
       const steps = 20;
-      const stepTime = ms / steps;
+      const stepTime = Math.max(10, ms / steps);
       const stepVol = targetV / steps;
-      const iv = setInterval(() => {
+      fadeInterval = setInterval(() => {
         v += stepVol;
         if (v >= targetV) {
           audio.volume = targetV;
-          clearInterval(iv);
+          clearFade();
         } else {
           audio.volume = v;
         }
       }, stepTime);
     },
     destroy: () => {
+      clearFade();
       audio.pause();
       audio.removeAttribute("src");
       audio.load();
@@ -430,9 +456,15 @@ export const usePlayerStore = defineStore("player", () => {
     }
 
     if (autoPlay) {
-      backend.play();
-      if (fadeInMs && fadeInMs > 0) {
+      const settings = useSettingsStore();
+      if (settings.fadeEnabled) {
+        backend.fadeIn(settings.fadeDurationMs, initialVolume);
+        backend.play();
+      } else if (fadeInMs && fadeInMs > 0) {
         backend.fadeIn(fadeInMs, initialVolume);
+        backend.play();
+      } else {
+        backend.play();
       }
     }
   }
@@ -507,19 +539,36 @@ export const usePlayerStore = defineStore("player", () => {
       return;
     }
     if (backend.isPlaying()) {
-      backend.pause();
+      pause();
     } else {
-      backend.play();
+      play();
     }
   }
 
   function play() {
-    if (!backend && current.value) loadCurrent(true);
-    backend?.play();
+    if (backend && !backend.isPlaying()) {
+      const settings = useSettingsStore();
+      if (settings.fadeEnabled) {
+        backend.fadeIn(settings.fadeDurationMs, muted.value ? 0 : volume.value);
+        backend.play();
+      } else {
+        backend.play();
+      }
+    } else if (!backend && current.value) {
+      loadCurrent(true);
+    }
   }
 
   function pause() {
-    backend?.pause();
+    if (backend && backend.isPlaying()) {
+      const settings = useSettingsStore();
+      if (settings.fadeEnabled) {
+        backend.fadeOut(settings.fadeDurationMs, true);
+        // IsPlaying will be updated when the 'pause' event fires
+      } else {
+        backend.pause();
+      }
+    }
   }
 
   function next() {

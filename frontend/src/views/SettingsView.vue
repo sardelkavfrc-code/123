@@ -38,13 +38,28 @@ const {
   startupVolume,
   cacheSize,
   externalCovers,
-  crossfade,
-  crossfadeDuration,
   autoScrollQueue,
   discordRpc,
   discordRpcText,
   discordRpcShowTrack,
 } = storeToRefs(settings);
+
+const crossfade = computed({
+  get: () => settings.crossfade,
+  set: (v) => (settings.crossfade = v),
+});
+const crossfadeDuration = computed({
+  get: () => settings.crossfadeDuration,
+  set: (v) => (settings.crossfadeDuration = v),
+});
+const fadeEnabled = computed({
+  get: () => settings.fadeEnabled,
+  set: (v) => (settings.fadeEnabled = v),
+});
+const fadeDurationMs = computed({
+  get: () => settings.fadeDurationMs,
+  set: (v) => (settings.fadeDurationMs = v),
+});
 
 const activeTab = ref<"appearance" | "playback" | "app" | "account">("appearance");
 const tabs = [
@@ -337,6 +352,27 @@ async function checkForUpdates() {
               <div class="settings__row-sub">Скроллить список к текущему треку при смене песни</div>
             </div>
             <input v-model="autoScrollQueue" type="checkbox" class="settings__switch" />
+          </label>
+        </article>
+
+        <article class="settings__card">
+          <h2>Пауза и переключения</h2>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Плавное затухание (Fade)</div>
+              <div class="settings__row-sub">Плавно изменять громкость при паузе и старте</div>
+            </div>
+            <input v-model="fadeEnabled" type="checkbox" class="settings__switch" />
+          </label>
+          <label class="settings__row" v-if="fadeEnabled">
+            <div>
+              <div class="settings__row-title">Длительность затухания</div>
+              <div class="settings__row-sub">В миллисекундах</div>
+            </div>
+            <div class="settings__range">
+              <input v-model.number="fadeDurationMs" type="range" min="100" max="1500" step="50" />
+              <span>{{ fadeDurationMs }} мс</span>
+            </div>
           </label>
         </article>
 

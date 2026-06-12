@@ -72,6 +72,8 @@ interface PersistedSettings {
   externalCovers: boolean;
   crossfade: boolean;
   crossfadeDuration: number;
+  fadeEnabled: boolean;
+  fadeDurationMs: number;
   autoScrollQueue: boolean;
   discordRpc: boolean;
   discordRpcText: string;
@@ -102,6 +104,8 @@ const defaults: PersistedSettings = {
   externalCovers: true,
   crossfade: true,
   crossfadeDuration: 2,
+  fadeEnabled: true,
+  fadeDurationMs: 500,
   autoScrollQueue: true,
   discordRpc: false,
   discordRpcText: "Слушает музыку",
@@ -143,6 +147,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const externalCovers = ref(initial.externalCovers);
   const crossfade = ref(initial.crossfade);
   const crossfadeDuration = ref(initial.crossfadeDuration);
+  const fadeEnabled = ref(initial.fadeEnabled ?? true);
+  const fadeDurationMs = ref(initial.fadeDurationMs ?? 500);
   const autoScrollQueue = ref(initial.autoScrollQueue ?? true);
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
@@ -199,6 +205,8 @@ export const useSettingsStore = defineStore("settings", () => {
       externalCovers: externalCovers.value,
       crossfade: crossfade.value,
       crossfadeDuration: crossfadeDuration.value,
+      fadeEnabled: fadeEnabled.value,
+      fadeDurationMs: fadeDurationMs.value,
       autoScrollQueue: autoScrollQueue.value,
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
@@ -315,6 +323,8 @@ export const useSettingsStore = defineStore("settings", () => {
     externalCovers,
     crossfade,
     crossfadeDuration,
+    fadeEnabled,
+    fadeDurationMs,
     autoScrollQueue,
     discordRpc,
     discordRpcText,
