@@ -866,7 +866,7 @@ async function checkForUpdates() {
   width: 140px;
   -webkit-appearance: none;
   appearance: none;
-  background: var(--bg-2);
+  background: var(--border-strong);
   height: 4px;
   border-radius: 2px;
   outline: none;
@@ -890,7 +890,7 @@ async function checkForUpdates() {
   border: none;
 }
 .settings__range input[type="range"]::-moz-range-track {
-  background: var(--bg-2);
+  background: var(--border-strong);
   height: 4px;
   border-radius: 2px;
 }
