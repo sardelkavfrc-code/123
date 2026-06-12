@@ -3,23 +3,30 @@ import { computed, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
+import { useUIStore } from "@/stores/ui";
 import type { Track } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
 import Spinner from "@/components/Spinner.vue";
+import UnavailableTracksModal from "@/components/UnavailableTracksModal.vue";
 import { tracksLabel } from "@/composables/useFormat";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
+const ui = useUIStore();
 
 const { myMusic, myMusicLoading, myMusicLoadingMore, myMusicHasMore, myMusicTotal } =
   storeToRefs(library);
 const query = ref("");
 
+const showUnavailableModal = ref(false);
+
 onMounted(() => {
   void library.loadMyMusic();
 });
+
+const unavailableTracks = computed(() => myMusic.value.filter(t => !t.url));
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
@@ -93,6 +100,34 @@ async function shufflePlay() {
     isGlobalLoading.value = false;
   }
 }
+
+async function deleteTrack(track: Track) {
+  try {
+    await library.removeFromLibrary(track);
+    ui.notify(`Трек удален: ${track.title}`, 'success');
+  } catch (err: any) {
+    ui.notify(`Ошибка удаления: ${err.message}`, 'error');
+  }
+}
+
+async function deleteAllTracks() {
+  const tracks = unavailableTracks.value;
+  let deleted = 0;
+  for (const track of tracks) {
+    try {
+      await library.removeFromLibrary(track);
+      deleted++;
+    } catch (err: any) {
+      console.error(err);
+    }
+  }
+  if (deleted > 0) {
+    ui.notify(`Удалено треков: ${deleted}`, 'success');
+  }
+  if (unavailableTracks.value.length === 0) {
+    showUnavailableModal.value = false;
+  }
+}
 </script>
 
 <template>
@@ -120,6 +155,14 @@ async function shufflePlay() {
           placeholder="Поиск в библиотеке"
           aria-label="Поиск"
         />
+        <button 
+          v-if="unavailableTracks.length > 0"
+          class="btn btn--unavailable"
+          title="Показать недоступные треки"
+          @click="showUnavailableModal = true"
+        >
+          <img src="/unavailable-icon.png" alt="error" />
+        </button>
       </template>
     </PageHeader>
 
@@ -141,6 +184,14 @@ async function shufflePlay() {
         </div>
       </template>
     </section>
+
+    <UnavailableTracksModal
+      :show="showUnavailableModal"
+      :tracks="unavailableTracks"
+      @close="showUnavailableModal = false"
+      @delete="deleteTrack"
+      @delete-all="deleteAllTracks"
+    />
   </ScrollArea>
 </template>
 
@@ -158,5 +209,25 @@ async function shufflePlay() {
   gap: 10px;
   color: var(--text-2);
   padding: 12px 0;
+}
+.btn--unavailable {
+  padding: 4px;
+  background: rgba(255, 71, 87, 0.1);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn--unavailable:hover {
+  background: rgba(255, 71, 87, 0.2);
+  border-color: rgba(255, 71, 87, 0.4);
+}
+.btn--unavailable img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 </style>
