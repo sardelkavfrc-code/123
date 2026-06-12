@@ -81,14 +81,14 @@ async function shufflePlay() {
   if (!filtered.value.length) return;
   if (query.value.trim().length > 0) {
     player.shuffle = true;
-    player.playQueue(filtered.value, 0);
+    player.playQueue(filtered.value, -1);
     return;
   }
   isGlobalLoading.value = true;
   try {
     const all = await library.loadAllMyMusic();
     player.shuffle = true;
-    player.playQueue(all, 0);
+    player.playQueue(all, -1);
   } finally {
     isGlobalLoading.value = false;
   }

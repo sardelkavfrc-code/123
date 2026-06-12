@@ -46,7 +46,7 @@ function indexInPlayable(track: Track): number {
       :index="i"
       :show-index="showIndex"
       :variant="variant"
-      @dblclick="playAll(Math.max(0, indexInPlayable(track)))"
+      @play="playAll(Math.max(0, indexInPlayable(track)))"
     />
   </div>
   <EmptyState

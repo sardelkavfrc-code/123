@@ -17,6 +17,10 @@ const props = defineProps<{
   variant?: "default" | "compact";
 }>();
 
+const emit = defineEmits<{
+  (e: "play"): void;
+}>();
+
 const player = usePlayerStore();
 const library = useLibraryStore();
 const ui = useUIStore();
@@ -40,7 +44,7 @@ function playOne() {
     ui.notify("Трек недоступен", "error");
     return;
   }
-  player.playTrack(props.track);
+  emit("play");
 }
 
 function gotoSpecificArtist(artistId?: string | null, artistName?: string | null) {
