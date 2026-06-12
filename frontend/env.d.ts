@@ -25,6 +25,8 @@ declare global {
       platform: string;
       version: string;
       getBackendUrl: () => Promise<string>;
+      waitForBackend: () => Promise<void>;
+      getVersion: () => Promise<string>;
       minimize: () => void;
       maximize: () => void;
       close: () => void;

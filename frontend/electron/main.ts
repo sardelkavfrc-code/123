@@ -26,6 +26,7 @@ let isQuitting = false;
 let backendProc: ChildProcessByStdio<Writable, Readable, Readable> | null = null;
 let backendPort = 0;
 let backendReady = false;
+let backendReadyPromise: Promise<void> | null = null;
 
 function findBackendBinary(): string {
   const binaryName = process.platform === "win32" ? "vkmp-backend.exe" : "vkmp-backend";
@@ -89,7 +90,7 @@ async function startBackend(): Promise<void> {
       VKMP_WATCH_PARENT: "1",
     },
   });
-  await new Promise<void>((resolve, reject) => {
+  backendReadyPromise = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("backend boot timeout")), 30_000);
     backendProc?.stdout?.on("data", (chunk: Buffer) => {
       const text = chunk.toString();
@@ -105,6 +106,7 @@ async function startBackend(): Promise<void> {
       if (!backendReady) reject(new Error(`backend exited early with code ${code ?? "null"}`));
     });
   });
+  return backendReadyPromise;
 }
 
 function stopBackend(): void {
@@ -275,15 +277,14 @@ app.on("second-instance", () => {
   }
 });
 
-app.whenReady().then(async () => {
-  try {
-    await startBackend();
-  } catch (err) {
-    console.error("VK Music: failed to start backend", err);
-  }
+app.whenReady().then(() => {
   mainWindow = createWindow();
   createTray();
   registerMediaKeys();
+
+  startBackend().catch((err) => {
+    console.error("VK Music: failed to start backend", err);
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -343,6 +344,11 @@ ipcMain.handle("update:install", () => {
 });
 
 ipcMain.handle("backend:url", () => `http://127.0.0.1:${backendPort}`);
+ipcMain.handle("backend:wait", async () => {
+  if (backendReadyPromise) {
+    await backendReadyPromise;
+  }
+});
 ipcMain.handle("app:version", () => app.getVersion());
 
 ipcMain.on("window:minimize", () => mainWindow?.minimize());

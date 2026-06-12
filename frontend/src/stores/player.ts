@@ -132,7 +132,8 @@ function createHlsBackend(
   url: string,
   initialVolume: number,
   cb: BackendCallbacks,
-  eq: any
+  eq: any,
+  startTime?: number
 ): PlaybackBackend {
   const audio = new Audio();
   audio.preload = "auto";
@@ -161,7 +162,7 @@ function createHlsBackend(
 
   // Safari handles HLS natively. For Chromium/Electron we need Hls.js → MSE.
   if (Hls.isSupported()) {
-    hls = new Hls({ enableWorker: true });
+    hls = new Hls({ enableWorker: true, startPosition: startTime && startTime > 0 ? startTime : -1 });
     hls.loadSource(url);
     hls.attachMedia(audio);
     hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -379,7 +380,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function loadCurrent(autoPlay: boolean, fadeInMs?: number) {
+  function loadCurrent(autoPlay: boolean, fadeInMs?: number, startTime?: number) {
     destroyBackend();
     const track = current.value;
     if (!track || !track.url) {
@@ -387,7 +388,7 @@ export const usePlayerStore = defineStore("player", () => {
       return;
     }
     loadingTrack.value = true;
-    currentTime.value = 0;
+    currentTime.value = startTime || 0;
     duration.value = track.duration;
 
     const initialVolume = muted.value ? 0 : volume.value;
@@ -419,9 +420,14 @@ export const usePlayerStore = defineStore("player", () => {
     };
 
     thisBackend = isHlsUrl(track.url)
-      ? createHlsBackend(track.url, initialVolume, callbacks, eq)
+      ? createHlsBackend(track.url, initialVolume, callbacks, eq, startTime)
       : createHtml5Backend(track.url, initialVolume, callbacks, eq);
     backend = thisBackend;
+
+    if (startTime && startTime > 0) {
+      // Modern browsers handle this synchronously before loadedmetadata
+      backend.seek(startTime);
+    }
 
     if (autoPlay) {
       backend.play();
@@ -452,13 +458,18 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function playQueue(tracks: Track[], startIndex = 0, onNearEnd?: () => Promise<void> | void) {
+  function playQueue(
+    tracks: Track[],
+    startIndex = 0,
+    options: { autoPlay?: boolean; startTime?: number } = { autoPlay: true },
+    onNearEnd?: () => Promise<void> | void
+  ) {
     const filtered = tracks.filter((t) => t.url);
     originalQueue.value = [...filtered];
     queue.value = shuffle.value ? shuffleArray(filtered, startIndex) : [...filtered];
     index.value = shuffle.value ? 0 : Math.min(Math.max(0, startIndex), filtered.length - 1);
     nearEndCallback = onNearEnd || null;
-    loadCurrent(true);
+    loadCurrent(options.autoPlay ?? true, undefined, options.startTime);
   }
 
   function playAtIndex(i: number) {

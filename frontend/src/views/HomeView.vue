@@ -134,6 +134,7 @@ async function playMix() {
     player.playQueue(
       mixTracks.value,
       0,
+      { autoPlay: true },
       async () => {
         // Обычная подгрузка, когда доиграли почти до конца (осталось < 10 треков)
         await fillMixBuffer(50);

@@ -51,14 +51,10 @@ onMounted(() => {
           const state = JSON.parse(rawState);
           if (state.queue && state.track) {
             const idx = state.queue.findIndex((t: any) => t.id === state.track.id);
-            player.playQueue(state.queue, idx >= 0 ? idx : 0);
-            if (state.time) {
-              // Wait for next tick so howler is initialized
-              setTimeout(() => {
-                player.seek(state.time);
-                if (!state.playing) player.pause();
-              }, 1000);
-            }
+            player.playQueue(state.queue, idx >= 0 ? idx : 0, {
+              autoPlay: state.playing,
+              startTime: state.time || 0,
+            });
           }
           if (state.path) {
             router.push(state.path);

@@ -72,6 +72,9 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
+  if (window.vkmp?.waitForBackend) {
+    await window.vkmp.waitForBackend().catch(() => {});
+  }
   const auth = useAuthStore();
   if (!auth.checked) {
     await auth.refresh();
