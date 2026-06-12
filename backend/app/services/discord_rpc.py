@@ -14,16 +14,17 @@ class RPCState(BaseModel):
     cover_url: Optional[str] = None
     duration: Optional[int] = None
     position: Optional[int] = None
-    client_id: str = "383226320970055681"
+
+CLIENT_ID = "1515030438270468268"
 
 class DiscordRPCManager:
     def __init__(self):
         self.presence: Optional[AioPresence] = None
         self.connected = False
-        self.current_client_id: Optional[str] = None
+        self._lock = asyncio.Lock()
 
-    async def connect(self, client_id: str) -> bool:
-        if self.connected and self.current_client_id == client_id:
+    async def connect(self) -> bool:
+        if self.connected:
             return True
             
         if self.presence:
@@ -33,11 +34,10 @@ class DiscordRPCManager:
                 pass
                 
         try:
-            self.presence = AioPresence(client_id)
+            self.presence = AioPresence(CLIENT_ID)
             await self.presence.connect()
             self.connected = True
-            self.current_client_id = client_id
-            log.info(f"Connected to Discord RPC with client ID {client_id}")
+            log.info(f"Connected to Discord RPC with client ID {CLIENT_ID}")
             return True
         except Exception as e:
             log.error(f"Failed to connect to Discord RPC: {e}")
@@ -46,13 +46,14 @@ class DiscordRPCManager:
             return False
 
     async def update(self, state: RPCState):
-        if not self.connected or self.current_client_id != state.client_id:
-            success = await self.connect(state.client_id)
-            if not success:
-                return
+        async with self._lock:
+            if not self.connected:
+                success = await self.connect()
+                if not success:
+                    return
 
-        try:
-            if not state.is_playing:
+            try:
+                if not state.is_playing:
                 await self.presence.clear()
                 return
 
@@ -81,20 +82,23 @@ class DiscordRPCManager:
             log.warning("Discord RPC pipe closed")
         except Exception as e:
             log.error(f"Error updating Discord RPC: {e}")
+            self.connected = False
 
     async def clear(self):
-        if self.connected and self.presence:
-            try:
-                await self.presence.clear()
-            except Exception:
-                pass
+        async with self._lock:
+            if self.connected and self.presence:
+                try:
+                    await self.presence.clear()
+                except Exception:
+                    self.connected = False
 
     async def close(self):
-        if self.connected and self.presence:
-            try:
-                await self.presence.close()
-            except Exception:
-                pass
-            self.connected = False
+        async with self._lock:
+            if self.connected and self.presence:
+                try:
+                    await self.presence.close()
+                except Exception:
+                    pass
+                self.connected = False
 
 rpc_manager = DiscordRPCManager()

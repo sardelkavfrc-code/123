@@ -43,7 +43,6 @@ const {
   discordRpc,
   discordRpcText,
   discordRpcShowTrack,
-  discordRpcAppId,
 } = storeToRefs(settings);
 
 const activeTab = ref<"appearance" | "playback" | "app" | "account">("appearance");
@@ -432,20 +431,6 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
                 type="text" 
                 class="settings__text-input" 
                 placeholder="Слушает музыку"
-              />
-            </div>
-          </label>
-          <label class="settings__row" v-if="discordRpc">
-            <div>
-              <div class="settings__row-title">App ID (Client ID)</div>
-              <div class="settings__row-sub">ID твоего приложения из Discord Developer Portal</div>
-            </div>
-            <div class="settings__input-wrap">
-              <input 
-                v-model="discordRpcAppId" 
-                type="text" 
-                class="settings__text-input" 
-                placeholder="1515030438270468268"
               />
             </div>
           </label>

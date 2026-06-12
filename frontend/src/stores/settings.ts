@@ -75,7 +75,6 @@ interface PersistedSettings {
   discordRpc: boolean;
   discordRpcText: string;
   discordRpcShowTrack: boolean;
-  discordRpcAppId: string;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -105,7 +104,6 @@ const defaults: PersistedSettings = {
   discordRpc: false,
   discordRpcText: "Слушает музыку",
   discordRpcShowTrack: true,
-  discordRpcAppId: "1515030438270468268",
 };
 
 function load(): PersistedSettings {
@@ -146,7 +144,6 @@ export const useSettingsStore = defineStore("settings", () => {
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
   const discordRpcShowTrack = ref(initial.discordRpcShowTrack ?? true);
-  const discordRpcAppId = ref(initial.discordRpcAppId || "1515030438270468268");
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -202,7 +199,6 @@ export const useSettingsStore = defineStore("settings", () => {
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
       discordRpcShowTrack: discordRpcShowTrack.value,
-      discordRpcAppId: discordRpcAppId.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -237,7 +233,6 @@ export const useSettingsStore = defineStore("settings", () => {
       discordRpc,
       discordRpcText,
       discordRpcShowTrack,
-      discordRpcAppId,
     ],
     () => {
       applyToDocument();
@@ -290,7 +285,6 @@ export const useSettingsStore = defineStore("settings", () => {
     discordRpc.value = defaults.discordRpc;
     discordRpcText.value = defaults.discordRpcText;
     discordRpcShowTrack.value = defaults.discordRpcShowTrack;
-    discordRpcAppId.value = defaults.discordRpcAppId;
   }
 
   return {
@@ -318,7 +312,6 @@ export const useSettingsStore = defineStore("settings", () => {
     discordRpc,
     discordRpcText,
     discordRpcShowTrack,
-    discordRpcAppId,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,
