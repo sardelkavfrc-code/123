@@ -19,10 +19,10 @@
     "lint": "eslint --max-warnings 0 \"src/**/*.{ts,vue}\" \"electron/**/*.ts\"",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p electron/tsconfig.json",
     "format": "prettier --write \"src/**/*.{ts,vue,css}\" \"electron/**/*.ts\"",
-    "dist": "npm run build && npm run build:electron && electron-builder",
-    "dist:linux": "npm run build && npm run build:electron && electron-builder --linux",
-    "dist:win": "npm run build && npm run build:electron && electron-builder --win",
-    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac"
+    "dist": "npm run build && npm run build:electron && electron-builder --publish never",
+    "dist:linux": "npm run build && npm run build:electron && electron-builder --linux --publish never",
+    "dist:win": "npm run build && npm run build:electron && electron-builder --win --publish never",
+    "dist:mac": "npm run build && npm run build:electron && electron-builder --mac --publish never"
   },
   "build": {
     "appId": "ai.devin.vkmusic",
