@@ -186,4 +186,20 @@ export const api = {
     const { data } = await http.get<User>(`/friends/${userId}`);
     return data;
   },
+
+  async updateRpc(state: {
+    is_playing: boolean;
+    title: string;
+    artist: string;
+    cover_url?: string;
+    custom_text?: string;
+    duration?: number;
+    position?: number;
+    client_id?: string;
+  }): Promise<void> {
+    await http.post("/rpc/update", state);
+  },
+  async clearRpc(): Promise<void> {
+    await http.post("/rpc/clear");
+  },
 };

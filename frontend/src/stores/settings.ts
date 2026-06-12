@@ -72,6 +72,8 @@ interface PersistedSettings {
   crossfade: boolean;
   crossfadeDuration: number;
   autoScrollQueue: boolean;
+  discordRpc: boolean;
+  discordRpcText: string;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -98,6 +100,8 @@ const defaults: PersistedSettings = {
   crossfade: true,
   crossfadeDuration: 2,
   autoScrollQueue: true,
+  discordRpc: true,
+  discordRpcText: "Слушает музыку",
 };
 
 function load(): PersistedSettings {
@@ -135,6 +139,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const crossfade = ref(initial.crossfade);
   const crossfadeDuration = ref(initial.crossfadeDuration);
   const autoScrollQueue = ref(initial.autoScrollQueue ?? true);
+  const discordRpc = ref(initial.discordRpc);
+  const discordRpcText = ref(initial.discordRpcText);
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -187,6 +193,8 @@ export const useSettingsStore = defineStore("settings", () => {
       crossfade: crossfade.value,
       crossfadeDuration: crossfadeDuration.value,
       autoScrollQueue: autoScrollQueue.value,
+      discordRpc: discordRpc.value,
+      discordRpcText: discordRpcText.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -217,6 +225,9 @@ export const useSettingsStore = defineStore("settings", () => {
       externalCovers,
       crossfade,
       crossfadeDuration,
+      autoScrollQueue,
+      discordRpc,
+      discordRpcText,
     ],
     () => {
       applyToDocument();
@@ -265,6 +276,9 @@ export const useSettingsStore = defineStore("settings", () => {
     externalCovers.value = defaults.externalCovers;
     crossfade.value = defaults.crossfade;
     crossfadeDuration.value = defaults.crossfadeDuration;
+    autoScrollQueue.value = defaults.autoScrollQueue;
+    discordRpc.value = defaults.discordRpc;
+    discordRpcText.value = defaults.discordRpcText;
   }
 
   return {
@@ -289,6 +303,8 @@ export const useSettingsStore = defineStore("settings", () => {
     crossfade,
     crossfadeDuration,
     autoScrollQueue,
+    discordRpc,
+    discordRpcText,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,

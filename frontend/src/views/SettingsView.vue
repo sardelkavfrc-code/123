@@ -40,6 +40,8 @@ const {
   crossfade,
   crossfadeDuration,
   autoScrollQueue,
+  discordRpc,
+  discordRpcText,
 } = storeToRefs(settings);
 
 const activeTab = ref<"appearance" | "playback" | "app" | "account">("appearance");
@@ -400,6 +402,31 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             <button class="btn btn--ghost" @click="clearCache">Очистить кеш</button>
           </div>
         </article>
+
+        <article class="settings__card">
+          <h2>Интеграции</h2>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Discord Rich Presence</div>
+              <div class="settings__row-sub">Отображать текущий трек в статусе Discord</div>
+            </div>
+            <input v-model="discordRpc" type="checkbox" class="settings__switch" />
+          </label>
+          <label class="settings__row" v-if="discordRpc">
+            <div>
+              <div class="settings__row-title">Текст статуса Discord</div>
+              <div class="settings__row-sub">Будет отображаться в первой строке</div>
+            </div>
+            <div class="settings__input-wrap">
+              <input 
+                v-model="discordRpcText" 
+                type="text" 
+                class="settings__text-input" 
+                placeholder="Слушает музыку"
+              />
+            </div>
+          </label>
+        </article>
       </template>
 
       <!-- Аккаунт -->
@@ -739,6 +766,21 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
   font-size: 12px;
+}
+.settings__text-input {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-0);
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  width: 200px;
+  outline: none;
+  transition: border-color var(--motion-duration-fast);
+}
+.settings__text-input:focus {
+  border-color: var(--accent-1);
 }
 .settings__hint {
   margin: 0;

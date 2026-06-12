@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import Hls from "hls.js";
 import type { Track } from "@/api/types";
+import { api } from "@/api/client";
 import { useSettingsStore } from "./settings";
 import { useEqualizerStore } from "./equalizer";
 
@@ -617,7 +618,34 @@ export const usePlayerStore = defineStore("player", () => {
         index.value = newIndex;
       }
     }
+
   }
+
+  // Discord RPC synchronization
+  watch(
+    [current, isPlaying, () => settings.discordRpc, () => settings.discordRpcText],
+    ([track, playing, rpcEnabled, customText]) => {
+      if (!rpcEnabled) {
+        api.clearRpc().catch(() => {});
+        return;
+      }
+      if (!track) {
+        api.clearRpc().catch(() => {});
+        return;
+      }
+      
+      const artist = track.main_artists?.[0]?.name || track.artist || "";
+      api.updateRpc({
+        is_playing: playing,
+        title: track.title,
+        artist,
+        cover_url: track.album_cover,
+        custom_text: customText,
+        duration: track.duration,
+        position: Math.floor(currentTime.value),
+      }).catch(err => console.error("RPC Update failed", err));
+    }
+  );
 
   return {
     queue,

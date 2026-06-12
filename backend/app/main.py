@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import art, audio, auth, friends
+from .routers import art, audio, auth, friends, rpc
 from .vk.client import VKClient
 
 
@@ -19,6 +19,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        from .services.discord_rpc import rpc_manager
+        await rpc_manager.close()
         await app.state.vk_client.aclose()
         await art.aclose()
 
@@ -44,6 +46,7 @@ def create_app() -> FastAPI:
     app.include_router(audio.router)
     app.include_router(friends.router)
     app.include_router(art.router)
+    app.include_router(rpc.router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
