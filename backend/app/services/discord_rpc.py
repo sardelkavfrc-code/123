@@ -57,32 +57,32 @@ class DiscordRPCManager:
                     await self.presence.clear()
                     return
 
-            kwargs = {
-                "details": state.custom_text,
-            }
-            if state.title:
-                kwargs["state"] = f"{state.artist} - {state.title}" if state.artist else state.title
-                kwargs["large_text"] = state.title
-                kwargs["large_image"] = state.cover_url or "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
-            else:
-                kwargs["large_image"] = "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
-                
-            # Add start time and end time if we have duration
-            # To show elapsed time, we just set start
-            if state.position is not None and state.title:
-                import time
-                current_time = int(time.time())
-                kwargs["start"] = current_time - state.position
-                if state.duration:
-                    kwargs["end"] = kwargs["start"] + state.duration
+                kwargs = {
+                    "details": state.custom_text,
+                }
+                if state.title:
+                    kwargs["state"] = f"{state.artist} - {state.title}" if state.artist else state.title
+                    kwargs["large_text"] = state.title
+                    kwargs["large_image"] = state.cover_url or "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
+                else:
+                    kwargs["large_image"] = "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
+                    
+                # Add start time and end time if we have duration
+                # To show elapsed time, we just set start
+                if state.position is not None and state.title:
+                    import time
+                    current_time = int(time.time())
+                    kwargs["start"] = current_time - state.position
+                    if state.duration:
+                        kwargs["end"] = kwargs["start"] + state.duration
 
-            await self.presence.update(**kwargs)
-        except PipeClosed:
-            self.connected = False
-            log.warning("Discord RPC pipe closed")
-        except Exception as e:
-            log.error(f"Error updating Discord RPC: {e}")
-            self.connected = False
+                await self.presence.update(**kwargs)
+            except PipeClosed:
+                self.connected = False
+                log.warning("Discord RPC pipe closed")
+            except Exception as e:
+                log.error(f"Error updating Discord RPC: {e}")
+                self.connected = False
 
     async def clear(self):
         async with self._lock:
