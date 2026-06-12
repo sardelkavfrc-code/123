@@ -1,25 +1,25 @@
 import asyncio
 import logging
-from typing import Optional
+
 from pydantic import BaseModel
-from pypresence import AioPresence, InvalidID, PipeClosed
+from pypresence import AioPresence, PipeClosed
 
 log = logging.getLogger(__name__)
 
 class RPCState(BaseModel):
     is_playing: bool
     custom_text: str = "Слушает музыку"
-    title: Optional[str] = None
-    artist: Optional[str] = None
-    cover_url: Optional[str] = None
-    duration: Optional[int] = None
-    position: Optional[int] = None
+    title: str | None = None
+    artist: str | None = None
+    cover_url: str | None = None
+    duration: int | None = None
+    position: int | None = None
 
 CLIENT_ID = "1515030438270468268"
 
 class DiscordRPCManager:
     def __init__(self):
-        self.presence: Optional[AioPresence] = None
+        self.presence: AioPresence | None = None
         self.connected = False
         self._lock = asyncio.Lock()
 

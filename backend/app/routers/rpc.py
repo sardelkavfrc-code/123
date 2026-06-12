@@ -1,5 +1,6 @@
 from fastapi import APIRouter
-from ..services.discord_rpc import rpc_manager, RPCState
+
+from ..services.discord_rpc import RPCState, rpc_manager
 
 router = APIRouter(prefix="/rpc", tags=["rpc"])
 

@@ -333,6 +333,9 @@ autoUpdater.on("update-downloaded", () => {
 ipcMain.handle("update:check", async () => {
   const result = await autoUpdater.checkForUpdates();
   const hasUpdate = result ? result.updateInfo.version !== app.getVersion() : false;
+  if (hasUpdate && result) {
+    mainWindow?.webContents.send("update:available", result.updateInfo);
+  }
   return { hasUpdate };
 });
 ipcMain.handle("update:download", () => autoUpdater.downloadUpdate());

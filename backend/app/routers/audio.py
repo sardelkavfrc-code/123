@@ -3,12 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import AlbumList, AlbumSummary, Artist, RecommendationFeed, Track, TrackList
+from ..models.audio import AlbumList, AlbumSummary, Artist, Track, TrackList
 from ..services.audio import (
-    build_virtual_feed,
     parse_albums,
     parse_artist,
-    parse_recommendation_feed,
     parse_track,
     parse_track_list,
 )
@@ -36,6 +34,32 @@ def _get_playlist_cover(pl: dict) -> str | None:
     return None
 
 
+async def _fill_missing_urls(vk: VKDep, session: SessionDep, items: list[dict]):
+    missing = []
+    for item in items:
+        # If track has no URL, but is NOT explicitly restricted, we retry
+        if not item.get("url") and not item.get("content_restricted"):
+            missing.append(item)
+    
+    if not missing:
+        return
+
+    # Fetch in chunks of 100
+    for i in range(0, len(missing), 100):
+        chunk = missing[i:i+100]
+        audios_param = ",".join(f"{t.get('owner_id')}_{t.get('id')}" for t in chunk)
+        try:
+            resp = await _safe_call(vk, "audio.getById", session.access_token, audios=audios_param)
+            if resp:
+                resp_map = {f"{t.get('owner_id')}_{t.get('id')}": t for t in resp}
+                for item in chunk:
+                    key = f"{item.get('owner_id')}_{item.get('id')}"
+                    if key in resp_map and resp_map[key].get("url"):
+                        item["url"] = resp_map[key]["url"]
+        except Exception:
+            pass
+
+
 @router.get("/my", response_model=TrackList)
 async def my_music(
     vk: VKDep,
@@ -46,6 +70,8 @@ async def my_music(
     response = await _safe_call(
         vk, "audio.get", session.access_token, owner_id=session.user_id, offset=offset, count=count
     )
+    if response and response.get("items"):
+        await _fill_missing_urls(vk, session, response["items"])
     return parse_track_list(response)
 
 
@@ -91,6 +117,7 @@ async def my_music_all(
         if offset >= total_count:
             break
             
+    await _fill_missing_urls(vk, session, all_items)
     return parse_track_list({"count": total_count, "items": all_items})
 
 
@@ -398,8 +425,6 @@ async def artist_albums(
     except VKError:
         return {"blocks": []}
 
-    return slug.replace("-", " ").replace("_", " ").strip().title() or slug
-
 
 @router.get("/by_artist/{artist_id}", response_model=TrackList)
 async def by_artist(
@@ -535,7 +560,6 @@ async def artist_info(
         if parsed:
             return parsed
     except VKError as exc:
-        last_exc = exc
         if exc.code not in (3, 4, 15, 100):
             raise HTTPException(
                 status.HTTP_502_BAD_GATEWAY,
