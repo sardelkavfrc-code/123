@@ -8,7 +8,7 @@ import {
   globalShortcut,
   shell,
 } from "electron";
-import AutoLaunch from "auto-launch";
+import { autoUpdater } from "electron-updater";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
 import { existsSync } from "node:fs";
 import net from "node:net";
@@ -22,7 +22,6 @@ const APP_NAME = "VK Music Player";
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
-const autoLauncher = new AutoLaunch({ name: APP_NAME, isHidden: true });
 
 let backendProc: ChildProcessByStdio<Writable, Readable, Readable> | null = null;
 let backendPort = 0;
@@ -165,7 +164,12 @@ function createWindow(): BrowserWindow {
   });
 
   win.once("ready-to-show", () => {
-    win.show();
+    const isHidden =
+      process.argv.includes("--hidden") ||
+      (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAsHidden);
+    if (!isHidden) {
+      win.show();
+    }
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -304,6 +308,35 @@ app.on("will-quit", () => {
   stopBackend();
 });
 
+// Update setup
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+
+app.whenReady().then(() => {
+  autoUpdater.checkForUpdates().catch((err) => console.error("Update check failed", err));
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch(() => {});
+  }, 1000 * 60 * 60); // Check every hour
+});
+
+autoUpdater.on("update-available", (info) => {
+  mainWindow?.webContents.send("update:available", info);
+});
+autoUpdater.on("download-progress", (progress) => {
+  mainWindow?.webContents.send("update:progress", progress);
+});
+autoUpdater.on("update-downloaded", () => {
+  mainWindow?.webContents.send("update:ready");
+});
+
+ipcMain.handle("update:check", () => autoUpdater.checkForUpdates());
+ipcMain.handle("update:download", () => autoUpdater.downloadUpdate());
+ipcMain.handle("update:install", () => {
+  isQuitting = true;
+  stopBackend();
+  autoUpdater.quitAndInstall(false, true);
+});
+
 ipcMain.handle("backend:url", () => `http://127.0.0.1:${backendPort}`);
 
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
@@ -317,25 +350,16 @@ ipcMain.on("window:maximize", () => {
 });
 ipcMain.on("window:close", () => mainWindow?.close());
 
-ipcMain.handle("auto-start:get", async () => {
-  try {
-    return await autoLauncher.isEnabled();
-  } catch {
-    return false;
-  }
+ipcMain.handle("auto-start:get", () => {
+  return app.getLoginItemSettings().openAtLogin;
 });
 
-ipcMain.handle("auto-start:set", async (_event, enabled: boolean) => {
-  try {
-    if (enabled) {
-      await autoLauncher.enable();
-    } else {
-      await autoLauncher.disable();
-    }
-    return true;
-  } catch {
-    return false;
-  }
+ipcMain.handle("auto-start:set", (_event, enabled: boolean, hidden: boolean) => {
+  app.setLoginItemSettings({
+    openAtLogin: enabled,
+    args: hidden ? ["--hidden"] : [],
+  });
+  return true;
 });
 
 ipcMain.on("tray:update", (_event, info: { title: string; artist: string; isPlaying: boolean } | null) => {

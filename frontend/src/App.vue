@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import TitleBar from "@/components/TitleBar.vue";
 import Sidebar from "@/components/Sidebar.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
 import ToastHost from "@/components/ToastHost.vue";
+import UpdateNotification from "@/components/UpdateNotification.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useUIStore } from "@/stores/ui";
 
 const route = useRoute();
+const router = useRouter();
 const isBlank = computed(() => route.meta.layout === "blank");
 const player = usePlayerStore();
 const ui = useUIStore();
@@ -22,6 +24,30 @@ onMounted(() => {
       else if (key === "next") player.next();
       else if (key === "prev") player.prev();
     });
+  }
+
+  // Restore state after update
+  try {
+    const rawState = localStorage.getItem("vkmp:update_restore_state");
+    if (rawState) {
+      localStorage.removeItem("vkmp:update_restore_state");
+      const state = JSON.parse(rawState);
+      if (state.queue && state.track) {
+        player.playQueue(state.queue, state.track);
+        if (state.time) {
+          // Wait for next tick so howler is initialized
+          setTimeout(() => {
+            player.seek(state.time);
+            if (!state.playing) player.pause();
+          }, 500);
+        }
+      }
+      if (state.path) {
+        router.push(state.path);
+      }
+    }
+  } catch (err) {
+    console.error("Failed to restore update state", err);
   }
 });
 
@@ -67,6 +93,7 @@ watch(
           </transition>
         </router-view>
       </main>
+      <UpdateNotification class="app-grid__update" />
       <PlayerBar class="app-grid__player" />
     </div>
     <ToastHost />
@@ -92,9 +119,10 @@ watch(
   min-height: 0;
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-rows: 1fr var(--player-height);
+  grid-template-rows: 1fr auto var(--player-height);
   grid-template-areas:
     "sidebar main"
+    "update update"
     "player player";
 }
 .app-grid__sidebar {
@@ -112,6 +140,9 @@ watch(
   min-height: 0;
   overflow: hidden;
   position: relative;
+}
+.app-grid__update {
+  grid-area: update;
 }
 .app-grid__player {
   grid-area: player;

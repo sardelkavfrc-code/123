@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld("vkmp", {
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),
-  setAutoStart: (enabled: boolean) => ipcRenderer.invoke("auto-start:set", enabled),
+  setAutoStart: (enabled: boolean, hidden: boolean) => ipcRenderer.invoke("auto-start:set", enabled, hidden),
   getAutoStart: () => ipcRenderer.invoke("auto-start:get"),
   onMediaKey: (cb: (key: MediaKey) => void) => {
     const handler = (_event: unknown, key: MediaKey) => cb(key);
@@ -19,4 +19,19 @@ contextBridge.exposeInMainWorld("vkmp", {
   setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) =>
     ipcRenderer.send("tray:update", info),
   openVKAuth: () => ipcRenderer.invoke("auth:open-vk-oauth"),
+  
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke("update:check"),
+    downloadUpdate: () => ipcRenderer.invoke("update:download"),
+    installUpdate: () => ipcRenderer.invoke("update:install"),
+    onUpdateAvailable: (cb: (info: any) => void) => {
+      ipcRenderer.on("update:available", (_e, info) => cb(info));
+    },
+    onUpdateProgress: (cb: (progress: any) => void) => {
+      ipcRenderer.on("update:progress", (_e, progress) => cb(progress));
+    },
+    onUpdateReady: (cb: () => void) => {
+      ipcRenderer.on("update:ready", () => cb());
+    },
+  }
 });

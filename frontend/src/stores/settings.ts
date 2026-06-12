@@ -251,12 +251,12 @@ export const useSettingsStore = defineStore("settings", () => {
     }
   }
 
-  async function setAutoStart(enabled: boolean) {
+  async function setAutoStart(enabled: boolean, hidden: boolean) {
     if (!window.vkmp) {
       autoStart.value = enabled;
       return;
     }
-    const ok = await window.vkmp.setAutoStart(enabled);
+    const ok = await window.vkmp.setAutoStart(enabled, hidden);
     if (ok) autoStart.value = enabled;
   }
 

@@ -1,6 +1,6 @@
 {
   "name": "vk-music-player",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "dist-electron/main.js",
   "description": "Desktop ВКонтакте music player built with Vue 3, Electron and a Python FastAPI backend.",
@@ -28,7 +28,13 @@
     "appId": "ai.devin.vkmusic",
     "productName": "VK Music",
     "asar": true,
-    "publish": null,
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "sardelkavfrc-code",
+        "repo": "123"
+      }
+    ],
     "directories": {
       "output": "release"
     },
@@ -80,9 +86,9 @@
   "dependencies": {
     "@vueuse/core": "^11.1.0",
     "@vueuse/motion": "^2.2.6",
-    "auto-launch": "^5.0.6",
     "axios": "^1.7.7",
     "electron-store": "^8.2.0",
+    "electron-updater": "^6.8.9",
     "hls.js": "^1.6.16",
     "howler": "^2.2.4",
     "pinia": "^2.2.4",

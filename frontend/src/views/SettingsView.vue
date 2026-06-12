@@ -142,7 +142,14 @@ function pickAccent(value: AccentName | "custom") {
 
 async function onAutoStartChange(event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
-  await settings.setAutoStart(enabled);
+  await settings.setAutoStart(enabled, startMinimized.value);
+}
+
+async function onStartMinimizedChange(event: Event) {
+  const hidden = (event.target as HTMLInputElement).checked;
+  if (autoStart.value) {
+    await settings.setAutoStart(autoStart.value, hidden);
+  }
 }
 
 const showEqModal = ref(false);
@@ -361,7 +368,7 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
               <div class="settings__row-title">Запуск свернутым</div>
               <div class="settings__row-sub">Подходит для автозапуска — не отвлекает</div>
             </div>
-            <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
+            <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" @change="onStartMinimizedChange" />
           </label>
           <label class="settings__row">
             <div>
