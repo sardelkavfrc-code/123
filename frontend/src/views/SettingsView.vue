@@ -861,9 +861,37 @@ async function checkForUpdates() {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
-}
 .settings__range input[type="range"] {
   width: 140px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--bg-2);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.settings__range input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-1);
+  cursor: pointer;
+}
+.settings__range input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--accent-1);
+  cursor: pointer;
+  border: none;
+}
+.settings__range input[type="range"]::-moz-range-track {
+  background: var(--bg-2);
+  height: 4px;
+  border-radius: 2px;
 }
 .settings__range span {
   min-width: 70px;
