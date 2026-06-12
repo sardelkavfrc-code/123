@@ -623,8 +623,8 @@ export const usePlayerStore = defineStore("player", () => {
 
   // Discord RPC synchronization
   watch(
-    [current, isPlaying, () => settings.discordRpc, () => settings.discordRpcText, () => settings.discordRpcShowTrack],
-    ([track, playing, rpcEnabled, customText, rpcShowTrack]) => {
+    [current, isPlaying, () => settings.discordRpc, () => settings.discordRpcText, () => settings.discordRpcShowTrack, () => settings.discordRpcAppId],
+    ([track, playing, rpcEnabled, customText, rpcShowTrack, rpcAppId]) => {
       if (!rpcEnabled) {
         api.clearRpc().catch(() => {});
         return;
@@ -633,6 +633,7 @@ export const usePlayerStore = defineStore("player", () => {
       const payload: any = {
         is_playing: playing,
         custom_text: customText,
+        client_id: rpcAppId,
       };
 
       if (track && rpcShowTrack) {
