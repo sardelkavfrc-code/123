@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useSettingsStore, type AccentName, type ThemeName, type StyleName, FONT_OPTIONS } from "@/stores/settings";
@@ -156,6 +156,18 @@ async function onStartMinimizedChange(event: Event) {
 const showEqModal = ref(false);
 
 const electronAvailable = computed(() => Boolean(window.vkmp));
+
+const appVersion = ref("");
+
+onMounted(async () => {
+  if (window.vkmp) {
+    try {
+      appVersion.value = await window.vkmp.getVersion();
+    } catch {
+      // ignore
+    }
+  }
+});
 
 const isCheckingUpdate = ref(false);
 async function checkForUpdates() {
@@ -406,7 +418,10 @@ async function checkForUpdates() {
         </article>
 
         <article class="settings__card" v-if="electronAvailable">
-          <h2>Обновления</h2>
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <h2>Обновления</h2>
+            <span v-if="appVersion" style="color: var(--text-2); font-size: 13px; margin-right: 32px;">v{{ appVersion }}</span>
+          </div>
           <label class="settings__row">
             <div>
               <div class="settings__row-title">Автоматическая проверка обновлений</div>

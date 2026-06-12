@@ -342,6 +342,7 @@ ipcMain.handle("update:install", () => {
 });
 
 ipcMain.handle("backend:url", () => `http://127.0.0.1:${backendPort}`);
+ipcMain.handle("app:version", () => app.getVersion());
 
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
 ipcMain.on("window:maximize", () => {
