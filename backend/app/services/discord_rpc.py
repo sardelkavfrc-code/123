@@ -63,9 +63,8 @@ class DiscordRPCManager:
                 if state.title:
                     kwargs["state"] = f"{state.artist} - {state.title}" if state.artist else state.title
                     kwargs["large_text"] = state.title
-                    kwargs["large_image"] = state.cover_url or "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
-                else:
-                    kwargs["large_image"] = "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
+                    if state.cover_url:
+                        kwargs["large_image"] = state.cover_url
                     
                 # Add start time and end time if we have duration
                 # To show elapsed time, we just set start
