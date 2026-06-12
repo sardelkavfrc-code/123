@@ -861,6 +861,7 @@ async function checkForUpdates() {
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+}
 .settings__range input[type="range"] {
   width: 140px;
   -webkit-appearance: none;
