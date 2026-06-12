@@ -109,6 +109,20 @@ export const useLibraryStore = defineStore("library", () => {
     }
   }
 
+  const myMusicAll = ref<Track[]>([]);
+
+  async function loadAllMyMusic(): Promise<Track[]> {
+    if (myMusicAll.value.length > 0) return myMusicAll.value;
+    try {
+      const list = await api.client.get<TrackList>("/audio/my/all");
+      myMusicAll.value = list.items;
+      return list.items;
+    } catch (err) {
+      console.error("Failed to load all my music", err);
+      return [];
+    }
+  }
+
   async function loadMyMusicPage(offset: number, count: number): Promise<TrackList> {
     const list = await api.myMusic({ offset, count });
     if (offset === 0) {
@@ -210,9 +224,11 @@ export const useLibraryStore = defineStore("library", () => {
     moods,
     albumsLoading,
     moodsLoading,
+    myMusicAll,
     myMusicIdSet,
     loadFromCache,
     loadMyMusic,
+    loadAllMyMusic,
     loadMoreMyMusic,
     loadMyMusicPage,
     loadFriends,

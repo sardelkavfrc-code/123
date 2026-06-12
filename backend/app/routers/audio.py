@@ -49,6 +49,51 @@ async def my_music(
     return parse_track_list(response)
 
 
+@router.get("/my/all", response_model=TrackList)
+async def my_music_all(
+    vk: VKDep,
+    session: SessionDep,
+) -> TrackList:
+    code = """
+    var offset = parseInt(Args.offset);
+    var owner_id = parseInt(Args.owner_id);
+    var count = 200;
+    var total = 0;
+    var items = [];
+    var first = API.audio.get({"owner_id": owner_id, "offset": offset, "count": count});
+    if (!first) { return {"count": 0, "items": []}; }
+    total = first.count;
+    items = first.items;
+    var i = 1;
+    while (i < 25 && items.length < total) {
+        var res = API.audio.get({"owner_id": owner_id, "offset": offset + i * count, "count": count});
+        if (res && res.items) {
+            items = items + res.items;
+        }
+        i = i + 1;
+    }
+    return {"count": total, "items": items};
+    """
+    
+    all_items = []
+    total_count = 0
+    offset = 0
+    while True:
+        resp = await _safe_call(vk, "execute", session.access_token, code=code, offset=offset, owner_id=session.user_id)
+        if not resp or not resp.get("items"):
+            break
+        total_count = resp.get("count", 0)
+        items = resp.get("items", [])
+        all_items.extend(items)
+        if len(all_items) >= total_count:
+            break
+        offset += len(items)
+        if offset >= total_count:
+            break
+            
+    return parse_track_list({"count": total_count, "items": all_items})
+
+
 @router.get("/by_owner/{owner_id}", response_model=TrackList)
 async def audio_by_owner(
     owner_id: int,

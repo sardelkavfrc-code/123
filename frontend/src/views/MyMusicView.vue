@@ -44,17 +44,54 @@ function onReachEnd() {
   void library.loadMoreMyMusic();
 }
 
-function playAll() {
-  if (filtered.value.length) player.playQueue(filtered.value);
-}
-function shufflePlay() {
-  if (!filtered.value.length) return;
-  const arr = [...filtered.value];
-  for (let i = arr.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
+const isGlobalLoading = ref(false);
+
+async function handlePlay(track: Track, index: number) {
+  if (query.value.trim().length > 0) {
+    player.playQueue(filtered.value, index);
+    return;
   }
-  player.playQueue(arr);
+  isGlobalLoading.value = true;
+  try {
+    const all = await library.loadAllMyMusic();
+    let fullIndex = all.findIndex((t) => t.id === track.id && t.owner_id === track.owner_id);
+    if (fullIndex === -1) fullIndex = index;
+    player.playQueue(all, fullIndex);
+  } finally {
+    isGlobalLoading.value = false;
+  }
+}
+
+async function playAll() {
+  if (!filtered.value.length) return;
+  if (query.value.trim().length > 0) {
+    player.playQueue(filtered.value, 0);
+    return;
+  }
+  isGlobalLoading.value = true;
+  try {
+    const all = await library.loadAllMyMusic();
+    player.playQueue(all, 0);
+  } finally {
+    isGlobalLoading.value = false;
+  }
+}
+
+async function shufflePlay() {
+  if (!filtered.value.length) return;
+  if (query.value.trim().length > 0) {
+    player.shuffle = true;
+    player.playQueue(filtered.value, 0);
+    return;
+  }
+  isGlobalLoading.value = true;
+  try {
+    const all = await library.loadAllMyMusic();
+    player.shuffle = true;
+    player.playQueue(all, 0);
+  } finally {
+    isGlobalLoading.value = false;
+  }
 }
 </script>
 
@@ -66,11 +103,12 @@ function shufflePlay() {
       :subtitle="subtitle"
     >
       <template #actions>
-        <button class="btn btn--primary" :disabled="!filtered.length" @click="playAll">
+        <button class="btn btn--primary" :disabled="!filtered.length || isGlobalLoading" @click="playAll">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          Слушать
+          <span v-if="isGlobalLoading">Загрузка...</span>
+          <span v-else>Слушать</span>
         </button>
-        <button class="btn btn--ghost" :disabled="!filtered.length" @click="shufflePlay">
+        <button class="btn btn--ghost" :disabled="!filtered.length || isGlobalLoading" @click="shufflePlay">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M16 3h5v5" /><path d="M4 20 21 3" /><path d="M21 16v5h-5" /><path d="m15 15 6 6" /><path d="M4 4l5 5" />
           </svg>
@@ -93,8 +131,10 @@ function shufflePlay() {
         <TrackList
           :tracks="filtered"
           show-index
+          manual-play
           empty-title="В библиотеке пусто"
           empty-subtitle="Сохрани треки из поиска или рекомендаций — они появятся здесь"
+          @play="handlePlay"
         />
         <div v-if="myMusicLoadingMore" class="my-music__loading">
           <Spinner :size="16" /> Подгружаем ещё…

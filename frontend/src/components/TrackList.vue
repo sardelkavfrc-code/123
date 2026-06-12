@@ -11,6 +11,11 @@ const props = defineProps<{
   variant?: "default" | "compact";
   emptyTitle?: string;
   emptySubtitle?: string;
+  manualPlay?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: "play", track: Track, index: number): void;
 }>();
 
 const player = usePlayerStore();
@@ -19,7 +24,12 @@ const playableTracks = computed(() => props.tracks.filter((t) => t.url));
 
 function playAll(startIndex: number) {
   if (playableTracks.value.length === 0) return;
-  player.playQueue(playableTracks.value, startIndex);
+  if (props.manualPlay) {
+    const track = playableTracks.value[startIndex];
+    emit("play", track, startIndex);
+  } else {
+    player.playQueue(playableTracks.value, startIndex);
+  }
 }
 
 function indexInPlayable(track: Track): number {
