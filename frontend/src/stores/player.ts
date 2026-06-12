@@ -309,16 +309,19 @@ export const usePlayerStore = defineStore("player", () => {
         currentTime.value = pos;
 
         // Crossfade logic
-        if (settings.crossfade && dur > 0 && !isCrossfading && repeat.value !== "one") {
+        if (settings.crossfade && dur > 0 && !isCrossfading) {
           const cfDur = settings.crossfadeDuration;
           const remaining = dur - pos;
-          if (remaining <= cfDur && remaining > 0.5 && hasNext.value) {
+          const hasNextSong = repeat.value === "one" || hasNext.value;
+          if (remaining <= cfDur && remaining > 0.5 && hasNextSong) {
             isCrossfading = true;
             const oldBackend = backend;
             backend = null;
             oldBackend.fadeOut(cfDur * 1000);
 
-            if (index.value + 1 < queue.value.length) {
+            if (repeat.value === "one") {
+              // repeat 1: keep the same index
+            } else if (index.value + 1 < queue.value.length) {
               index.value += 1;
             } else if (repeat.value === "all") {
               index.value = 0;
@@ -399,10 +402,7 @@ export const usePlayerStore = defineStore("player", () => {
 
   function handleEnd() {
     if (repeat.value === "one") {
-      if (backend) {
-        backend.seek(0);
-        backend.play();
-      }
+      loadCurrent(true);
       return;
     }
     if (index.value + 1 < queue.value.length) {
