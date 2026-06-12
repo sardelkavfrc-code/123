@@ -54,8 +54,8 @@ class DiscordRPCManager:
 
             try:
                 if not state.is_playing:
-                await self.presence.clear()
-                return
+                    await self.presence.clear()
+                    return
 
             kwargs = {
                 "details": state.custom_text,
