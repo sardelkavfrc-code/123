@@ -33,11 +33,12 @@ declare global {
       onMediaKey: (cb: (key: "play-pause" | "next" | "prev") => void) => () => void;
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
       openVKAuth: () => Promise<VKAuthResult>;
-      updater?: {
-        checkForUpdates: () => Promise<void>;
-        downloadUpdate: () => Promise<void>;
+      updater: {
+        checkForUpdates: () => Promise<any>;
+        downloadUpdate: () => Promise<any>;
         installUpdate: () => Promise<void>;
         onUpdateAvailable: (cb: (info: any) => void) => void;
+        onUpdateNotAvailable: (cb: (info: any) => void) => void;
         onUpdateProgress: (cb: (progress: any) => void) => void;
         onUpdateReady: (cb: () => void) => void;
       };

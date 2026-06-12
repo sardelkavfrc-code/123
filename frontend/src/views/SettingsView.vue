@@ -162,8 +162,11 @@ async function checkForUpdates() {
   if (!window.vkmp?.updater) return;
   isCheckingUpdate.value = true;
   try {
-    await window.vkmp.updater.checkForUpdates();
-    ui.notify("Проверка обновлений завершена", "success");
+    const res = await window.vkmp.updater.checkForUpdates();
+    if (res && !res.hasUpdate) {
+      ui.notify("Установлена последняя версия", "success");
+    }
+    // If hasUpdate is true, UpdateNotification will show the download prompt.
   } catch (err) {
     ui.notify("Ошибка при проверке обновлений", "error");
     console.error(err);

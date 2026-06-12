@@ -319,6 +319,9 @@ app.whenReady().then(() => {
 autoUpdater.on("update-available", (info) => {
   mainWindow?.webContents.send("update:available", info);
 });
+autoUpdater.on("update-not-available", (info) => {
+  mainWindow?.webContents.send("update:not-available", info);
+});
 autoUpdater.on("download-progress", (progress) => {
   mainWindow?.webContents.send("update:progress", progress);
 });
@@ -326,7 +329,11 @@ autoUpdater.on("update-downloaded", () => {
   mainWindow?.webContents.send("update:ready");
 });
 
-ipcMain.handle("update:check", () => autoUpdater.checkForUpdates());
+ipcMain.handle("update:check", async () => {
+  const result = await autoUpdater.checkForUpdates();
+  const hasUpdate = result ? result.updateInfo.version !== app.getVersion() : false;
+  return { hasUpdate };
+});
 ipcMain.handle("update:download", () => autoUpdater.downloadUpdate());
 ipcMain.handle("update:install", () => {
   isQuitting = true;

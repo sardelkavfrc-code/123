@@ -27,6 +27,9 @@ contextBridge.exposeInMainWorld("vkmp", {
     onUpdateAvailable: (cb: (info: any) => void) => {
       ipcRenderer.on("update:available", (_e, info) => cb(info));
     },
+    onUpdateNotAvailable: (cb: (info: any) => void) => {
+      ipcRenderer.on("update:not-available", (_e, info) => cb(info));
+    },
     onUpdateProgress: (cb: (progress: any) => void) => {
       ipcRenderer.on("update:progress", (_e, progress) => cb(progress));
     },
