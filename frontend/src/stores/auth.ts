@@ -34,10 +34,31 @@ export const useAuthStore = defineStore("auth", () => {
   async function refresh() {
     try {
       status.value = await api.authStatus();
+      if (status.value.authenticated) {
+        localStorage.setItem("wasAuthenticated", "true");
+      } else {
+        localStorage.removeItem("wasAuthenticated");
+      }
     } catch (err) {
-      status.value = emptyStatus();
-      if (err instanceof APIError && err.status !== 401) {
-        lastError.value = err.message;
+      if (err instanceof APIError && err.status === 401) {
+        status.value = emptyStatus();
+        localStorage.removeItem("wasAuthenticated");
+      } else {
+        // Not a 401 (e.g. 504 Gateway Timeout or network down).
+        if (localStorage.getItem("wasAuthenticated") === "true") {
+          // Assume still authenticated to prevent redirect loop to login screen
+          status.value.authenticated = true;
+          if (err instanceof APIError) {
+            lastError.value = "Ошибка связи с ВК: " + err.message;
+          } else {
+            lastError.value = "Ошибка сети: " + (err as Error).message;
+          }
+        } else {
+          status.value = emptyStatus();
+          if (err instanceof APIError) {
+            lastError.value = err.message;
+          }
+        }
       }
     } finally {
       checked.value = true;
@@ -49,6 +70,7 @@ export const useAuthStore = defineStore("auth", () => {
       await api.logout();
     } finally {
       status.value = emptyStatus();
+      localStorage.removeItem("wasAuthenticated");
     }
   }
 
@@ -57,6 +79,7 @@ export const useAuthStore = defineStore("auth", () => {
     loading.value = true;
     try {
       status.value = await api.loginWithToken({ remember: true, ...payload });
+      localStorage.setItem("wasAuthenticated", "true");
       return true;
     } catch (err) {
       if (err instanceof APIError) {
