@@ -240,6 +240,17 @@ function createHlsBackend(
   };
 }
 
+let tickHandle: number | null = null;
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (tickHandle !== null) {
+      window.clearInterval(tickHandle);
+      tickHandle = null;
+    }
+  });
+}
+
 export const usePlayerStore = defineStore("player", () => {
   const settings = useSettingsStore();
   const eq = useEqualizerStore();
@@ -254,6 +265,7 @@ export const usePlayerStore = defineStore("player", () => {
   const duration = ref(0);
   const repeat = ref<RepeatMode>("off");
   const shuffle = ref(false);
+  const hasRepeatedOnce = ref(false);
   // Volume is initialised from the user-configured startup volume on every
   // session. Runtime adjustments live only in this store — we don't write
   // back to settings.startupVolume so a quick tweak doesn't override the
@@ -262,7 +274,6 @@ export const usePlayerStore = defineStore("player", () => {
   const muted = ref(false);
 
   let backend: PlaybackBackend | null = null;
-  let tickHandle: number | null = null;
   let nearEndCallback: (() => void) | null = null;
 
   const current = computed<Track | null>(() => {
@@ -270,8 +281,8 @@ export const usePlayerStore = defineStore("player", () => {
     return queue.value[index.value];
   });
 
-  const hasNext = computed(() => index.value + 1 < queue.value.length || repeat.value === "all");
-  const hasPrev = computed(() => index.value > 0 || repeat.value === "all");
+  const hasNext = computed(() => index.value + 1 < queue.value.length);
+  const hasPrev = computed(() => index.value > 0);
 
   watch(volume, (v) => {
     if (backend) backend.setVolume(muted.value ? 0 : v);
@@ -281,6 +292,7 @@ export const usePlayerStore = defineStore("player", () => {
   });
 
   watch(index, () => {
+    hasRepeatedOnce.value = false;
     if (nearEndCallback && queue.value.length > 0 && index.value >= queue.value.length - 10) {
       loadMoreQueue();
     }
@@ -312,19 +324,35 @@ export const usePlayerStore = defineStore("player", () => {
         if (settings.crossfade && dur > 0 && !isCrossfading) {
           const cfDur = settings.crossfadeDuration;
           const remaining = dur - pos;
-          const hasNextSong = repeat.value === "one" || hasNext.value;
-          if (remaining <= cfDur && remaining > 0.5 && hasNextSong) {
+          
+          let willLoopSameTrack = false;
+          let willGoNext = false;
+
+          if (repeat.value === "all") {
+             willLoopSameTrack = true;
+          } else if (repeat.value === "one") {
+             if (!hasRepeatedOnce.value) {
+                 willLoopSameTrack = true;
+             } else {
+                 willGoNext = index.value + 1 < queue.value.length;
+             }
+          } else {
+             willGoNext = index.value + 1 < queue.value.length;
+          }
+
+          if (remaining <= cfDur && remaining > 0.5 && (willLoopSameTrack || willGoNext)) {
             isCrossfading = true;
             const oldBackend = backend;
             backend = null;
             oldBackend.fadeOut(cfDur * 1000);
 
-            if (repeat.value === "one") {
-              // repeat 1: keep the same index
-            } else if (index.value + 1 < queue.value.length) {
+            if (willLoopSameTrack) {
+              if (repeat.value === "one") {
+                hasRepeatedOnce.value = true;
+              }
+              // keep the same index
+            } else if (willGoNext) {
               index.value += 1;
-            } else if (repeat.value === "all") {
-              index.value = 0;
             }
             loadCurrent(true, cfDur * 1000);
           }
@@ -401,15 +429,19 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function handleEnd() {
-    if (repeat.value === "one") {
+    if (repeat.value === "all") {
       loadCurrent(true);
       return;
     }
+    if (repeat.value === "one") {
+      if (!hasRepeatedOnce.value) {
+        hasRepeatedOnce.value = true;
+        loadCurrent(true);
+        return;
+      }
+    }
     if (index.value + 1 < queue.value.length) {
       index.value += 1;
-      loadCurrent(true);
-    } else if (repeat.value === "all") {
-      index.value = 0;
       loadCurrent(true);
     } else {
       isPlaying.value = false;
@@ -480,9 +512,6 @@ export const usePlayerStore = defineStore("player", () => {
     if (index.value + 1 < queue.value.length) {
       index.value += 1;
       loadCurrent(true);
-    } else if (repeat.value === "all" && queue.value.length) {
-      index.value = 0;
-      loadCurrent(true);
     }
   }
 
@@ -493,9 +522,6 @@ export const usePlayerStore = defineStore("player", () => {
     }
     if (index.value > 0) {
       index.value -= 1;
-      loadCurrent(true);
-    } else if (repeat.value === "all" && queue.value.length) {
-      index.value = queue.value.length - 1;
       loadCurrent(true);
     }
   }

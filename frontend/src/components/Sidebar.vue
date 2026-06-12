@@ -73,7 +73,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 20px 14px 20px;
+  padding: 8px 14px 20px;
   background: var(--bg-sidebar);
   backdrop-filter: var(--app-blur);
   border-right: 1px solid var(--border);
