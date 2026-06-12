@@ -43,8 +43,12 @@ class VKClient:
             else:
                 payload[key] = value
 
-        resp = await self._client.post(f"/method/{method}", data=payload)
-        resp.raise_for_status()
+        try:
+            resp = await self._client.post(f"/method/{method}", data=payload)
+            resp.raise_for_status()
+        except httpx.RequestError as exc:
+            raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
+        
         data = resp.json()
 
         if "error" in data:
