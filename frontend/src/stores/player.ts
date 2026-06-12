@@ -78,7 +78,9 @@ function createHtml5Backend(
     seek: (s) => {
       try {
         audio.currentTime = s;
-      } catch {}
+      } catch {
+        // ignore
+      }
     },
     position: () => audio.currentTime || 0,
     duration: () => (Number.isFinite(audio.duration) ? audio.duration : 0),

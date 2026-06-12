@@ -245,9 +245,7 @@ function playAll() {
       </nav>
 
       <section class="artist__body">
-
-      
-      <Transition name="fade-slide" mode="out-in">
+        <Transition name="fade-slide" mode="out-in">
         <div :key="tab" class="artist__tab-pane">
           <template v-if="tab === 'all'">
             <div v-if="tracksWarning" class="artist__warn">{{ tracksWarning }}</div>

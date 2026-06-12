@@ -43,7 +43,9 @@ export const useEqualizerStore = defineStore("equalizer", () => {
         userPresets.value = parsed.userPresets;
       }
     }
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   // Save to localStorage
   watch(
