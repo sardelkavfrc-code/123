@@ -85,6 +85,10 @@ export const api = {
     const { data } = await http.get<TrackList>("/audio/my", { params });
     return data;
   },
+  async myMusicAll(): Promise<TrackList> {
+    const { data } = await http.get<TrackList>("/audio/my/all");
+    return data;
+  },
   async musicOfOwner(
     ownerId: number,
     params: { offset?: number; count?: number } = {}

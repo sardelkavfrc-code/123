@@ -114,7 +114,7 @@ export const useLibraryStore = defineStore("library", () => {
   async function loadAllMyMusic(): Promise<Track[]> {
     if (myMusicAll.value.length > 0) return myMusicAll.value;
     try {
-      const list = await api.client.get<TrackList>("/audio/my/all");
+      const list = await api.myMusicAll();
       myMusicAll.value = list.items;
       return list.items;
     } catch (err) {
