@@ -74,6 +74,7 @@ interface PersistedSettings {
   autoScrollQueue: boolean;
   discordRpc: boolean;
   discordRpcText: string;
+  discordRpcShowTrack: boolean;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -100,8 +101,9 @@ const defaults: PersistedSettings = {
   crossfade: true,
   crossfadeDuration: 2,
   autoScrollQueue: true,
-  discordRpc: true,
+  discordRpc: false,
   discordRpcText: "Слушает музыку",
+  discordRpcShowTrack: true,
 };
 
 function load(): PersistedSettings {
@@ -141,6 +143,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const autoScrollQueue = ref(initial.autoScrollQueue ?? true);
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
+  const discordRpcShowTrack = ref(initial.discordRpcShowTrack ?? true);
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -195,6 +198,7 @@ export const useSettingsStore = defineStore("settings", () => {
       autoScrollQueue: autoScrollQueue.value,
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
+      discordRpcShowTrack: discordRpcShowTrack.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -228,6 +232,7 @@ export const useSettingsStore = defineStore("settings", () => {
       autoScrollQueue,
       discordRpc,
       discordRpcText,
+      discordRpcShowTrack,
     ],
     () => {
       applyToDocument();
@@ -279,6 +284,7 @@ export const useSettingsStore = defineStore("settings", () => {
     autoScrollQueue.value = defaults.autoScrollQueue;
     discordRpc.value = defaults.discordRpc;
     discordRpcText.value = defaults.discordRpcText;
+    discordRpcShowTrack.value = defaults.discordRpcShowTrack;
   }
 
   return {
@@ -305,6 +311,7 @@ export const useSettingsStore = defineStore("settings", () => {
     autoScrollQueue,
     discordRpc,
     discordRpcText,
+    discordRpcShowTrack,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,

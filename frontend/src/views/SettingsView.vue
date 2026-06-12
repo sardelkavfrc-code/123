@@ -42,6 +42,7 @@ const {
   autoScrollQueue,
   discordRpc,
   discordRpcText,
+  discordRpcShowTrack,
 } = storeToRefs(settings);
 
 const activeTab = ref<"appearance" | "playback" | "app" | "account">("appearance");
@@ -407,10 +408,17 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
           <h2>Интеграции</h2>
           <label class="settings__row">
             <div>
-              <div class="settings__row-title">Discord Rich Presence</div>
-              <div class="settings__row-sub">Отображать текущий трек в статусе Discord</div>
+              <div class="settings__row-title">Discord RPC</div>
+              <div class="settings__row-sub">Отображать статус в Discord</div>
             </div>
             <input v-model="discordRpc" type="checkbox" class="settings__switch" />
+          </label>
+          <label class="settings__row" v-if="discordRpc">
+            <div>
+              <div class="settings__row-title">Показывать текущий трек</div>
+              <div class="settings__row-sub">Вместе с кастомным текстом отображать название и артиста</div>
+            </div>
+            <input v-model="discordRpcShowTrack" type="checkbox" class="settings__switch" />
           </label>
           <label class="settings__row" v-if="discordRpc">
             <div>

@@ -623,27 +623,27 @@ export const usePlayerStore = defineStore("player", () => {
 
   // Discord RPC synchronization
   watch(
-    [current, isPlaying, () => settings.discordRpc, () => settings.discordRpcText],
-    ([track, playing, rpcEnabled, customText]) => {
+    [current, isPlaying, () => settings.discordRpc, () => settings.discordRpcText, () => settings.discordRpcShowTrack],
+    ([track, playing, rpcEnabled, customText, rpcShowTrack]) => {
       if (!rpcEnabled) {
         api.clearRpc().catch(() => {});
         return;
       }
-      if (!track) {
-        api.clearRpc().catch(() => {});
-        return;
-      }
       
-      const artist = track.main_artists?.[0]?.name || track.artist || "";
-      api.updateRpc({
+      const payload: any = {
         is_playing: playing,
-        title: track.title,
-        artist,
-        cover_url: track.album_cover,
         custom_text: customText,
-        duration: track.duration,
-        position: Math.floor(currentTime.value),
-      }).catch(err => console.error("RPC Update failed", err));
+      };
+
+      if (track && rpcShowTrack) {
+        payload.title = track.title;
+        payload.artist = track.main_artists?.[0]?.name || track.artist || "";
+        payload.cover_url = track.album_cover;
+        payload.duration = track.duration;
+        payload.position = Math.floor(currentTime.value);
+      }
+
+      api.updateRpc(payload).catch(err => console.error("RPC Update failed", err));
     }
   );
 

@@ -189,8 +189,8 @@ export const api = {
 
   async updateRpc(state: {
     is_playing: boolean;
-    title: string;
-    artist: string;
+    title?: string;
+    artist?: string;
     cover_url?: string;
     custom_text?: string;
     duration?: number;

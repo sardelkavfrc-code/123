@@ -8,10 +8,10 @@ log = logging.getLogger(__name__)
 
 class RPCState(BaseModel):
     is_playing: bool
-    title: str
-    artist: str
-    cover_url: Optional[str] = None
     custom_text: str = "Слушает музыку"
+    title: Optional[str] = None
+    artist: Optional[str] = None
+    cover_url: Optional[str] = None
     duration: Optional[int] = None
     position: Optional[int] = None
     client_id: str = "383226320970055681"
@@ -58,14 +58,17 @@ class DiscordRPCManager:
 
             kwargs = {
                 "details": state.custom_text,
-                "state": f"{state.artist} - {state.title}" if state.artist else state.title,
-                "large_image": state.cover_url or "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png", # Fallback logo
-                "large_text": state.title,
             }
-            
+            if state.title:
+                kwargs["state"] = f"{state.artist} - {state.title}" if state.artist else state.title
+                kwargs["large_text"] = state.title
+                kwargs["large_image"] = state.cover_url or "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
+            else:
+                kwargs["large_image"] = "https://raw.githubusercontent.com/sardelkavfrc-code/123/main/assets/logo.png"
+                
             # Add start time and end time if we have duration
             # To show elapsed time, we just set start
-            if state.position is not None:
+            if state.position is not None and state.title:
                 import time
                 current_time = int(time.time())
                 kwargs["start"] = current_time - state.position
