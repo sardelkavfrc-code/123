@@ -57,9 +57,12 @@ class DiscordRPCManager:
                     await self.presence.clear()
                     return
 
-                kwargs = {
-                    "details": state.custom_text,
-                }
+                kwargs = {}
+                custom_text = state.custom_text.strip() if state.custom_text else ""
+                if len(custom_text) >= 2:
+                    kwargs["details"] = custom_text
+                elif not state.title:
+                    kwargs["details"] = "Слушает музыку"
                 if state.title:
                     kwargs["state"] = f"{state.artist} - {state.title}" if state.artist else state.title
                     kwargs["large_text"] = state.title
