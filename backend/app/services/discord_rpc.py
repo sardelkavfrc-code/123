@@ -34,7 +34,7 @@ class DiscordRPCManager:
                 pass
                 
         try:
-            self.presence = AioPresence(CLIENT_ID)
+            self.presence = AioPresence(CLIENT_ID, loop=asyncio.get_running_loop())
             await self.presence.connect()
             self.connected = True
             log.info(f"Connected to Discord RPC with client ID {CLIENT_ID}")
