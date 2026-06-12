@@ -98,6 +98,11 @@ function openQueue() {
 const showEqModal = ref(false);
 const eqEnabled = computed(() => eq.enabled);
 
+const showRemainingTime = ref(false);
+function toggleTimeMode() {
+  showRemainingTime.value = !showRemainingTime.value;
+}
+
 // Cover-art fallback (iTunes) when VK doesn't ship a cover. The composable
 // no-ops when the setting is off or when VK already has artwork.
 const trackArtist = computed(() => current.value?.main_artists[0]?.name || current.value?.artist || null);
@@ -251,7 +256,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
         </div>
       </div>
       <div class="player__seek">
-        <span class="player__time">{{ formatDuration(displayTime) }}</span>
+        <span class="player__time player__time--clickable" @click="toggleTimeMode">
+          {{ showRemainingTime ? "-" + formatDuration(Math.max(0, (duration || 0) - displayTime)) : formatDuration(displayTime) }}
+        </span>
         <div class="player__scrubber" :style="{ '--progress-pct': progressPct }">
           <div class="player__scrubber-track" />
           <div class="player__scrubber-fill" :class="{ 'player__scrubber-fill--seeking': isSeeking }" />
@@ -405,6 +412,21 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   text-align: left;
   display: inline;
   transition: color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.player__time {
+  font-size: 12px;
+  color: var(--text-2);
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.player__time--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+.player__time--clickable:hover {
+  color: var(--text-1);
 }
 .player__artist-comma {
   font-size: 12px;
