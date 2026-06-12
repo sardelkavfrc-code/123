@@ -74,7 +74,6 @@ async function installAndRestart() {
       <div class="update-notification__content">
         <div class="update-notification__header">
           <h3>Доступно обновление</h3>
-          <button v-if="state === 'available'" class="btn-icon" @click="hide">×</button>
         </div>
         
         <div v-if="state === 'available'" class="update-notification__notes" v-html="releaseNotes || 'Улучшения стабильности и новые функции.'"></div>

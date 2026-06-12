@@ -9,6 +9,7 @@ import UpdateNotification from "@/components/UpdateNotification.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
+import { useAuthStore } from "@/stores/auth";
 
 const route = useRoute();
 const router = useRouter();
@@ -40,28 +41,34 @@ onMounted(() => {
   }
 
   // Restore state after update
-  try {
-    const rawState = localStorage.getItem("vkmp:update_restore_state");
-    if (rawState) {
-      localStorage.removeItem("vkmp:update_restore_state");
-      const state = JSON.parse(rawState);
-      if (state.queue && state.track) {
-        player.playQueue(state.queue, state.track);
-        if (state.time) {
-          // Wait for next tick so howler is initialized
-          setTimeout(() => {
-            player.seek(state.time);
-            if (!state.playing) player.pause();
-          }, 500);
+  const unwatch = watch(() => useAuthStore().checked, (isChecked) => {
+    if (isChecked) {
+      unwatch();
+      try {
+        const rawState = localStorage.getItem("vkmp:update_restore_state");
+        if (rawState) {
+          localStorage.removeItem("vkmp:update_restore_state");
+          const state = JSON.parse(rawState);
+          if (state.queue && state.track) {
+            const idx = state.queue.findIndex((t: any) => t.id === state.track.id);
+            player.playQueue(state.queue, idx >= 0 ? idx : 0);
+            if (state.time) {
+              // Wait for next tick so howler is initialized
+              setTimeout(() => {
+                player.seek(state.time);
+                if (!state.playing) player.pause();
+              }, 1000);
+            }
+          }
+          if (state.path) {
+            router.push(state.path);
+          }
         }
-      }
-      if (state.path) {
-        router.push(state.path);
+      } catch (err) {
+        console.error("Failed to restore update state", err);
       }
     }
-  } catch (err) {
-    console.error("Failed to restore update state", err);
-  }
+  }, { immediate: true });
 });
 
 onUnmounted(() => {

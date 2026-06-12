@@ -338,7 +338,8 @@ ipcMain.handle("update:download", () => autoUpdater.downloadUpdate());
 ipcMain.handle("update:install", () => {
   isQuitting = true;
   stopBackend();
-  autoUpdater.quitAndInstall(false, true);
+  // isSilent: true, isForceRunAfter: true
+  autoUpdater.quitAndInstall(true, true);
 });
 
 ipcMain.handle("backend:url", () => `http://127.0.0.1:${backendPort}`);
