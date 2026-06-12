@@ -34,6 +34,7 @@ const {
   startSidebarCollapsed,
   hardwareAcceleration,
   autoStart,
+  autoUpdateCheck,
   startupVolume,
   cacheSize,
   externalCovers,
@@ -155,6 +156,21 @@ async function onStartMinimizedChange(event: Event) {
 const showEqModal = ref(false);
 
 const electronAvailable = computed(() => Boolean(window.vkmp));
+
+const isCheckingUpdate = ref(false);
+async function checkForUpdates() {
+  if (!window.vkmp?.updater) return;
+  isCheckingUpdate.value = true;
+  try {
+    await window.vkmp.updater.checkForUpdates();
+    ui.notify("Проверка обновлений завершена", "success");
+  } catch (err) {
+    ui.notify("Ошибка при проверке обновлений", "error");
+    console.error(err);
+  } finally {
+    isCheckingUpdate.value = false;
+  }
+}
 </script>
 
 <template>
@@ -384,6 +400,26 @@ const electronAvailable = computed(() => Boolean(window.vkmp));
             </div>
             <input v-model="hardwareAcceleration" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
           </label>
+        </article>
+
+        <article class="settings__card" v-if="electronAvailable">
+          <h2>Обновления</h2>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Автоматическая проверка обновлений</div>
+              <div class="settings__row-sub">Раз в час плеер будет тихо проверять новые версии</div>
+            </div>
+            <input v-model="autoUpdateCheck" type="checkbox" class="settings__switch" />
+          </label>
+          <div class="settings__row">
+            <div>
+              <div class="settings__row-title">Проверить обновления вручную</div>
+              <div class="settings__row-sub">Нажмите, чтобы проверить прямо сейчас</div>
+            </div>
+            <button class="btn btn--primary" style="padding: 8px 16px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; background: var(--bg-3); color: var(--text-0);" @click="checkForUpdates" :disabled="isCheckingUpdate">
+              {{ isCheckingUpdate ? 'Проверка...' : 'Проверить' }}
+            </button>
+          </div>
         </article>
 
         <article class="settings__card">

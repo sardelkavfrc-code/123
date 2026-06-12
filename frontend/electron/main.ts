@@ -313,10 +313,7 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
 
 app.whenReady().then(() => {
-  autoUpdater.checkForUpdates().catch((err) => console.error("Update check failed", err));
-  setInterval(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 1000 * 60 * 60); // Check every hour
+  // autoUpdater.checkForUpdates() is triggered by the renderer now
 });
 
 autoUpdater.on("update-available", (info) => {

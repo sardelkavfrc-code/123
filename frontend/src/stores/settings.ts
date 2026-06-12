@@ -56,6 +56,7 @@ interface PersistedSettings {
   startSidebarCollapsed: boolean;
   hardwareAcceleration: boolean;
   autoStart: boolean;
+  autoUpdateCheck: boolean;
   /**
    * Volume the player boots into on every app start. Runtime volume changes
    * during playback don't overwrite this — they live in the player store only.
@@ -95,6 +96,7 @@ const defaults: PersistedSettings = {
   startSidebarCollapsed: false,
   hardwareAcceleration: true,
   autoStart: false,
+  autoUpdateCheck: true,
   startupVolume: 0.5,
   cacheSize: 250,
   externalCovers: true,
@@ -135,6 +137,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const startSidebarCollapsed = ref(initial.startSidebarCollapsed);
   const hardwareAcceleration = ref(initial.hardwareAcceleration);
   const autoStart = ref(initial.autoStart);
+  const autoUpdateCheck = ref(initial.autoUpdateCheck ?? true);
   const startupVolume = ref(initial.startupVolume);
   const cacheSize = ref(initial.cacheSize);
   const externalCovers = ref(initial.externalCovers);
@@ -190,6 +193,7 @@ export const useSettingsStore = defineStore("settings", () => {
       startSidebarCollapsed: startSidebarCollapsed.value,
       hardwareAcceleration: hardwareAcceleration.value,
       autoStart: autoStart.value,
+      autoUpdateCheck: autoUpdateCheck.value,
       startupVolume: startupVolume.value,
       cacheSize: cacheSize.value,
       externalCovers: externalCovers.value,
@@ -224,6 +228,7 @@ export const useSettingsStore = defineStore("settings", () => {
       startSidebarCollapsed,
       hardwareAcceleration,
       autoStart,
+      autoUpdateCheck,
       startupVolume,
       cacheSize,
       externalCovers,
@@ -276,6 +281,7 @@ export const useSettingsStore = defineStore("settings", () => {
     startSidebarCollapsed.value = defaults.startSidebarCollapsed;
     hardwareAcceleration.value = defaults.hardwareAcceleration;
     autoStart.value = defaults.autoStart;
+    autoUpdateCheck.value = defaults.autoUpdateCheck;
     startupVolume.value = defaults.startupVolume;
     cacheSize.value = defaults.cacheSize;
     externalCovers.value = defaults.externalCovers;
@@ -303,6 +309,7 @@ export const useSettingsStore = defineStore("settings", () => {
     startSidebarCollapsed,
     hardwareAcceleration,
     autoStart,
+    autoUpdateCheck,
     startupVolume,
     cacheSize,
     externalCovers,

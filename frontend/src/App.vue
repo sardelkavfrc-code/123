@@ -7,6 +7,7 @@ import PlayerBar from "@/components/PlayerBar.vue";
 import ToastHost from "@/components/ToastHost.vue";
 import UpdateNotification from "@/components/UpdateNotification.vue";
 import { usePlayerStore } from "@/stores/player";
+import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
 
 const route = useRoute();
@@ -24,6 +25,18 @@ onMounted(() => {
       else if (key === "next") player.next();
       else if (key === "prev") player.prev();
     });
+
+    const settings = useSettingsStore();
+    if (settings.autoUpdateCheck) {
+      window.vkmp.updater?.checkForUpdates().catch(() => {});
+    }
+    
+    // Check every hour
+    setInterval(() => {
+      if (useSettingsStore().autoUpdateCheck) {
+        window.vkmp?.updater?.checkForUpdates().catch(() => {});
+      }
+    }, 1000 * 60 * 60);
   }
 
   // Restore state after update

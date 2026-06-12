@@ -52,7 +52,7 @@ function saveStateBeforeUpdate() {
   // Save track, time, queue, tab
   const data = {
     track: player.current,
-    time: player.progress,
+    time: player.currentTime,
     queue: player.queue,
     playing: player.isPlaying,
     path: router.currentRoute.value.fullPath,
