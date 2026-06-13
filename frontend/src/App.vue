@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar.vue";
 import PlayerBar from "@/components/PlayerBar.vue";
 import ToastHost from "@/components/ToastHost.vue";
 import UpdateNotification from "@/components/UpdateNotification.vue";
+import DynamicBackground from "@/components/DynamicBackground.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
@@ -90,6 +91,7 @@ watch(
 
 <template>
   <div class="app-root" :class="{ blank: isBlank, 'app-root--collapsed': ui.sidebarCollapsed }">
+    <DynamicBackground />
     <TitleBar />
     <div v-if="isBlank" class="blank-host">
       <router-view v-slot="{ Component }">

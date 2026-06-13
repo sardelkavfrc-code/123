@@ -171,6 +171,31 @@
   --divider: rgba(220, 190, 160, 0.04);
 }
 
+[data-theme="spotify"] {
+  color-scheme: dark;
+
+  /* Semi-transparent backgrounds to let the dynamic gradient shine through */
+  --bg-0: transparent;
+  --bg-1: rgba(18, 18, 18, 0.35);
+  --bg-2: rgba(24, 24, 24, 0.45);
+  --bg-3: rgba(40, 40, 40, 0.55);
+  --bg-elev: rgba(24, 24, 24, 0.6);
+  --bg-overlay: rgba(0, 0, 0, 0.85);
+
+  --app-blur: blur(40px) saturate(1.5) contrast(0.9);
+  --bg-sidebar: rgba(18, 18, 18, 0.4);
+  --bg-player: rgba(18, 18, 18, 0.5);
+
+  --text-0: #ffffff;
+  --text-1: #b3b3b3;
+  --text-2: #808080;
+  --text-3: #535353;
+
+  --border: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --divider: rgba(255, 255, 255, 0.03);
+}
+
 [data-accent="blue"] {
   --accent-1: #1a8cff;
   --accent-2: #2a4eff;

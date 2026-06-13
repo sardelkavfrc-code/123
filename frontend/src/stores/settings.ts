@@ -8,7 +8,8 @@ export type ThemeName =
   | "midnight"
   | "forest"
   | "sunset"
-  | "mocha";
+  | "mocha"
+  | "spotify";
 export type AccentName =
   | "blue"
   | "magenta"

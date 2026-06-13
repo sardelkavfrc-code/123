@@ -92,6 +92,7 @@ const themes: { value: ThemeName; label: string; preview: string }[] = [
   { value: "forest", label: "Лес", preview: "linear-gradient(135deg, #19302a, #0a1410)" },
   { value: "sunset", label: "Закат", preview: "linear-gradient(135deg, #3d251f, #1a0d0b)" },
   { value: "mocha", label: "Кофе", preview: "linear-gradient(135deg, #342a24, #161210)" },
+  { value: "spotify", label: "Spotify (Динамика)", preview: "linear-gradient(135deg, #1a8cff, #ff5e7e)" },
 ];
 
 const styles: { value: StyleName; label: string; desc: string }[] = [
