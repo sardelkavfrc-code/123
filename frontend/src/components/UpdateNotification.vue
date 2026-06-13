@@ -13,7 +13,7 @@ const router = useRouter();
 const player = usePlayerStore();
 
 // Временный хак для тестирования из обычной консоли
-// @ts-ignore
+// @ts-expect-error temporary global for testing
 window.showUpdate = () => { state.value = "available"; };
 
 onMounted(() => {
@@ -81,7 +81,12 @@ async function installAndRestart() {
             <h3>Доступно обновление</h3>
           </div>
           
-          <div v-if="state === 'available'" class="update-notification__notes" v-html="releaseNotes || 'Улучшения стабильности и новые функции.'"></div>
+          <div v-if="state === 'available'" class="update-notification__notes">
+            <div class="update-notification__notes-html" v-html="releaseNotes || 'Улучшения стабильности и новые функции.'"></div>
+            <a href="https://github.com/sardelkavfrc-code/123/blob/main/RELEASE_NOTES.md" target="_blank" class="update-notification__link">
+              Читать историю изменений (Changelog)
+            </a>
+          </div>
           
           <div v-if="state === 'downloading'" class="update-notification__progress-wrap">
             <div class="update-notification__progress-bar">
@@ -158,6 +163,17 @@ async function installAndRestart() {
 }
 .update-notification__notes :deep(p) {
   margin: 4px 0;
+}
+.update-notification__link {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--accent-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.update-notification__link:hover {
+  color: var(--accent-2);
 }
 .update-notification__progress-wrap {
   display: flex;
