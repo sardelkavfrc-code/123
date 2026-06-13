@@ -171,7 +171,8 @@
   --divider: rgba(220, 190, 160, 0.04);
 }
 
-[data-theme="spotify"] {
+[data-theme="spotify"],
+[data-theme="spotify-cover"] {
   color-scheme: dark;
 
   /* Semi-transparent backgrounds to let the dynamic gradient shine through */

@@ -2,7 +2,7 @@
 import { ref, watch } from "vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
-import { getFallbackColors } from "@/utils/color";
+import { extractColors, getFallbackColors } from "@/utils/color";
 
 const player = usePlayerStore();
 const settings = useSettingsStore();
@@ -19,15 +19,24 @@ const getFallbackGradient = (trackId: number | string) => {
   `;
 };
 
-const updateBackground = () => {
-  if (settings.theme !== "spotify") return;
+const updateBackground = async () => {
+  if (settings.theme !== "spotify" && settings.theme !== "spotify-cover") return;
   
   const track = player.current;
   let bgStyle: string;
   
   if (track) {
     if (track.album_cover) {
-      bgStyle = `url("${track.album_cover}")`;
+      if (settings.theme === "spotify-cover") {
+        bgStyle = `url("${track.album_cover}")`;
+      } else {
+        const colors = await extractColors(track.album_cover);
+        bgStyle = `
+          radial-gradient(circle at 20% 20%, ${colors[0]} 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, ${colors[1]} 0%, transparent 60%),
+          radial-gradient(circle at 50% 50%, ${colors[2]} 0%, transparent 70%)
+        `;
+      }
     } else {
       bgStyle = getFallbackGradient(track.id);
     }
@@ -45,14 +54,16 @@ const updateBackground = () => {
 
 watch(() => player.current?.id, updateBackground, { immediate: true });
 watch(() => settings.theme, (theme) => {
-  if (theme === "spotify") {
+  if (theme === "spotify" || theme === "spotify-cover") {
     updateBackground();
+  } else {
+    activeLayers.value = [];
   }
 });
 </script>
 
 <template>
-  <div class="dynamic-bg" v-if="settings.theme === 'spotify'">
+  <div class="dynamic-bg" v-if="settings.theme === 'spotify' || settings.theme === 'spotify-cover'">
     <TransitionGroup name="bg-fade">
       <div 
         v-for="layer in activeLayers"

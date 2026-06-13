@@ -9,7 +9,8 @@ export type ThemeName =
   | "forest"
   | "sunset"
   | "mocha"
-  | "spotify";
+  | "spotify"
+  | "spotify-cover";
 export type AccentName =
   | "blue"
   | "magenta"
