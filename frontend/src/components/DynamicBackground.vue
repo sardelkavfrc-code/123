@@ -7,11 +7,8 @@ import { getFallbackColors } from "@/utils/color";
 const player = usePlayerStore();
 const settings = useSettingsStore();
 
-const layer1Style = ref<string>("none");
-const layer2Style = ref<string>("none");
-const activeLayer = ref(1);
-
-let sequenceId = 0;
+const activeLayers = ref<{ id: number; style: string }[]>([]);
+let layerId = 0;
 
 const getFallbackGradient = (trackId: number | string) => {
   const c = getFallbackColors(trackId);
@@ -22,10 +19,9 @@ const getFallbackGradient = (trackId: number | string) => {
   `;
 };
 
-const updateBackground = async () => {
+const updateBackground = () => {
   if (settings.theme !== "spotify") return;
   
-  const currentSeq = ++sequenceId;
   const track = player.current;
   let bgStyle: string;
   
@@ -39,16 +35,12 @@ const updateBackground = async () => {
     bgStyle = "none";
   }
 
-  // Stop if a newer track switch happened
-  if (currentSeq !== sequenceId) return;
-
-  if (activeLayer.value === 1) {
-    layer2Style.value = bgStyle;
-    activeLayer.value = 2;
-  } else {
-    layer1Style.value = bgStyle;
-    activeLayer.value = 1;
+  // Prevent adding the exact same background if it hasn't changed
+  if (activeLayers.value.length > 0 && activeLayers.value[0].style === bgStyle) {
+    return;
   }
+
+  activeLayers.value = [{ id: ++layerId, style: bgStyle }];
 };
 
 watch(() => player.current?.id, updateBackground, { immediate: true });
@@ -61,16 +53,14 @@ watch(() => settings.theme, (theme) => {
 
 <template>
   <div class="dynamic-bg" v-if="settings.theme === 'spotify'">
-    <div 
-      class="dynamic-bg__layer" 
-      :class="{ 'dynamic-bg__layer--active': activeLayer === 1 }"
-      :style="{ backgroundImage: layer1Style }"
-    ></div>
-    <div 
-      class="dynamic-bg__layer" 
-      :class="{ 'dynamic-bg__layer--active': activeLayer === 2 }"
-      :style="{ backgroundImage: layer2Style }"
-    ></div>
+    <TransitionGroup name="bg-fade">
+      <div 
+        v-for="layer in activeLayers"
+        :key="layer.id"
+        class="dynamic-bg__layer"
+        :style="{ backgroundImage: layer.style }"
+      ></div>
+    </TransitionGroup>
     <!-- Dark overlay to ensure text readability -->
     <div class="dynamic-bg__overlay"></div>
   </div>
@@ -90,8 +80,6 @@ watch(() => settings.theme, (theme) => {
   inset: -100px; /* extend by fixed pixels to cover blur artifacts without excessive zooming */
   width: calc(100% + 200px);
   height: calc(100% + 200px);
-  opacity: 0;
-  transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1);
   /* The blur gives it that smooth Spotify/Apple Music glassmorphism vibe */
   filter: blur(90px) saturate(1.4);
   transform: translateZ(0); /* hardware acceleration */
@@ -100,8 +88,14 @@ watch(() => settings.theme, (theme) => {
   background-position: center;
 }
 
-.dynamic-bg__layer--active {
-  opacity: 1;
+.bg-fade-enter-active,
+.bg-fade-leave-active {
+  transition: opacity 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bg-fade-enter-from,
+.bg-fade-leave-to {
+  opacity: 0;
 }
 
 .dynamic-bg__overlay {
