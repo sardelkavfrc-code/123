@@ -69,10 +69,10 @@ function createHtml5Backend(
 
   audio.src = url;
 
-  let fadeInterval: ReturnType<typeof setInterval> | null = null;
+  let fadeInterval: ReturnType<typeof setTimeout> | null = null;
   const clearFade = () => {
     if (fadeInterval) {
-      clearInterval(fadeInterval);
+      clearTimeout(fadeInterval);
       fadeInterval = null;
     }
   };
@@ -97,13 +97,24 @@ function createHtml5Backend(
     },
     fadeOut: (ms, justPause = false) => {
       clearFade();
-      let v = audio.volume;
-      const steps = 20;
-      const stepTime = Math.max(10, ms / steps);
-      const stepVol = v / steps;
-      fadeInterval = setInterval(() => {
-        v -= stepVol;
-        if (v <= 0) {
+      const startVolume = audio.volume;
+      if (startVolume <= 0 || ms <= 0) {
+        audio.pause();
+        if (!justPause) {
+          audio.removeAttribute("src");
+          audio.load();
+        }
+        return;
+      }
+      const startTime = performance.now();
+      const tick = () => {
+        const elapsed = performance.now() - startTime;
+        let progress = elapsed / ms;
+        if (progress >= 1) progress = 1;
+        
+        audio.volume = Math.max(0, startVolume * (1 - progress));
+        
+        if (progress >= 1) {
           clearFade();
           audio.pause();
           if (!justPause) {
@@ -111,26 +122,39 @@ function createHtml5Backend(
             audio.load();
           }
         } else {
-          audio.volume = v;
+          fadeInterval = setTimeout(tick, 20);
         }
-      }, stepTime);
+      };
+      fadeInterval = setTimeout(tick, 20);
     },
     fadeIn: (ms, targetV) => {
       clearFade();
-      let v = 0;
-      audio.volume = v;
-      const steps = 20;
-      const stepTime = Math.max(10, ms / steps);
-      const stepVol = targetV / steps;
-      fadeInterval = setInterval(() => {
-        v += stepVol;
-        if (v >= targetV) {
-          audio.volume = targetV;
+      if (ms <= 0) {
+        audio.volume = targetV;
+        return;
+      }
+      audio.volume = 0;
+      let startTime: number | null = null;
+      const tick = () => {
+        if (audio.readyState < 3 || audio.paused) {
+          startTime = null;
+          fadeInterval = setTimeout(tick, 20);
+          return;
+        }
+        if (!startTime) startTime = performance.now();
+        const elapsed = performance.now() - startTime;
+        let progress = elapsed / ms;
+        if (progress >= 1) progress = 1;
+        
+        audio.volume = Math.min(targetV, targetV * progress);
+        
+        if (progress >= 1) {
           clearFade();
         } else {
-          audio.volume = v;
+          fadeInterval = setTimeout(tick, 20);
         }
-      }, stepTime);
+      };
+      fadeInterval = setTimeout(tick, 20);
     },
     destroy: () => {
       clearFade();
@@ -190,10 +214,10 @@ function createHlsBackend(
     audio.src = url;
   }
 
-  let fadeInterval: ReturnType<typeof setInterval> | null = null;
+  let fadeInterval: ReturnType<typeof setTimeout> | null = null;
   const clearFade = () => {
     if (fadeInterval) {
-      clearInterval(fadeInterval);
+      clearTimeout(fadeInterval);
       fadeInterval = null;
     }
   };
@@ -218,13 +242,28 @@ function createHlsBackend(
     },
     fadeOut: (ms, justPause = false) => {
       clearFade();
-      let v = audio.volume;
-      const steps = 20;
-      const stepTime = Math.max(10, ms / steps);
-      const stepVol = v / steps;
-      fadeInterval = setInterval(() => {
-        v -= stepVol;
-        if (v <= 0) {
+      const startVolume = audio.volume;
+      if (startVolume <= 0 || ms <= 0) {
+        audio.pause();
+        if (!justPause) {
+          audio.removeAttribute("src");
+          audio.load();
+          if (hls) {
+            hls.destroy();
+            hls = null;
+          }
+        }
+        return;
+      }
+      const startTime = performance.now();
+      const tick = () => {
+        const elapsed = performance.now() - startTime;
+        let progress = elapsed / ms;
+        if (progress >= 1) progress = 1;
+        
+        audio.volume = Math.max(0, startVolume * (1 - progress));
+        
+        if (progress >= 1) {
           clearFade();
           audio.pause();
           if (!justPause) {
@@ -236,26 +275,39 @@ function createHlsBackend(
             }
           }
         } else {
-          audio.volume = v;
+          fadeInterval = setTimeout(tick, 20);
         }
-      }, stepTime);
+      };
+      fadeInterval = setTimeout(tick, 20);
     },
     fadeIn: (ms, targetV) => {
       clearFade();
-      let v = 0;
-      audio.volume = v;
-      const steps = 20;
-      const stepTime = Math.max(10, ms / steps);
-      const stepVol = targetV / steps;
-      fadeInterval = setInterval(() => {
-        v += stepVol;
-        if (v >= targetV) {
-          audio.volume = targetV;
+      if (ms <= 0) {
+        audio.volume = targetV;
+        return;
+      }
+      audio.volume = 0;
+      let startTime: number | null = null;
+      const tick = () => {
+        if (audio.readyState < 3 || audio.paused) {
+          startTime = null;
+          fadeInterval = setTimeout(tick, 20);
+          return;
+        }
+        if (!startTime) startTime = performance.now();
+        const elapsed = performance.now() - startTime;
+        let progress = elapsed / ms;
+        if (progress >= 1) progress = 1;
+        
+        audio.volume = Math.min(targetV, targetV * progress);
+        
+        if (progress >= 1) {
           clearFade();
         } else {
-          audio.volume = v;
+          fadeInterval = setTimeout(tick, 20);
         }
-      }, stepTime);
+      };
+      fadeInterval = setTimeout(tick, 20);
     },
     destroy: () => {
       clearFade();
@@ -538,7 +590,7 @@ export const usePlayerStore = defineStore("player", () => {
       if (current.value) loadCurrent(true);
       return;
     }
-    if (backend.isPlaying()) {
+    if (isPlaying.value) {
       pause();
     } else {
       play();
@@ -546,12 +598,13 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function play() {
-    if (backend && !backend.isPlaying()) {
+    if (backend) {
       const settings = useSettingsStore();
       if (settings.fadeEnabled) {
         backend.fadeIn(settings.fadeDurationMs, muted.value ? 0 : volume.value);
         backend.play();
       } else {
+        backend.setVolume(muted.value ? 0 : volume.value);
         backend.play();
       }
     } else if (!backend && current.value) {
@@ -560,11 +613,11 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function pause() {
-    if (backend && backend.isPlaying()) {
+    if (backend && isPlaying.value) {
       const settings = useSettingsStore();
+      isPlaying.value = false;
       if (settings.fadeEnabled) {
         backend.fadeOut(settings.fadeDurationMs, true);
-        // IsPlaying will be updated when the 'pause' event fires
       } else {
         backend.pause();
       }

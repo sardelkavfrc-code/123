@@ -96,7 +96,6 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   gap: 12px;
   padding: 4px 8px 12px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
   transition: padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .sidebar__logo {
@@ -132,15 +131,12 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 8px 8px;
+  padding: 4px 8px 4px 4px;
+  margin: -4px 0;
   border-radius: var(--radius-md);
   transition:
-    padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
     background-color var(--motion-duration-fast) var(--motion-ease-out);
   background-color: transparent;
-}
-.sidebar--collapsed .sidebar__profile {
-  padding-left: 4px;
 }
 .sidebar__profile:hover {
   background-color: var(--bg-2);
@@ -204,19 +200,15 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   align-items: center;
   justify-content: flex-start;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 10px 12px 10px 14px;
   border-radius: var(--radius-md);
   color: var(--text-1);
   font-weight: 500;
   font-size: 14px;
   transition:
-    padding var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
     background-color var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);
   background-color: transparent;
-}
-.sidebar--collapsed .sidebar__link {
-  padding-left: 14px; /* Centers 20px icon inside 48px inner width */
 }
 .sidebar__label {
   min-width: 0;

@@ -12,6 +12,10 @@ const progress = ref(0);
 const router = useRouter();
 const player = usePlayerStore();
 
+// Временный хак для тестирования из обычной консоли
+// @ts-ignore
+window.showUpdate = () => { state.value = "available"; };
+
 onMounted(() => {
   if (!window.vkmp?.updater) return;
 
@@ -69,38 +73,40 @@ async function installAndRestart() {
 </script>
 
 <template>
-  <div class="update-notification" v-if="state !== 'hidden'">
-    <div class="update-notification__inner">
-      <div class="update-notification__content">
-        <div class="update-notification__header">
-          <h3>Доступно обновление</h3>
-        </div>
-        
-        <div v-if="state === 'available'" class="update-notification__notes" v-html="releaseNotes || 'Улучшения стабильности и новые функции.'"></div>
-        
-        <div v-if="state === 'downloading'" class="update-notification__progress-wrap">
-          <div class="update-notification__progress-bar">
-            <div class="update-notification__progress-fill" :style="{ width: `${progress}%` }"></div>
+  <transition name="update-slide">
+    <div class="update-notification" v-if="state !== 'hidden'">
+      <div class="update-notification__inner">
+        <div class="update-notification__content">
+          <div class="update-notification__header">
+            <h3>Доступно обновление</h3>
           </div>
-          <span class="update-notification__progress-text">{{ Math.round(progress) }}%</span>
+          
+          <div v-if="state === 'available'" class="update-notification__notes" v-html="releaseNotes || 'Улучшения стабильности и новые функции.'"></div>
+          
+          <div v-if="state === 'downloading'" class="update-notification__progress-wrap">
+            <div class="update-notification__progress-bar">
+              <div class="update-notification__progress-fill" :style="{ width: `${progress}%` }"></div>
+            </div>
+            <span class="update-notification__progress-text">{{ Math.round(progress) }}%</span>
+          </div>
+
+          <div v-if="state === 'installing'" class="update-notification__installing">
+            <span class="loader"></span> Подготовка к установке...
+          </div>
         </div>
 
-        <div v-if="state === 'installing'" class="update-notification__installing">
-          <span class="loader"></span> Подготовка к установке...
+        <div class="update-notification__actions">
+          <template v-if="state === 'available'">
+            <button class="btn btn--primary" @click="startDownload">Скачать</button>
+            <button class="btn btn--ghost" @click="hide">Позже</button>
+          </template>
+          <template v-else-if="state === 'ready'">
+            <button class="btn btn--primary" @click="installAndRestart">Установить и перезапустить</button>
+          </template>
         </div>
-      </div>
-
-      <div class="update-notification__actions">
-        <template v-if="state === 'available'">
-          <button class="btn btn--primary" @click="startDownload">Скачать</button>
-          <button class="btn btn--ghost" @click="hide">Позже</button>
-        </template>
-        <template v-else-if="state === 'ready'">
-          <button class="btn btn--primary" @click="installAndRestart">Установить и перезапустить</button>
-        </template>
       </div>
     </div>
-  </div>
+  </transition>
 </template>
 
 <style scoped>
@@ -211,5 +217,23 @@ async function installAndRestart() {
 }
 .btn-icon:hover {
   color: var(--text-0);
+}
+
+.update-slide-enter-active,
+.update-slide-leave-active {
+  transition: all var(--motion-duration-slow, 0.4s) cubic-bezier(0.2, 0.8, 0.2, 1);
+  overflow: hidden;
+  max-height: 200px;
+}
+
+.update-slide-enter-from,
+.update-slide-leave-to {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+  transform: translateX(-40px);
 }
 </style>
