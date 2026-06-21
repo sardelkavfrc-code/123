@@ -60,6 +60,9 @@ function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: strin
 function submitCaptcha() {
   if (redirectUri.value) {
     showCaptchaPrompt.value = false;
+    if (window.vkmp?.closeVKCaptcha) {
+      void window.vkmp.closeVKCaptcha();
+    }
     if (captchaResolve) {
       captchaResolve({ solved: true });
       captchaResolve = null;

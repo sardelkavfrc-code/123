@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("vkmp", {
     ipcRenderer.send("tray:update", info),
   openVKAuth: () => ipcRenderer.invoke("auth:open-vk-oauth"),
   openVKCaptcha: (redirectUrl: string, remixstlid: string) => ipcRenderer.invoke("auth:open-vk-captcha", redirectUrl, remixstlid),
+  closeVKCaptcha: () => ipcRenderer.invoke("auth:close-vk-captcha"),
   waitForBackend: () => ipcRenderer.invoke("backend:wait"),
   getVersion: () => ipcRenderer.invoke("app:version"),
   

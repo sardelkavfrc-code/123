@@ -36,6 +36,7 @@ declare global {
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
       openVKAuth: () => Promise<VKAuthResult>;
       openVKCaptcha: (redirectUrl: string, remixstlid: string) => Promise<boolean>;
+      closeVKCaptcha: () => Promise<void>;
       getVersion: () => Promise<string>;
       updater: {
         checkForUpdates: () => Promise<any>;

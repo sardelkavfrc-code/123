@@ -25,6 +25,7 @@ app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 
 let mainWindow: BrowserWindow | null = null;
+let captchaWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -532,7 +533,7 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
     width: 550,
     height: 650,
     parent: mainWindow ?? undefined,
-    modal: true,
+    modal: false,
     autoHideMenuBar: true,
     title: "Подтверждение безопасности",
     webPreferences: {
@@ -541,6 +542,7 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
     },
   });
   captchaWin.removeMenu();
+  captchaWindow = captchaWin;
 
   return new Promise<boolean>((resolve) => {
     let settled = false;
@@ -552,24 +554,41 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
       } catch {
         // ignore
       }
+      if (captchaWindow === captchaWin) {
+        captchaWindow = null;
+      }
       resolve(success);
     };
 
     captchaWin.webContents.on("will-redirect", (_e, url) => {
-      if (url.includes("blank.html") || url.includes("close")) {
+      if (url.includes("blank.html") || url.includes("close") || url.includes("success")) {
         finalize(true);
       }
     });
     captchaWin.webContents.on("did-navigate", (_e, url) => {
-      if (url.includes("blank.html") || url.includes("close")) {
+      if (url.includes("blank.html") || url.includes("close") || url.includes("success")) {
         finalize(true);
       }
     });
 
     captchaWin.on("closed", () => {
+      if (captchaWindow === captchaWin) {
+        captchaWindow = null;
+      }
       finalize(true);
     });
 
     void captchaWin.loadURL(redirectUrl);
   });
+});
+
+ipcMain.handle("auth:close-vk-captcha", () => {
+  if (captchaWindow) {
+    try {
+      captchaWindow.close();
+    } catch {
+      // ignore
+    }
+    captchaWindow = null;
+  }
 });
