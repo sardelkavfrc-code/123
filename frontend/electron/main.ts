@@ -7,6 +7,7 @@ import {
   Tray,
   globalShortcut,
   shell,
+  session,
 } from "electron";
 import { autoUpdater } from "electron-updater";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
@@ -498,5 +499,77 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
     oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
 
     void oauthWin.loadURL(url);
+  });
+});
+
+ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remixstlid: string) => {
+  const cookieVal = String(remixstlid);
+  
+  try {
+    await session.defaultSession.cookies.set({
+      url: "https://vk.com",
+      name: "remixstlid",
+      value: cookieVal,
+      domain: ".vk.com",
+      path: "/",
+      secure: true,
+      expirationDate: Math.floor(Date.now() / 1000) + 3600 * 24 * 365,
+    });
+    await session.defaultSession.cookies.set({
+      url: "https://id.vk.com",
+      name: "remixstlid",
+      value: cookieVal,
+      domain: ".vk.com",
+      path: "/",
+      secure: true,
+      expirationDate: Math.floor(Date.now() / 1000) + 3600 * 24 * 365,
+    });
+  } catch (err) {
+    console.error("Failed to set remixstlid cookie:", err);
+  }
+
+  const captchaWin = new BrowserWindow({
+    width: 550,
+    height: 650,
+    parent: mainWindow ?? undefined,
+    modal: true,
+    autoHideMenuBar: true,
+    title: "Подтверждение безопасности",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  captchaWin.removeMenu();
+
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const finalize = (success: boolean) => {
+      if (settled) return;
+      settled = true;
+      try {
+        captchaWin.close();
+      } catch {
+        // ignore
+      }
+      resolve(success);
+    };
+
+    captchaWin.webContents.on("will-redirect", (_e, url) => {
+      if (url.includes("blank.html") || url.includes("close")) {
+        finalize(true);
+      }
+    });
+    captchaWin.webContents.on("did-navigate", (_e, url) => {
+      if (url.includes("blank.html") || url.includes("close")) {
+        finalize(true);
+      }
+    });
+
+    captchaWin.on("closed", () => {
+      finalize(true);
+    });
+
+    void captchaWin.loadURL(redirectUrl);
   });
 });

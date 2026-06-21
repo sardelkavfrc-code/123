@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     vk_client_secret: str = Field(default="lxhD8OD7dMsqtXIm5IUY", alias="VK_CLIENT_SECRET")
     vk_api_version: str = Field(default="5.131", alias="VK_API_VERSION")
     vk_user_agent: str = Field(
-        default="KateMobileAndroid/56 lite-460 (Android 4.4.2; SDK 19; x86; unknown Android SDK built for x86; en)",
+        default="KateMobileAndroid/113 v1-543 (Android 13; SDK 33; arm64-v8a; unknown Unknown; ru)",
         alias="VK_USER_AGENT",
     )
 
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     bind_port: int = Field(default=8765, alias="VKMP_BIND_PORT")
 
     cors_origins: str = Field(
-        default="http://localhost:5173,app://./", alias="VKMP_CORS_ORIGINS"
+        default="http://localhost:5173,http://127.0.0.1:5173,app://./", alias="VKMP_CORS_ORIGINS"
     )
 
     session_dir: Path = Field(

@@ -5,7 +5,6 @@ import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
-import { useMotion } from "@/composables/useSpring";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
@@ -25,7 +24,6 @@ const player = usePlayerStore();
 const library = useLibraryStore();
 const ui = useUIStore();
 const router = useRouter();
-const motion = useMotion();
 
 const { current, isPlaying } = storeToRefs(player);
 
@@ -34,10 +32,6 @@ const isCurrent = computed(
 );
 const inLibrary = computed(() => library.isInLibrary(props.track));
 const unavailable = computed(() => !props.track.url);
-
-const motionVariants = computed(() =>
-  motion.spring({ opacity: 0, y: 6 }, { opacity: 1, y: 0 }, { stiffness: 260, damping: 24 })
-);
 
 function playOne() {
   if (unavailable.value) {
@@ -114,7 +108,6 @@ async function toggleLibrary() {
 
 <template>
   <div
-    v-motion="motionVariants"
     class="row"
     :class="{ 'row--playing': isCurrent, 'row--compact': variant === 'compact', 'row--off': unavailable }"
     @dblclick="playOne"

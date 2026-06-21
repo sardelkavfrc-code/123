@@ -29,6 +29,7 @@ class VKClient:
         await self._client.aclose()
 
     async def call(self, method: str, token: str, **params: Any) -> Any:
+        remixstlid = params.pop("remixstlid", None)
         payload: dict[str, Any] = {
             "v": self._settings.vk_api_version,
             "access_token": token,
@@ -43,8 +44,12 @@ class VKClient:
             else:
                 payload[key] = value
 
+        cookies = {}
+        if remixstlid:
+            cookies["remixstlid"] = str(remixstlid)
+
         try:
-            resp = await self._client.post(f"/method/{method}", data=payload)
+            resp = await self._client.post(f"/method/{method}", data=payload, cookies=cookies)
             resp.raise_for_status()
         except httpx.RequestError as exc:
             raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onActivated, nextTick, watch } from "vue";
+import { computed, ref, onMounted, onActivated, nextTick, watch, onBeforeUnmount } from "vue";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";
@@ -20,17 +20,41 @@ const { queue, index, isPlaying } = storeToRefs(player);
 
 let isSettingQueue = false;
 
+const listRef = ref<HTMLElement | null>(null);
+const loaderRef = ref<HTMLElement | null>(null);
+
+// Scroll position state for spacer-based virtual scrolling
+const scrollTop = ref(0);
+const clientHeight = ref(window.innerHeight || 800);
+
+const rowHeight = 64; // 60px height + 4px gap
+
+// Calculate visible item window with buffers
+const startIdx = computed(() => {
+  return Math.max(0, Math.floor(scrollTop.value / rowHeight) - 15);
+});
+const endIdx = computed(() => {
+  return Math.min(queue.value.length, Math.ceil((scrollTop.value + clientHeight.value) / rowHeight) + 25);
+});
+
+const topSpacerHeight = computed(() => startIdx.value * rowHeight);
+const bottomSpacerHeight = computed(() => (queue.value.length - endIdx.value) * rowHeight);
+
+const visibleQueue = computed(() => {
+  return queue.value.slice(startIdx.value, endIdx.value);
+});
+
 const draggableQueue = computed({
-  get: () => queue.value,
+  get: () => visibleQueue.value,
   set: (val: Track[]) => {
     isSettingQueue = true;
-    player.setQueue(val);
+    const before = queue.value.slice(0, startIdx.value);
+    const after = queue.value.slice(endIdx.value);
+    const newFullQueue = [...before, ...val, ...after];
+    player.setQueue(newFullQueue, true);
     setTimeout(() => { isSettingQueue = false; }, 100);
   }
 });
-
-const listRef = ref<HTMLElement | null>(null);
-const loaderRef = ref<HTMLElement | null>(null);
 
 useIntersectionObserver(loaderRef, ([entry]) => {
   if (entry.isIntersecting) {
@@ -38,19 +62,61 @@ useIntersectionObserver(loaderRef, ([entry]) => {
   }
 });
 
-function scrollToCurrent() {
-  if (!listRef.value) return false;
-  const currentEl = listRef.value.querySelector('.queue__row--current') as HTMLElement | null;
-  if (currentEl) {
-    const container = currentEl.closest('.scroll-area') as HTMLElement | null;
-    if (container) {
-      const cRect = container.getBoundingClientRect();
-      const eRect = currentEl.getBoundingClientRect();
-      const top = container.scrollTop + (eRect.top - cRect.top) - container.clientHeight / 2 + eRect.height / 2;
-      container.scrollTo({ top, behavior: 'smooth' });
-    } else {
-      currentEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+// Track scroll parent
+let scrollParent: HTMLElement | null = null;
+
+function getScrollParent(node: HTMLElement | null): HTMLElement | null {
+  if (node == null) return null;
+  const style = window.getComputedStyle(node);
+  const overflowY = style.overflowY;
+  const isScrollable = overflowY === "auto" || overflowY === "scroll";
+  
+  if (isScrollable) {
+    return node;
+  }
+  return getScrollParent(node.parentElement);
+}
+
+function handleScroll() {
+  if (scrollParent) {
+    scrollTop.value = scrollParent.scrollTop;
+  }
+}
+
+function handleResize() {
+  handleScroll();
+  if (scrollParent && scrollParent.clientHeight > 0) {
+    clientHeight.value = scrollParent.clientHeight;
+  }
+}
+
+function updateScrollParent() {
+  if (scrollParent) {
+    scrollParent.removeEventListener("scroll", handleScroll);
+  }
+  
+  if (listRef.value) {
+    scrollParent = getScrollParent(listRef.value.parentElement);
+  }
+  
+  if (!scrollParent) {
+    scrollParent = document.documentElement;
+  }
+  
+  if (scrollParent) {
+    scrollParent.addEventListener("scroll", handleScroll, { passive: true });
+    scrollTop.value = scrollParent.scrollTop;
+    if (scrollParent.clientHeight > 0) {
+      clientHeight.value = scrollParent.clientHeight;
     }
+  }
+}
+
+function scrollToCurrent() {
+  if (scrollParent && index.value >= 0) {
+    const listOffsetTop = listRef.value ? listRef.value.offsetTop : 160;
+    const top = listOffsetTop + index.value * rowHeight - scrollParent.clientHeight / 2 + rowHeight / 2;
+    scrollParent.scrollTo({ top, behavior: 'smooth' });
     return true;
   }
   return false;
@@ -60,15 +126,26 @@ const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration ||
 
 function initScroll() {
   if (!settings.autoScrollQueue) return;
-  // wait for transition and layout
   setTimeout(() => {
     if (!settings.autoScrollQueue) return;
     scrollToCurrent();
   }, 300);
 }
 
-onMounted(initScroll);
+onMounted(() => {
+  setTimeout(updateScrollParent, 50);
+  window.addEventListener("resize", handleResize, { passive: true });
+  initScroll();
+});
+
 onActivated(initScroll);
+
+onBeforeUnmount(() => {
+  if (scrollParent) {
+    scrollParent.removeEventListener("scroll", handleScroll);
+  }
+  window.removeEventListener("resize", handleResize);
+});
 
 watch(index, () => {
   if (!settings.autoScrollQueue || isSettingQueue) return;
@@ -76,6 +153,13 @@ watch(index, () => {
     scrollToCurrent();
   });
 });
+
+watch(queue, () => {
+  setTimeout(() => {
+    handleScroll();
+    updateScrollParent();
+  }, 50);
+}, { deep: false });
 
 function playAt(i: number) {
   if (i === index.value) {
@@ -110,6 +194,7 @@ function remove(i: number) {
         subtitle="Откуда угодно нажми Play — добавится сюда. Можно перетягивать и удалять"
       />
       <draggable
+        v-else
         v-model="draggableQueue"
         item-key="id"
         tag="ol"
@@ -117,23 +202,29 @@ function remove(i: number) {
         ghost-class="queue__row-wrap--ghost"
         drag-class="queue__row-wrap--dragging"
         fallback-class="queue__row-wrap--dragging"
-        :force-fallback="true"
-        :fallback-on-body="true"
+        :force-fallback="false"
+        :fallback-on-body="false"
         :animation="250"
       >
+        <template #header>
+          <li :style="{ height: `${topSpacerHeight}px` }" class="queue__spacer" key="top-spacer"></li>
+        </template>
+        
         <template #item="{ element: track, index: i }">
-          <div class="queue__row-wrap" @dblclick="playAt(i)">
+          <div class="queue__row-wrap" @dblclick="playAt(i + startIdx)">
             <QueueRow
               :track="track"
-              :index="i"
-              :current="i === index"
-              :playing="i === index && isPlaying"
+              :index="i + startIdx"
+              :current="(i + startIdx) === index"
+              :playing="(i + startIdx) === index && isPlaying"
               @play="playAt"
               @remove="remove"
             />
           </div>
         </template>
+        
         <template #footer>
+          <li :style="{ height: `${bottomSpacerHeight}px` }" class="queue__spacer" key="bottom-spacer"></li>
           <div ref="loaderRef" class="queue__loader" key="loader">
             <Spinner v-if="player.loadingMore" :size="24" color="var(--accent-1)" />
           </div>
@@ -171,7 +262,14 @@ function remove(i: number) {
 .queue__row-wrap--ghost :deep(.queue__row) {
   background: var(--bg-2);
 }
+.queue__spacer {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+}
 :deep(.queue__row) {
+  list-style: none;
   position: relative;
   display: grid;
   grid-template-columns: 20px 28px 48px 1fr auto auto 40px;

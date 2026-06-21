@@ -22,8 +22,9 @@ const query = ref("");
 
 const showUnavailableModal = ref(false);
 
-onMounted(() => {
-  void library.loadMyMusic();
+onMounted(async () => {
+  await library.loadMyMusic();
+  void library.loadAllMyMusic();
 });
 
 const unavailableTracks = computed(() => myMusic.value.filter(t => !t.url));
@@ -53,20 +54,23 @@ function onReachEnd() {
 
 const isGlobalLoading = ref(false);
 
-async function handlePlay(track: Track, index: number) {
+async function handlePlay(_track: Track, index: number) {
   if (query.value.trim().length > 0) {
     player.playQueue(filtered.value, index);
     return;
   }
-  isGlobalLoading.value = true;
-  try {
-    const all = await library.loadAllMyMusic();
-    let fullIndex = all.findIndex((t) => t.id === track.id && t.owner_id === track.owner_id);
-    if (fullIndex === -1) fullIndex = index;
-    player.playQueue(all, fullIndex);
-  } finally {
-    isGlobalLoading.value = false;
-  }
+  // Play immediately with currently loaded tracks
+  player.playQueue(myMusic.value, index);
+  
+  // Load the rest of the library in the background
+  void (async () => {
+    try {
+      const all = await library.loadAllMyMusic();
+      player.setQueue(all);
+    } catch (err) {
+      console.error("Failed to load all music in background", err);
+    }
+  })();
 }
 
 async function playAll() {
@@ -75,13 +79,18 @@ async function playAll() {
     player.playQueue(filtered.value, 0);
     return;
   }
-  isGlobalLoading.value = true;
-  try {
-    const all = await library.loadAllMyMusic();
-    player.playQueue(all, 0);
-  } finally {
-    isGlobalLoading.value = false;
-  }
+  // Play immediately with currently loaded tracks
+  player.playQueue(myMusic.value, 0);
+  
+  // Load the rest of the library in the background
+  void (async () => {
+    try {
+      const all = await library.loadAllMyMusic();
+      player.setQueue(all);
+    } catch (err) {
+      console.error("Failed to load all music in background", err);
+    }
+  })();
 }
 
 async function shufflePlay() {
@@ -91,14 +100,19 @@ async function shufflePlay() {
     player.playQueue(filtered.value, -1);
     return;
   }
-  isGlobalLoading.value = true;
-  try {
-    const all = await library.loadAllMyMusic();
-    player.shuffle = true;
-    player.playQueue(all, -1);
-  } finally {
-    isGlobalLoading.value = false;
-  }
+  // Shuffle immediate queue
+  player.shuffle = true;
+  player.playQueue(myMusic.value, -1);
+  
+  // Load the rest of the library in the background
+  void (async () => {
+    try {
+      const all = await library.loadAllMyMusic();
+      player.setQueue(all);
+    } catch (err) {
+      console.error("Failed to load all music in background", err);
+    }
+  })();
 }
 
 async function deleteTrack(track: Track) {
@@ -107,6 +121,16 @@ async function deleteTrack(track: Track) {
     ui.notify(`Трек удален: ${track.title}`, 'success');
   } catch (err: any) {
     ui.notify(`Ошибка удаления: ${err.message}`, 'error');
+  }
+}
+
+async function replaceTrack(oldTrack: Track, newTrack: Track) {
+  try {
+    await library.addToLibrary(newTrack);
+    await library.removeFromLibrary(oldTrack);
+    ui.notify(`Трек заменен: ${oldTrack.title} -> ${newTrack.title}`, 'success');
+  } catch (err: any) {
+    ui.notify(`Ошибка замены трека: ${err.message}`, 'error');
   }
 }
 
@@ -191,6 +215,7 @@ async function deleteAllTracks() {
       @close="showUnavailableModal = false"
       @delete="deleteTrack"
       @delete-all="deleteAllTracks"
+      @replace="replaceTrack"
     />
   </ScrollArea>
 </template>

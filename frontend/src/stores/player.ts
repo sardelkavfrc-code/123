@@ -725,17 +725,32 @@ export const usePlayerStore = defineStore("player", () => {
     originalQueue.value = [...queue.value];
   }
 
-  function setQueue(newQueue: Track[]) {
+  function setQueue(newQueue: Track[], skipShuffle = false) {
     const currentTrack = current.value;
-    queue.value = newQueue;
-    originalQueue.value = [...newQueue];
-    if (currentTrack) {
-      const newIndex = newQueue.findIndex(t => t.id === currentTrack.id && t.owner_id === currentTrack.owner_id);
-      if (newIndex !== -1) {
-        index.value = newIndex;
+    const filtered = newQueue.filter((t) => t.url);
+    
+    if (shuffle.value && !skipShuffle) {
+      originalQueue.value = [...filtered];
+      if (currentTrack) {
+        const pinIdx = filtered.findIndex((t) => t.id === currentTrack.id && t.owner_id === currentTrack.owner_id);
+        queue.value = shuffleArray(filtered, pinIdx);
+        index.value = 0;
+      } else {
+        queue.value = shuffleArray(filtered, -1);
+        index.value = -1;
+      }
+    } else {
+      queue.value = [...filtered];
+      if (!shuffle.value) {
+        originalQueue.value = [...filtered];
+      }
+      if (currentTrack) {
+        const newIndex = filtered.findIndex((t) => t.id === currentTrack.id && t.owner_id === currentTrack.owner_id);
+        if (newIndex !== -1) {
+          index.value = newIndex;
+        }
       }
     }
-
   }
 
   // Discord RPC synchronization

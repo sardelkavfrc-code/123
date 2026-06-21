@@ -27,6 +27,10 @@ export interface APIErrorDetail {
   kind: string;
   message?: string;
   code?: number;
+  captcha_sid?: string;
+  captcha_img?: string;
+  redirect_uri?: string;
+  remixstlid?: string;
 }
 
 export class APIError extends Error {
@@ -101,6 +105,9 @@ export const api = {
     offset?: number;
     count?: number;
     performer_only?: boolean;
+    captcha_sid?: string;
+    captcha_key?: string;
+    remixstlid?: string;
   }): Promise<TrackList> {
     const { data } = await http.get<TrackList>("/audio/search", { params });
     return data;

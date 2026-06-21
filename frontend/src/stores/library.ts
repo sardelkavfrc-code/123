@@ -110,17 +110,29 @@ export const useLibraryStore = defineStore("library", () => {
   }
 
   const myMusicAll = ref<Track[]>([]);
+  let activeLoadAllPromise: Promise<Track[]> | null = null;
 
   async function loadAllMyMusic(): Promise<Track[]> {
     if (myMusicAll.value.length > 0) return myMusicAll.value;
-    try {
-      const list = await api.myMusicAll();
-      myMusicAll.value = list.items;
-      return list.items;
-    } catch (err) {
-      console.error("Failed to load all my music", err);
-      return [];
-    }
+    if (activeLoadAllPromise) return activeLoadAllPromise;
+
+    activeLoadAllPromise = (async () => {
+      try {
+        const list = await api.myMusicAll();
+        myMusicAll.value = list.items;
+        myMusic.value = list.items;
+        myMusicTotal.value = list.count;
+        refreshMyMusicIndex(list.items);
+        return list.items;
+      } catch (err) {
+        console.error("Failed to load all my music", err);
+        return [];
+      } finally {
+        activeLoadAllPromise = null;
+      }
+    })();
+
+    return activeLoadAllPromise;
   }
 
   async function loadMyMusicPage(offset: number, count: number): Promise<TrackList> {

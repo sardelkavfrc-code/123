@@ -7,7 +7,20 @@ const observer = new IntersectionObserver(
         const el = entry.target as HTMLElement;
         const src = el.dataset.lazyBg;
         if (src && src !== 'null' && src !== 'undefined') {
-          el.style.backgroundImage = `url("${src}")`;
+          const img = new Image();
+          img.src = src;
+          img.decode()
+            .then(() => {
+              if (el.dataset.lazyBg === src) {
+                el.style.backgroundImage = `url("${src}")`;
+              }
+            })
+            .catch(() => {
+              // Fallback to direct setting if decode fails (e.g. invalid format or browser error)
+              if (el.dataset.lazyBg === src) {
+                el.style.backgroundImage = `url("${src}")`;
+              }
+            });
         } else {
           el.style.backgroundImage = 'none';
         }

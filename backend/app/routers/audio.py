@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
@@ -19,9 +21,32 @@ async def _safe_call(vk, method: str, token: str, **params):
     try:
         return await vk.call(method, token, **params)
     except VKError as exc:
+        print(f"VK API Error calling {method}: [{exc.code}] {exc.message}")
+        detail = {"kind": "vk_error", "code": exc.code, "message": exc.message}
+        if exc.code == 14 and exc.raw:
+            detail["captcha_sid"] = exc.raw.get("captcha_sid")
+            detail["redirect_uri"] = exc.raw.get("redirect_uri")
+            detail["remixstlid"] = exc.raw.get("remixstlid")
+            captcha_img = exc.raw.get("captcha_img")
+            if captcha_img:
+                try:
+                    img_resp = await vk._client.get(captcha_img)
+                    if img_resp.status_code == 200:
+                        import base64
+                        encoded = base64.b64encode(img_resp.content).decode("utf-8")
+                        content_type = img_resp.headers.get("content-type", "image/png")
+                        detail["captcha_img"] = f"data:{content_type};base64,{encoded}"
+                    else:
+                        print(f"Failed to fetch captcha image, status code: {img_resp.status_code}")
+                        detail["captcha_img"] = captcha_img
+                except Exception as fetch_exc:
+                    print(f"Error fetching captcha image on backend: {fetch_exc}")
+                    detail["captcha_img"] = captcha_img
+            else:
+                detail["captcha_img"] = None
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY,
-            detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+            detail=detail,
         ) from exc
 
 
@@ -44,20 +69,23 @@ async def _fill_missing_urls(vk: VKDep, session: SessionDep, items: list[dict]):
     if not missing:
         return
 
-    # Fetch in chunks of 100
-    for i in range(0, len(missing), 100):
-        chunk = missing[i:i+100]
+    # Fetch in chunks of 100 in parallel
+    chunks = [missing[i:i+100] for i in range(0, len(missing), 100)]
+    tasks = []
+    for chunk in chunks:
         audios_param = ",".join(f"{t.get('owner_id')}_{t.get('id')}" for t in chunk)
-        try:
-            resp = await _safe_call(vk, "audio.getById", session.access_token, audios=audios_param)
-            if resp:
-                resp_map = {f"{t.get('owner_id')}_{t.get('id')}": t for t in resp}
-                for item in chunk:
-                    key = f"{item.get('owner_id')}_{item.get('id')}"
-                    if key in resp_map and resp_map[key].get("url"):
-                        item["url"] = resp_map[key]["url"]
-        except Exception:
-            pass
+        tasks.append(_safe_call(vk, "audio.getById", session.access_token, audios=audios_param))
+        
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    for chunk, resp in zip(chunks, results, strict=False):
+        if isinstance(resp, Exception) or not resp:
+            continue
+        resp_map = {f"{t.get('owner_id')}_{t.get('id')}": t for t in resp}
+        for item in chunk:
+            key = f"{item.get('owner_id')}_{item.get('id')}"
+            if key in resp_map and resp_map[key].get("url"):
+                item["url"] = resp_map[key]["url"]
 
 
 @router.get("/my", response_model=TrackList)
@@ -80,43 +108,71 @@ async def my_music_all(
     vk: VKDep,
     session: SessionDep,
 ) -> TrackList:
+    # First, run a quick call to get the total count
+    try:
+        first_resp = await _safe_call(vk, "audio.get", session.access_token, owner_id=session.user_id, count=1)
+        total_count = first_resp.get("count", 0) if first_resp else 0
+    except Exception:
+        total_count = 0
+
+    if total_count == 0:
+        return parse_track_list({"count": 0, "items": []})
+
+    chunk_size = 200
+    total_chunks = (total_count + chunk_size - 1) // chunk_size
+    
+    # Run up to 6 concurrent execute tasks max
+    num_partitions = min(6, total_chunks)
+    chunks_per_partition = (total_chunks + num_partitions - 1) // num_partitions
+    
     code = """
     var offset = parseInt(Args.offset);
     var owner_id = parseInt(Args.owner_id);
-    var count = 200;
-    var total = 0;
-    var items = [];
-    var first = API.audio.get({"owner_id": owner_id, "offset": offset, "count": count});
-    if (!first) { return {"count": 0, "items": []}; }
-    total = first.count;
-    items = first.items;
-    var i = 1;
-    while (i < 25 && items.length < total) {
+    var count = parseInt(Args.count);
+    var num_chunks = parseInt(Args.num_chunks);
+    var chunks = [];
+    var i = 0;
+    while (i < num_chunks) {
         var res = API.audio.get({"owner_id": owner_id, "offset": offset + i * count, "count": count});
-        if (res && res.items) {
-            items = items + res.items;
+        if (!!res) {
+            if (!!res.items) {
+                chunks.push(res.items);
+            }
         }
         i = i + 1;
     }
-    return {"count": total, "items": items};
+    return chunks;
     """
     
+    tasks = []
+    for p in range(num_partitions):
+        chunk_offset = p * chunks_per_partition
+        if chunk_offset >= total_chunks:
+            break
+        actual_chunks = min(chunks_per_partition, total_chunks - chunk_offset)
+        offset = chunk_offset * chunk_size
+        tasks.append(
+            _safe_call(
+                vk,
+                "execute",
+                session.access_token,
+                code=code,
+                offset=offset,
+                owner_id=session.user_id,
+                count=chunk_size,
+                num_chunks=actual_chunks,
+            )
+        )
+        
+    results = await asyncio.gather(*tasks)
+    
     all_items = []
-    total_count = 0
-    offset = 0
-    while True:
-        resp = await _safe_call(vk, "execute", session.access_token, code=code, offset=offset, owner_id=session.user_id)
-        if not resp or not resp.get("items"):
-            break
-        total_count = resp.get("count", 0)
-        items = resp.get("items", [])
-        all_items.extend(items)
-        if len(all_items) >= total_count:
-            break
-        offset += len(items)
-        if offset >= total_count:
-            break
-            
+    for res in results:
+        if res:
+            for chunk in res:
+                if chunk:
+                    all_items.extend(chunk)
+                    
     await _fill_missing_urls(vk, session, all_items)
     return parse_track_list({"count": total_count, "items": all_items})
 
@@ -145,6 +201,9 @@ async def search(
     auto_complete: bool = Query(True),
     performer_only: bool = Query(False),
     sort: int = Query(2, ge=0, le=2),
+    captcha_sid: str | None = Query(None),
+    captcha_key: str | None = Query(None),
+    remixstlid: str | None = Query(None),
 ) -> TrackList:
     response = await _safe_call(
         vk,
@@ -156,6 +215,9 @@ async def search(
         auto_complete=auto_complete,
         performer_only=performer_only,
         sort=sort,
+        captcha_sid=captcha_sid,
+        captcha_key=captcha_key,
+        remixstlid=remixstlid,
     )
     return parse_track_list(response)
 
@@ -548,7 +610,6 @@ async def artist_info(
     to catalog.getAudioArtist -> catalog.getSection to get the banner/photo,
     which works for web tokens (vk1.a...).
     """
-    last_exc = None
     try:
         response = await vk.call(
             "audio.getArtistById",
