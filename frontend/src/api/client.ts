@@ -108,6 +108,7 @@ export const api = {
     captcha_sid?: string;
     captcha_key?: string;
     remixstlid?: string;
+    captcha_mode?: string;
   }): Promise<TrackList> {
     const { data } = await http.get<TrackList>("/audio/search", { params });
     return data;

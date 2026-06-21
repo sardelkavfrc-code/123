@@ -27,27 +27,33 @@ async def _safe_call(vk, method: str, token: str, **params):
             detail["captcha_sid"] = exc.raw.get("captcha_sid")
             detail["redirect_uri"] = exc.raw.get("redirect_uri")
             detail["remixstlid"] = exc.raw.get("remixstlid")
+            captcha_mode = params.pop("captcha_mode", None)
             captcha_img = exc.raw.get("captcha_img")
             if captcha_img:
                 img_data = None
                 content_type = None
 
+                try_mode1 = captcha_mode in (None, "auto", "mode1")
+                try_mode2 = captcha_mode in (None, "auto", "mode2")
+                try_mode3 = captcha_mode in (None, "auto", "mode3")
+
                 # Mode 1: Using VK Client (with cookies and KateMobile user-agent)
-                try:
-                    print(f"[Captcha] Attempting Mode 1 (VK Client) to fetch {captcha_img}")
-                    resp = await vk._client.get(captcha_img, follow_redirects=True)
-                    ct = resp.headers.get("content-type", "")
-                    if resp.status_code == 200 and ct.startswith("image/"):
-                        img_data = resp.content
-                        content_type = ct
-                        print(f"[Captcha] Mode 1 Succeeded! content-type: {ct}")
-                    else:
-                        print(f"[Captcha] Mode 1 failed/returned non-image. status: {resp.status_code}, content-type: {ct}")
-                except Exception as e:
-                    print(f"[Captcha] Mode 1 exception: {e}")
+                if try_mode1:
+                    try:
+                        print(f"[Captcha] Attempting Mode 1 (VK Client) to fetch {captcha_img}")
+                        resp = await vk._client.get(captcha_img, follow_redirects=True)
+                        ct = resp.headers.get("content-type", "")
+                        if resp.status_code == 200 and ct.startswith("image/"):
+                            img_data = resp.content
+                            content_type = ct
+                            print(f"[Captcha] Mode 1 Succeeded! content-type: {ct}")
+                        else:
+                            print(f"[Captcha] Mode 1 failed/returned non-image. status: {resp.status_code}, content-type: {ct}")
+                    except Exception as e:
+                        print(f"[Captcha] Mode 1 exception: {e}")
 
                 # Mode 2: Anonymous client (no cookies, standard browser user-agent)
-                if not img_data:
+                if try_mode2 and not img_data:
                     try:
                         print(f"[Captcha] Attempting Mode 2 (Anonymous Client) to fetch {captcha_img}")
                         import httpx as httpx_lib
@@ -73,7 +79,10 @@ async def _safe_call(vk, method: str, token: str, **params):
                     detail["captcha_img"] = f"data:{content_type};base64,{encoded}"
                 else:
                     # Mode 3: Fallback directly to raw URL
-                    print("[Captcha] All download modes failed. Falling back to Mode 3 (Direct URL)")
+                    if try_mode3:
+                        print("[Captcha] Mode 3 requested or fallback. Using raw URL directly.")
+                    else:
+                        print("[Captcha] All requested download modes failed. Falling back to Mode 3 (Direct URL)")
                     detail["captcha_img"] = captcha_img
             else:
                 detail["captcha_img"] = None
@@ -237,6 +246,7 @@ async def search(
     captcha_sid: str | None = Query(None),
     captcha_key: str | None = Query(None),
     remixstlid: str | None = Query(None),
+    captcha_mode: str | None = Query(None),
 ) -> TrackList:
     response = await _safe_call(
         vk,
@@ -251,6 +261,7 @@ async def search(
         captcha_sid=captcha_sid,
         captcha_key=captcha_key,
         remixstlid=remixstlid,
+        captcha_mode=captcha_mode,
     )
     return parse_track_list(response)
 

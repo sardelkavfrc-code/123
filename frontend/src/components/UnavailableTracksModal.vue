@@ -44,9 +44,10 @@ const redirectUri = ref("");
 const remixstlid = ref("");
 const captchaInputRef = ref<HTMLInputElement | null>(null);
 const imgFailed = ref(false);
-let captchaResolve: ((value: { key?: string; solved: boolean; remixstlid?: string } | null) => void) | null = null;
+const selectedMode = ref("auto");
+let captchaResolve: ((value: { key?: string; solved: boolean; remixstlid?: string; reload?: boolean } | null) => void) | null = null;
 
-function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: string, remixstlidVal?: string): Promise<{ key?: string; solved: boolean; remixstlid?: string } | null> {
+function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: string, remixstlidVal?: string): Promise<{ key?: string; solved: boolean; remixstlid?: string; reload?: boolean } | null> {
   captchaSid.value = sid;
   captchaImgUrl.value = imgUrl;
   imgFailed.value = false;
@@ -83,6 +84,14 @@ function cancelCaptcha() {
   showCaptchaPrompt.value = false;
   if (captchaResolve) {
     captchaResolve(null);
+    captchaResolve = null;
+  }
+}
+
+function reloadCaptcha() {
+  showCaptchaPrompt.value = false;
+  if (captchaResolve) {
+    captchaResolve({ solved: false, reload: true });
     captchaResolve = null;
   }
 }
@@ -163,6 +172,7 @@ async function searchWithRetry(q: string, count: number, retries = 2): Promise<T
         captcha_sid: activeSid,
         captcha_key: activeKey,
         remixstlid: activeRemixstlid,
+        captcha_mode: selectedMode.value,
       });
       return res.items || [];
     } catch (err) {
@@ -173,6 +183,12 @@ async function searchWithRetry(q: string, count: number, retries = 2): Promise<T
         const remixstlidVal = err.detail.remixstlid;
         if (sid) {
           const result = await handleCaptchaChallenge(sid, img || "", redirectUrl, remixstlidVal);
+          if (result && result.reload) {
+            activeSid = undefined;
+            activeKey = undefined;
+            attempt--;
+            continue;
+          }
           if (result && result.solved) {
             if (result.key) {
               activeSid = sid;
@@ -772,6 +788,20 @@ onBeforeUnmount(() => {
                 <p v-if="captchaImgUrl && !imgFailed">Введите код с картинки, чтобы продолжить поиск</p>
                 <p v-else-if="redirectUri">Это ограничение лимитов ВК (Rate Limit), а не сбой плеера</p>
                 <p v-else>Введите код с картинки, чтобы продолжить поиск</p>
+              </div>
+              <div class="captcha-mode-container" style="padding: 0 24px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px;">
+                <span style="color: var(--text-muted);">Режим загрузки капчи:</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <select v-model="selectedMode" class="select-mode" style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text-0); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 13px; outline: none; cursor: pointer;">
+                    <option value="auto">Авто (Режимы 1 ➜ 2 ➜ 3)</option>
+                    <option value="mode1">Режим 1 (Через сессию)</option>
+                    <option value="mode2">Режим 2 (Анонимно)</option>
+                    <option value="mode3">Режим 3 (Прямой URL)</option>
+                  </select>
+                  <button class="btn btn--ghost" style="padding: 4px 8px; height: auto; min-height: 0; font-size: 12px; border: 1px solid var(--border);" @click="reloadCaptcha">
+                    Обновить
+                  </button>
+                </div>
               </div>
               <div class="captcha-body">
                 <template v-if="captchaImgUrl && !imgFailed">
