@@ -158,6 +158,7 @@ watch(
   min-height: 0;
   overflow: hidden;
   position: relative;
+  contain: layout;
 }
 .app-grid__update {
   grid-area: update;

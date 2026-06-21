@@ -158,6 +158,8 @@ function remove(i: number) {
 .queue__row-wrap {
   position: relative;
   width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 62px;
 }
 .queue__row-wrap--dragging {
   opacity: 1 !important;

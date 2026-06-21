@@ -214,6 +214,8 @@ async function toggleLibrary() {
   transition:
     background var(--motion-duration-fast) var(--motion-ease-out),
     transform var(--motion-duration-fast) var(--motion-ease-out);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 60px;
 }
 .row:hover {
   background: var(--bg-2);
@@ -229,6 +231,7 @@ async function toggleLibrary() {
   grid-template-columns: 32px 40px minmax(0, 1fr) 56px;
   gap: 12px;
   padding: 6px 10px;
+  contain-intrinsic-size: auto 50px;
 }
 .row--compact .row__actions {
   display: none;
