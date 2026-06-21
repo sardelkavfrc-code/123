@@ -12,8 +12,15 @@ export const useUIStore = defineStore("ui", () => {
   const toasts = ref<Toast[]>([]);
   let nextId = 1;
 
-  const rawSettings = localStorage.getItem("vkmp:settings");
-  const forceCollapse = rawSettings ? JSON.parse(rawSettings).startSidebarCollapsed === true : false;
+  let forceCollapse = false;
+  try {
+    const rawSettings = localStorage.getItem("vkmp:settings");
+    if (rawSettings) {
+      forceCollapse = JSON.parse(rawSettings).startSidebarCollapsed === true;
+    }
+  } catch (err) {
+    console.error("Failed to parse settings for sidebar state", err);
+  }
   
   const sidebarCollapsed = useStorage("vkmp_sidebar_collapsed", forceCollapse);
   if (forceCollapse) {

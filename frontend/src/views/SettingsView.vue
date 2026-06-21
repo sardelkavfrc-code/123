@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, nextTick } from "vue";
+import { computed, ref, onMounted, nextTick, watch } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useSettingsStore, type AccentName, type ThemeName, type StyleName, FONT_OPTIONS } from "@/stores/settings";
@@ -200,6 +200,10 @@ async function handleStartMinimizedClick(event: Event) {
   startMinimized.value = hidden;
   await settings.setAutoStart(autoStart.value, hidden);
 }
+
+watch(startSidebarCollapsed, (val) => {
+  ui.sidebarCollapsed = val;
+});
 
 const showEqModal = ref(false);
 
