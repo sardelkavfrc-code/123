@@ -508,6 +508,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
 
     if (autoPlay) {
+      void eq.resumeContext();
       const settings = useSettingsStore();
       if (settings.fadeEnabled) {
         backend.fadeIn(settings.fadeDurationMs, initialVolume);
@@ -598,6 +599,7 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function play() {
+    void eq.resumeContext();
     if (backend) {
       const settings = useSettingsStore();
       if (settings.fadeEnabled) {

@@ -172,6 +172,16 @@ export const useEqualizerStore = defineStore("equalizer", () => {
     attachedElements.add(audioElement);
   }
 
+  async function resumeContext() {
+    if (audioCtx.value && audioCtx.value.state === "suspended") {
+      try {
+        await audioCtx.value.resume();
+      } catch (err) {
+        console.error("VK Music: failed to resume AudioContext", err);
+      }
+    }
+  }
+
   // We expose frequencies for the UI
   return {
     FREQUENCIES,
@@ -186,5 +196,6 @@ export const useEqualizerStore = defineStore("equalizer", () => {
     saveUserPreset,
     deleteUserPreset,
     connectAudioElement,
+    resumeContext,
   };
 });
