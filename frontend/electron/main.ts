@@ -542,6 +542,7 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
     },
   });
   captchaWin.removeMenu();
+  captchaWin.webContents.setUserAgent(DESKTOP_UA);
   captchaWindow = captchaWin;
 
   return new Promise<boolean>((resolve) => {
