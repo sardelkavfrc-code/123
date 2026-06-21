@@ -759,14 +759,14 @@ onBeforeUnmount(() => {
           <div v-if="showCaptchaPrompt" class="captcha-overlay">
             <div class="captcha-box" :class="{ 'captcha-box--redirect': redirectUri }">
               <div class="captcha-header">
-                <h3>Подтверждение действия</h3>
-                <p v-if="redirectUri">ВКонтакте требует подтверждения, что вы не робот</p>
+                <h3>Проверка безопасности ВКонтакте</h3>
+                <p v-if="redirectUri">Это ограничение лимитов ВК (Rate Limit), а не сбой плеера</p>
                 <p v-else>Введите код с картинки, чтобы продолжить поиск</p>
               </div>
               <div class="captcha-body">
                 <template v-if="redirectUri">
                   <div class="captcha-redirect-info">
-                    Для продолжения поиска необходимо пройти проверку в открывшемся окне.
+                    Из-за частых запросов ВКонтакте временно ограничил поиск и требует подтвердить, что вы человек. Пожалуйста, пройдите проверку в открывшемся окне.
                   </div>
                   <button class="btn btn--primary btn-open-verify" @click="openVerificationWindow">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">

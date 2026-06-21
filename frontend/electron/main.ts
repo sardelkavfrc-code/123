@@ -561,12 +561,14 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
     };
 
     captchaWin.webContents.on("will-redirect", (_e, url) => {
-      if (url.includes("blank.html") || url.includes("close") || url.includes("success")) {
+      if (url.includes("blank.html") || url.includes("close") || url.includes("success") || 
+          (!url.includes("act=auth_captcha") && !url.includes("captcha") && (url.includes("vk.com") || url.includes("vk.ru")))) {
         finalize(true);
       }
     });
     captchaWin.webContents.on("did-navigate", (_e, url) => {
-      if (url.includes("blank.html") || url.includes("close") || url.includes("success")) {
+      if (url.includes("blank.html") || url.includes("close") || url.includes("success") || 
+          (!url.includes("act=auth_captcha") && !url.includes("captcha") && (url.includes("vk.com") || url.includes("vk.ru")))) {
         finalize(true);
       }
     });
