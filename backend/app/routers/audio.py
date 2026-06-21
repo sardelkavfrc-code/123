@@ -29,18 +29,51 @@ async def _safe_call(vk, method: str, token: str, **params):
             detail["remixstlid"] = exc.raw.get("remixstlid")
             captcha_img = exc.raw.get("captcha_img")
             if captcha_img:
+                img_data = None
+                content_type = None
+
+                # Mode 1: Using VK Client (with cookies and KateMobile user-agent)
                 try:
-                    img_resp = await vk._client.get(captcha_img, follow_redirects=True)
-                    if img_resp.status_code == 200:
-                        import base64
-                        encoded = base64.b64encode(img_resp.content).decode("utf-8")
-                        content_type = img_resp.headers.get("content-type", "image/png")
-                        detail["captcha_img"] = f"data:{content_type};base64,{encoded}"
+                    print(f"[Captcha] Attempting Mode 1 (VK Client) to fetch {captcha_img}")
+                    resp = await vk._client.get(captcha_img, follow_redirects=True)
+                    ct = resp.headers.get("content-type", "")
+                    if resp.status_code == 200 and ct.startswith("image/"):
+                        img_data = resp.content
+                        content_type = ct
+                        print(f"[Captcha] Mode 1 Succeeded! content-type: {ct}")
                     else:
-                        print(f"Failed to fetch captcha image, status code: {img_resp.status_code}")
-                        detail["captcha_img"] = captcha_img
-                except Exception as fetch_exc:
-                    print(f"Error fetching captcha image on backend: {fetch_exc}")
+                        print(f"[Captcha] Mode 1 failed/returned non-image. status: {resp.status_code}, content-type: {ct}")
+                except Exception as e:
+                    print(f"[Captcha] Mode 1 exception: {e}")
+
+                # Mode 2: Anonymous client (no cookies, standard browser user-agent)
+                if not img_data:
+                    try:
+                        print(f"[Captcha] Attempting Mode 2 (Anonymous Client) to fetch {captcha_img}")
+                        import httpx as httpx_lib
+                        async with httpx_lib.AsyncClient(follow_redirects=True) as anon_client:
+                            resp = await anon_client.get(
+                                captcha_img,
+                                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                            )
+                            ct = resp.headers.get("content-type", "")
+                            if resp.status_code == 200 and ct.startswith("image/"):
+                                img_data = resp.content
+                                content_type = ct
+                                print(f"[Captcha] Mode 2 Succeeded! content-type: {ct}")
+                            else:
+                                print(f"[Captcha] Mode 2 failed/returned non-image. status: {resp.status_code}, content-type: {ct}")
+                    except Exception as e:
+                        print(f"[Captcha] Mode 2 exception: {e}")
+
+                # If successful in Mode 1 or Mode 2, base64 encode
+                if img_data and content_type:
+                    import base64
+                    encoded = base64.b64encode(img_data).decode("utf-8")
+                    detail["captcha_img"] = f"data:{content_type};base64,{encoded}"
+                else:
+                    # Mode 3: Fallback directly to raw URL
+                    print("[Captcha] All download modes failed. Falling back to Mode 3 (Direct URL)")
                     detail["captcha_img"] = captcha_img
             else:
                 detail["captcha_img"] = None

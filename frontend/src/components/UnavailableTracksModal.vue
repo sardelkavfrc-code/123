@@ -43,11 +43,13 @@ const captchaKey = ref("");
 const redirectUri = ref("");
 const remixstlid = ref("");
 const captchaInputRef = ref<HTMLInputElement | null>(null);
+const imgFailed = ref(false);
 let captchaResolve: ((value: { key?: string; solved: boolean; remixstlid?: string } | null) => void) | null = null;
 
 function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: string, remixstlidVal?: string): Promise<{ key?: string; solved: boolean; remixstlid?: string } | null> {
   captchaSid.value = sid;
   captchaImgUrl.value = imgUrl;
+  imgFailed.value = false;
   captchaKey.value = "";
   redirectUri.value = redirectUrl || "";
   remixstlid.value = remixstlidVal || "";
@@ -58,7 +60,7 @@ function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: strin
 }
 
 function submitCaptcha() {
-  if (captchaImgUrl.value && captchaImgUrl.value.startsWith("data:")) {
+  if (captchaImgUrl.value && !imgFailed.value) {
     if (!captchaKey.value.trim()) return;
     showCaptchaPrompt.value = false;
     if (captchaResolve) {
@@ -103,7 +105,7 @@ async function openVerificationWindow() {
 
 // Auto-focus captcha input when it becomes visible
 watch(showCaptchaPrompt, (newVal) => {
-  if (newVal && captchaImgUrl.value && captchaImgUrl.value.startsWith("data:")) {
+  if (newVal && captchaImgUrl.value && !imgFailed.value) {
     setTimeout(() => {
       captchaInputRef.value?.focus();
     }, 100);
@@ -764,16 +766,16 @@ onBeforeUnmount(() => {
         <!-- CAPTCHA PROMPT OVERLAY -->
         <Transition name="captcha-fade">
           <div v-if="showCaptchaPrompt" class="captcha-overlay">
-            <div class="captcha-box" :class="{ 'captcha-box--redirect': redirectUri && !(captchaImgUrl && captchaImgUrl.startsWith('data:')) }">
+            <div class="captcha-box" :class="{ 'captcha-box--redirect': redirectUri && (!captchaImgUrl || imgFailed) }">
               <div class="captcha-header">
                 <h3>Проверка безопасности ВКонтакте</h3>
-                <p v-if="captchaImgUrl && captchaImgUrl.startsWith('data:')">Введите код с картинки, чтобы продолжить поиск</p>
+                <p v-if="captchaImgUrl && !imgFailed">Введите код с картинки, чтобы продолжить поиск</p>
                 <p v-else-if="redirectUri">Это ограничение лимитов ВК (Rate Limit), а не сбой плеера</p>
                 <p v-else>Введите код с картинки, чтобы продолжить поиск</p>
               </div>
               <div class="captcha-body">
-                <template v-if="captchaImgUrl && captchaImgUrl.startsWith('data:')">
-                  <img :src="captchaImgUrl" alt="VK Captcha" class="captcha-image" />
+                <template v-if="captchaImgUrl && !imgFailed">
+                  <img :src="captchaImgUrl" alt="VK Captcha" class="captcha-image" @error="imgFailed = true" />
                   <input 
                     ref="captchaInputRef"
                     v-model="captchaKey" 
@@ -802,8 +804,8 @@ onBeforeUnmount(() => {
               </div>
               <div class="captcha-footer">
                 <button class="btn btn--ghost" @click="cancelCaptcha">Отмена</button>
-                <button class="btn btn--primary" :disabled="captchaImgUrl && captchaImgUrl.startsWith('data:') ? !captchaKey.trim() : !redirectUri" @click="submitCaptcha">
-                  {{ captchaImgUrl && captchaImgUrl.startsWith('data:') ? 'Отправить' : 'Я прошел проверку' }}
+                <button class="btn btn--primary" :disabled="captchaImgUrl && !imgFailed ? !captchaKey.trim() : !redirectUri" @click="submitCaptcha">
+                  {{ captchaImgUrl && !imgFailed ? 'Отправить' : 'Я прошел проверку' }}
                 </button>
               </div>
             </div>
