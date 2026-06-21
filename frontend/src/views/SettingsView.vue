@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
+import { computed, ref, onMounted, nextTick } from "vue";
 import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useSettingsStore, type AccentName, type ThemeName, type StyleName, FONT_OPTIONS } from "@/stores/settings";
@@ -160,6 +160,7 @@ function pickAccent(value: AccentName | "custom") {
 
 const shakeMinimized = ref(false);
 const flashAutostart = ref(false);
+let animTimeoutId: any = null;
 
 async function onAutoStartChange(event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
@@ -173,16 +174,23 @@ async function handleStartMinimizedClick(event: Event) {
   if (!autoStart.value) {
     event.preventDefault();
     
+    if (animTimeoutId) {
+      clearTimeout(animTimeoutId);
+    }
+    
     shakeMinimized.value = false;
     flashAutostart.value = false;
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+    
+    await nextTick();
+    await new Promise((resolve) => setTimeout(resolve, 20));
     
     shakeMinimized.value = true;
     flashAutostart.value = true;
     
-    setTimeout(() => {
+    animTimeoutId = setTimeout(() => {
       shakeMinimized.value = false;
       flashAutostart.value = false;
+      animTimeoutId = null;
     }, 800);
     return;
   }
@@ -987,12 +995,12 @@ async function checkForUpdates() {
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
-  20%, 40%, 60%, 80% { transform: translateX(6px); }
+  20%, 60% { transform: translateX(-3px); }
+  40%, 80% { transform: translateX(3px); }
 }
 
 .settings__row--shake {
-  animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+  animation: shake 0.4s ease-in-out;
 }
 
 .settings__switch--error {
@@ -1000,19 +1008,31 @@ async function checkForUpdates() {
   box-shadow: 0 0 0 4px rgba(255, 94, 126, 0.2);
 }
 
-@keyframes flash-highlight {
+@keyframes flash-switch {
   0%, 100% {
-    background-color: transparent;
     box-shadow: none;
+    transform: scale(1);
   }
   50% {
-    background-color: color-mix(in srgb, var(--accent-1) 15%, transparent);
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-1) 10%, transparent);
-    border-radius: 8px;
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent-1) 30%, transparent);
+    transform: scale(1.06);
   }
 }
 
-.settings__row--flash {
-  animation: flash-highlight 0.8s ease-in-out;
+@keyframes flash-text {
+  0%, 100% {
+    color: var(--text-0);
+  }
+  50% {
+    color: var(--accent-1);
+  }
+}
+
+.settings__row--flash .settings__switch {
+  animation: flash-switch 0.8s ease-in-out;
+}
+
+.settings__row--flash .settings__row-title {
+  animation: flash-text 0.8s ease-in-out;
 }
 </style>
