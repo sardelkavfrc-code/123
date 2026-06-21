@@ -58,6 +58,9 @@ class VKClient:
 
         if "error" in data:
             err = data["error"]
+            remixstlid_val = resp.cookies.get("remixstlid") or self._client.cookies.get("remixstlid")
+            if remixstlid_val:
+                err["remixstlid"] = remixstlid_val
             raise VKError(
                 code=int(err.get("error_code", -1)),
                 message=str(err.get("error_msg", "Unknown VK error")),
