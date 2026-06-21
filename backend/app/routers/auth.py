@@ -74,7 +74,8 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
     except HTTPException as exc:
         if exc.status_code == status.HTTP_401_UNAUTHORIZED:
             storage.clear()
-        return AuthStatus(authenticated=False)
+            return AuthStatus(authenticated=False)
+        raise exc
 
 
 @router.post("/token", response_model=AuthStatus)
