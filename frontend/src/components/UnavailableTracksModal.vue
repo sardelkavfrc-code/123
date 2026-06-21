@@ -58,20 +58,20 @@ function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: strin
 }
 
 function submitCaptcha() {
-  if (redirectUri.value) {
+  if (captchaImgUrl.value && captchaImgUrl.value.startsWith("data:")) {
+    if (!captchaKey.value.trim()) return;
+    showCaptchaPrompt.value = false;
+    if (captchaResolve) {
+      captchaResolve({ key: captchaKey.value.trim(), solved: true });
+      captchaResolve = null;
+    }
+  } else if (redirectUri.value) {
     showCaptchaPrompt.value = false;
     if (window.vkmp?.closeVKCaptcha) {
       void window.vkmp.closeVKCaptcha();
     }
     if (captchaResolve) {
       captchaResolve({ solved: true, remixstlid: remixstlid.value });
-      captchaResolve = null;
-    }
-  } else {
-    if (!captchaKey.value.trim()) return;
-    showCaptchaPrompt.value = false;
-    if (captchaResolve) {
-      captchaResolve({ key: captchaKey.value.trim(), solved: true });
       captchaResolve = null;
     }
   }
@@ -103,7 +103,7 @@ async function openVerificationWindow() {
 
 // Auto-focus captcha input when it becomes visible
 watch(showCaptchaPrompt, (newVal) => {
-  if (newVal && !redirectUri.value) {
+  if (newVal && captchaImgUrl.value && captchaImgUrl.value.startsWith("data:")) {
     setTimeout(() => {
       captchaInputRef.value?.focus();
     }, 100);
@@ -764,14 +764,26 @@ onBeforeUnmount(() => {
         <!-- CAPTCHA PROMPT OVERLAY -->
         <Transition name="captcha-fade">
           <div v-if="showCaptchaPrompt" class="captcha-overlay">
-            <div class="captcha-box" :class="{ 'captcha-box--redirect': redirectUri }">
+            <div class="captcha-box" :class="{ 'captcha-box--redirect': redirectUri && !(captchaImgUrl && captchaImgUrl.startsWith('data:')) }">
               <div class="captcha-header">
                 <h3>Проверка безопасности ВКонтакте</h3>
-                <p v-if="redirectUri">Это ограничение лимитов ВК (Rate Limit), а не сбой плеера</p>
+                <p v-if="captchaImgUrl && captchaImgUrl.startsWith('data:')">Введите код с картинки, чтобы продолжить поиск</p>
+                <p v-else-if="redirectUri">Это ограничение лимитов ВК (Rate Limit), а не сбой плеера</p>
                 <p v-else>Введите код с картинки, чтобы продолжить поиск</p>
               </div>
               <div class="captcha-body">
-                <template v-if="redirectUri">
+                <template v-if="captchaImgUrl && captchaImgUrl.startsWith('data:')">
+                  <img :src="captchaImgUrl" alt="VK Captcha" class="captcha-image" />
+                  <input 
+                    ref="captchaInputRef"
+                    v-model="captchaKey" 
+                    type="text" 
+                    class="captcha-input" 
+                    placeholder="Код капчи" 
+                    @keyup.enter="submitCaptcha"
+                  />
+                </template>
+                <template v-else-if="redirectUri">
                   <div class="captcha-redirect-info">
                     Из-за частых запросов ВКонтакте временно ограничил поиск и требует подтвердить, что вы человек. Пожалуйста, пройдите проверку в открывшемся окне.
                   </div>
@@ -785,21 +797,13 @@ onBeforeUnmount(() => {
                   </button>
                 </template>
                 <template v-else>
-                  <img :src="captchaImgUrl" alt="VK Captcha" class="captcha-image" />
-                  <input 
-                    ref="captchaInputRef"
-                    v-model="captchaKey" 
-                    type="text" 
-                    class="captcha-input" 
-                    placeholder="Код капчи" 
-                    @keyup.enter="submitCaptcha"
-                  />
+                  <p class="error-text" style="color: var(--text-muted); text-align: center;">Не удалось загрузить изображение капчи.</p>
                 </template>
               </div>
               <div class="captcha-footer">
                 <button class="btn btn--ghost" @click="cancelCaptcha">Отмена</button>
-                <button class="btn btn--primary" :disabled="!redirectUri && !captchaKey.trim()" @click="submitCaptcha">
-                  {{ redirectUri ? 'Я прошел проверку' : 'Отправить' }}
+                <button class="btn btn--primary" :disabled="captchaImgUrl && captchaImgUrl.startsWith('data:') ? !captchaKey.trim() : !redirectUri" @click="submitCaptcha">
+                  {{ captchaImgUrl && captchaImgUrl.startsWith('data:') ? 'Отправить' : 'Я прошел проверку' }}
                 </button>
               </div>
             </div>
