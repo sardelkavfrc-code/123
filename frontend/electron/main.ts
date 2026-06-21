@@ -146,6 +146,23 @@ function stopBackend(): void {
   }
 }
 
+function cleanLegacyRegistry(): void {
+  if (process.platform !== "win32") return;
+  try {
+    spawn(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        'Remove-ItemProperty -Path "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run" -Name "VK Music" -ErrorAction SilentlyContinue',
+      ],
+      { stdio: "ignore", windowsHide: true },
+    );
+  } catch (err) {
+    console.error("VK Music: failed to clean legacy registry key", err);
+  }
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -168,6 +185,7 @@ function createWindow(): BrowserWindow {
   win.once("ready-to-show", () => {
     const isHidden =
       process.argv.includes("--hidden") ||
+      app.commandLine.hasSwitch("hidden") ||
       (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAsHidden);
     if (!isHidden) {
       win.show();
@@ -269,7 +287,14 @@ if (!app.requestSingleInstanceLock()) {
   process.exit(0);
 }
 
-app.on("second-instance", () => {
+app.on("second-instance", (event, commandLine) => {
+  // If the second instance was launched with --hidden, do not show the window.
+  // This avoids flashing/opening the window when multiple registry startup keys trigger.
+  const isHidden = commandLine.includes("--hidden") || commandLine.includes("-hidden");
+  if (isHidden) {
+    return;
+  }
+
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     if (!mainWindow.isVisible()) mainWindow.show();
@@ -278,6 +303,7 @@ app.on("second-instance", () => {
 });
 
 app.whenReady().then(() => {
+  cleanLegacyRegistry();
   mainWindow = createWindow();
   createTray();
   registerMediaKeys();

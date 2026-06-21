@@ -158,16 +158,39 @@ function pickAccent(value: AccentName | "custom") {
   }
 }
 
+const shakeMinimized = ref(false);
+const flashAutostart = ref(false);
+
 async function onAutoStartChange(event: Event) {
   const enabled = (event.target as HTMLInputElement).checked;
+  if (!enabled) {
+    startMinimized.value = false;
+  }
   await settings.setAutoStart(enabled, startMinimized.value);
 }
 
-async function onStartMinimizedChange(event: Event) {
-  const hidden = (event.target as HTMLInputElement).checked;
-  if (autoStart.value) {
-    await settings.setAutoStart(autoStart.value, hidden);
+async function handleStartMinimizedClick(event: Event) {
+  if (!autoStart.value) {
+    event.preventDefault();
+    
+    shakeMinimized.value = false;
+    flashAutostart.value = false;
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    
+    shakeMinimized.value = true;
+    flashAutostart.value = true;
+    
+    setTimeout(() => {
+      shakeMinimized.value = false;
+      flashAutostart.value = false;
+    }, 800);
+    return;
   }
+  
+  const target = event.target as HTMLInputElement;
+  const hidden = target.checked;
+  startMinimized.value = hidden;
+  await settings.setAutoStart(autoStart.value, hidden);
 }
 
 const showEqModal = ref(false);
@@ -412,7 +435,13 @@ async function checkForUpdates() {
 
         <article class="settings__card">
           <h2>Поведение</h2>
-          <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
+          <label
+            class="settings__row"
+            :class="{
+              'settings__row--disabled': !electronAvailable,
+              'settings__row--flash': flashAutostart
+            }"
+          >
             <div>
               <div class="settings__row-title">Автозапуск при старте системы</div>
               <div class="settings__row-sub">{{ electronAvailable ? "Запускать VK Music вместе с ОС" : "Доступно только в десктоп-версии" }}</div>
@@ -432,12 +461,25 @@ async function checkForUpdates() {
             </div>
             <input v-model="closeToTray" type="checkbox" class="settings__switch" :disabled="!electronAvailable" />
           </label>
-          <label class="settings__row" :class="{ 'settings__row--disabled': !electronAvailable }">
+          <label
+            class="settings__row"
+            :class="{
+              'settings__row--disabled': !electronAvailable,
+              'settings__row--shake': shakeMinimized
+            }"
+          >
             <div>
               <div class="settings__row-title">Запуск свернутым</div>
               <div class="settings__row-sub">Подходит для автозапуска — не отвлекает</div>
             </div>
-            <input v-model="startMinimized" type="checkbox" class="settings__switch" :disabled="!electronAvailable" @change="onStartMinimizedChange" />
+            <input
+              :checked="startMinimized"
+              type="checkbox"
+              class="settings__switch"
+              :class="{ 'settings__switch--error': shakeMinimized }"
+              :disabled="!electronAvailable"
+              @click="handleStartMinimizedClick"
+            />
           </label>
           <label class="settings__row">
             <div>
@@ -941,5 +983,36 @@ async function checkForUpdates() {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+  20%, 40%, 60%, 80% { transform: translateX(6px); }
+}
+
+.settings__row--shake {
+  animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.settings__switch--error {
+  background: var(--danger, #ff5e7e) !important;
+  box-shadow: 0 0 0 4px rgba(255, 94, 126, 0.2);
+}
+
+@keyframes flash-highlight {
+  0%, 100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background-color: color-mix(in srgb, var(--accent-1) 15%, transparent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-1) 10%, transparent);
+    border-radius: 8px;
+  }
+}
+
+.settings__row--flash {
+  animation: flash-highlight 0.8s ease-in-out;
 }
 </style>
