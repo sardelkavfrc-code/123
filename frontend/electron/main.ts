@@ -545,11 +545,30 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
   captchaWin.webContents.setUserAgent(DESKTOP_UA);
   captchaWindow = captchaWin;
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<{ success: boolean; remixstlid?: string }>((resolve) => {
     let settled = false;
-    const finalize = (success: boolean) => {
+
+    const getUpdatedCookie = async (): Promise<string | undefined> => {
+      try {
+        const cookies = await session.defaultSession.cookies.get({
+          name: "remixstlid",
+        });
+        console.log("[Captcha] remixstlid cookies in session:", cookies.map(c => `${c.domain || ""}: ${c.value}`));
+        const vkCookie = cookies.find(c => c.domain?.includes("vk.com") || c.domain?.includes("vk.ru"));
+        return vkCookie?.value || cookies[0]?.value;
+      } catch (err) {
+        console.error("[Captcha] Failed to get updated cookie:", err);
+        return undefined;
+      }
+    };
+
+    const finalize = async (success: boolean) => {
       if (settled) return;
       settled = true;
+      let newCookieVal: string | undefined;
+      if (success) {
+        newCookieVal = await getUpdatedCookie();
+      }
       try {
         captchaWin.close();
       } catch {
@@ -558,19 +577,21 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
       if (captchaWindow === captchaWin) {
         captchaWindow = null;
       }
-      resolve(success);
+      resolve({ success, remixstlid: newCookieVal });
     };
 
     captchaWin.webContents.on("will-redirect", (_e, url) => {
+      console.log("[Captcha] Window will-redirect to:", url);
       if (url.includes("blank.html") || url.includes("close") || url.includes("success") || 
           (!url.includes("act=auth_captcha") && !url.includes("captcha") && (url.includes("vk.com") || url.includes("vk.ru")))) {
-        finalize(true);
+        void finalize(true);
       }
     });
     captchaWin.webContents.on("did-navigate", (_e, url) => {
+      console.log("[Captcha] Window did-navigate to:", url);
       if (url.includes("blank.html") || url.includes("close") || url.includes("success") || 
           (!url.includes("act=auth_captcha") && !url.includes("captcha") && (url.includes("vk.com") || url.includes("vk.ru")))) {
-        finalize(true);
+        void finalize(true);
       }
     });
 
@@ -578,7 +599,7 @@ ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remix
       if (captchaWindow === captchaWin) {
         captchaWindow = null;
       }
-      finalize(true);
+      void finalize(true);
     });
 
     void captchaWin.loadURL(redirectUrl);

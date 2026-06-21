@@ -35,7 +35,7 @@ declare global {
       onMediaKey: (cb: (key: "play-pause" | "next" | "prev") => void) => () => void;
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
       openVKAuth: () => Promise<VKAuthResult>;
-      openVKCaptcha: (redirectUrl: string, remixstlid: string) => Promise<boolean>;
+      openVKCaptcha: (redirectUrl: string, remixstlid: string) => Promise<{ success: boolean; remixstlid?: string }>;
       closeVKCaptcha: () => Promise<void>;
       getVersion: () => Promise<string>;
       updater: {

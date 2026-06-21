@@ -58,6 +58,14 @@ class VKClient:
 
         if "error" in data:
             err = data["error"]
+            try:
+                with open("debug_vk.log", "a", encoding="utf-8") as f:
+                    f.write(f"Method: {method}, cookies passed: {cookies}\n")
+                    f.write(f"VK API Error response cookies: {list(resp.cookies.items())}\n")
+                    f.write(f"VK API client cookies: {list(self._client.cookies.items())}\n")
+                    f.write(f"VK API Error raw data: {err}\n\n")
+            except Exception as log_exc:
+                print("Failed to write debug log:", log_exc)
             remixstlid_val = resp.cookies.get("remixstlid") or self._client.cookies.get("remixstlid")
             if remixstlid_val:
                 err["remixstlid"] = remixstlid_val

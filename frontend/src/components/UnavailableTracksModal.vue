@@ -43,9 +43,9 @@ const captchaKey = ref("");
 const redirectUri = ref("");
 const remixstlid = ref("");
 const captchaInputRef = ref<HTMLInputElement | null>(null);
-let captchaResolve: ((value: { key?: string; solved: boolean } | null) => void) | null = null;
+let captchaResolve: ((value: { key?: string; solved: boolean; remixstlid?: string } | null) => void) | null = null;
 
-function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: string, remixstlidVal?: string): Promise<{ key?: string; solved: boolean } | null> {
+function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: string, remixstlidVal?: string): Promise<{ key?: string; solved: boolean; remixstlid?: string } | null> {
   captchaSid.value = sid;
   captchaImgUrl.value = imgUrl;
   captchaKey.value = "";
@@ -64,7 +64,7 @@ function submitCaptcha() {
       void window.vkmp.closeVKCaptcha();
     }
     if (captchaResolve) {
-      captchaResolve({ solved: true });
+      captchaResolve({ solved: true, remixstlid: remixstlid.value });
       captchaResolve = null;
     }
   } else {
@@ -88,8 +88,11 @@ function cancelCaptcha() {
 async function openVerificationWindow() {
   if (redirectUri.value) {
     if (window.vkmp?.openVKCaptcha) {
-      const success = await window.vkmp.openVKCaptcha(redirectUri.value, remixstlid.value);
-      if (success) {
+      const res = await window.vkmp.openVKCaptcha(redirectUri.value, remixstlid.value);
+      if (res && res.success) {
+        if (res.remixstlid) {
+          remixstlid.value = res.remixstlid;
+        }
         submitCaptcha();
       }
     } else {
@@ -173,6 +176,10 @@ async function searchWithRetry(q: string, count: number, retries = 2): Promise<T
               activeSid = sid;
               activeKey = result.key;
               activeRemixstlid = undefined;
+            } else if (result.remixstlid) {
+              activeSid = undefined;
+              activeKey = undefined;
+              activeRemixstlid = result.remixstlid;
             } else if (remixstlidVal) {
               activeSid = undefined;
               activeKey = undefined;

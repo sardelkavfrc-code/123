@@ -5,6 +5,30 @@
 
 ---
 
+## 🔒 Исправление работы с капчей и синхронизации сессионных кук (v0.2.24)
+
+Мы исправили проблемы с прохождением капчи ВКонтакте (как графической, так и веб-проверки «Я не робот»).
+
+### Сделанные изменения
+
+#### 1. Бэкенд: Исправление загрузки графической капчи (ошибка 302)
+- В [audio.py](file:///c:/Users/ohlamon/Desktop/vkplayer/123/backend/app/routers/audio.py) при загрузке картинки капчи с помощью `vk._client.get()` добавлен параметр `follow_redirects=True`.
+- Ранее VK перенаправлял запросы картинок на CDN (`302 Found`), и из-за отключенного по умолчанию следования редиректам бэкенд не мог скачать изображение, возвращая ошибку `Failed to fetch captcha image`. Теперь картинки капчи загружаются и конвертируются в base64 без сбоев.
+
+#### 2. Electron: Возврат обновлённых кук из окна верификации
+- В IPC-обработчик `auth:open-vk-captcha` в [main.ts](file:///c:/Users/ohlamon/Desktop/vkplayer/123/frontend/electron/main.ts) добавлена логика извлечения куки `remixstlid` из сессии Chromium Electron после завершения проверки (как автоматического, так и при ручном закрытии окна пользователем).
+- Теперь метод возвращает объект `{ success: boolean, remixstlid?: string }`.
+- Добавлено логирование путей переходов окна проверки в консоль (`Window will-redirect to:` / `Window did-navigate to:`) для удобства отладки.
+
+#### 3. Фронтенд: Передача новой куки в повторные запросы
+- Типизация `openVKCaptcha` в [env.d.ts](file:///c:/Users/ohlamon/Desktop/vkplayer/123/frontend/env.d.ts) обновлена под новую структуру ответа.
+- В [UnavailableTracksModal.vue](file:///c:/Users/ohlamon/Desktop/vkplayer/123/frontend/src/components/UnavailableTracksModal.vue):
+  - `handleCaptchaChallenge` теперь возвращает `remixstlid` в случае успешного решения.
+  - Метод `openVerificationWindow` при получении успешного результата обновляет локальное состояние куки `remixstlid.value`.
+  - В методе `searchWithRetry` при повторном запросе поиска (`api.search`) используется обновлённое значение `activeRemixstlid`. Это предотвращает зацикливание капчи, поскольку VK видит, что повторный запрос пришел с подтвержденной в окне Electron сессией.
+
+---
+
 # VK Music Player v0.2.22
 
 🐛 **Исправления**

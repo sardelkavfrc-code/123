@@ -30,7 +30,7 @@ async def _safe_call(vk, method: str, token: str, **params):
             captcha_img = exc.raw.get("captcha_img")
             if captcha_img:
                 try:
-                    img_resp = await vk._client.get(captcha_img)
+                    img_resp = await vk._client.get(captcha_img, follow_redirects=True)
                     if img_resp.status_code == 200:
                         import base64
                         encoded = base64.b64encode(img_resp.content).decode("utf-8")
