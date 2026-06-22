@@ -80,7 +80,14 @@ function getScrollParent(node: HTMLElement | null): HTMLElement | null {
 }
 
 function handleScroll() {
-  if (scrollParent) {
+  if (scrollParent && containerRef.value) {
+    const parentRect = scrollParent.getBoundingClientRect();
+    const containerRect = containerRef.value.getBoundingClientRect();
+    // offsetTop of container relative to scrollParent's client area (accounting for current scroll)
+    const offsetInParent = containerRect.top - parentRect.top + scrollParent.scrollTop;
+    
+    scrollTop.value = Math.max(0, scrollParent.scrollTop - offsetInParent);
+  } else if (scrollParent) {
     scrollTop.value = scrollParent.scrollTop;
   }
 }
@@ -105,7 +112,7 @@ function updateScrollParent() {
     
     if (scrollParent) {
       scrollParent.addEventListener("scroll", handleScroll, { passive: true });
-      scrollTop.value = scrollParent.scrollTop;
+      handleScroll();
       if (scrollParent.clientHeight > 0) {
         clientHeight.value = scrollParent.clientHeight;
       }
