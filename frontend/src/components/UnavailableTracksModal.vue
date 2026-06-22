@@ -35,90 +35,29 @@ const manualSearchLoading = ref(false);
 
 const getTrackKey = (t: Track) => `${t.owner_id}_${t.id}`;
 
-// Captcha challenge states
-const showCaptchaPrompt = ref(false);
-const captchaImgUrl = ref("");
-const captchaSid = ref("");
-const captchaKey = ref("");
-const redirectUri = ref("");
-const remixstlid = ref("");
-const captchaInputRef = ref<HTMLInputElement | null>(null);
-const imgFailed = ref(false);
-const selectedMode = ref("auto");
-let captchaResolve: ((value: { key?: string; solved: boolean; remixstlid?: string; reload?: boolean } | null) => void) | null = null;
 
-function handleCaptchaChallenge(sid: string, imgUrl: string, redirectUrl?: string, remixstlidVal?: string): Promise<{ key?: string; solved: boolean; remixstlid?: string; reload?: boolean } | null> {
-  captchaSid.value = sid;
-  captchaImgUrl.value = imgUrl;
-  imgFailed.value = false;
-  captchaKey.value = "";
-  redirectUri.value = redirectUrl || "";
-  remixstlid.value = remixstlidVal || "";
-  showCaptchaPrompt.value = true;
-  return new Promise((resolve) => {
-    captchaResolve = resolve;
-  });
-}
+let isAborted = false;
+let searchSession = 0;
 
-function submitCaptcha() {
-  if (captchaImgUrl.value && !imgFailed.value) {
-    if (!captchaKey.value.trim()) return;
-    showCaptchaPrompt.value = false;
-    if (captchaResolve) {
-      captchaResolve({ key: captchaKey.value.trim(), solved: true });
-      captchaResolve = null;
+// Reset search loop and loading states when the modal is closed
+watch(() => props.show, (newVal) => {
+  if (!newVal) {
+    isAborted = true;
+    searchSession++;
+    isSearchingAll.value = false;
+    for (const key in searchLoading.value) {
+      searchLoading.value[key] = false;
     }
-  } else if (redirectUri.value) {
-    showCaptchaPrompt.value = false;
-    if (window.vkmp?.closeVKCaptcha) {
-      void window.vkmp.closeVKCaptcha();
-    }
-    if (captchaResolve) {
-      captchaResolve({ solved: true, remixstlid: remixstlid.value });
-      captchaResolve = null;
-    }
+  } else {
+    isAborted = false;
+    searchSession++;
   }
-}
+});
 
-function cancelCaptcha() {
-  showCaptchaPrompt.value = false;
-  if (captchaResolve) {
-    captchaResolve(null);
-    captchaResolve = null;
-  }
-}
-
-function reloadCaptcha() {
-  showCaptchaPrompt.value = false;
-  if (captchaResolve) {
-    captchaResolve({ solved: false, reload: true });
-    captchaResolve = null;
-  }
-}
-
-async function openVerificationWindow() {
-  if (redirectUri.value) {
-    if (window.vkmp?.openVKCaptcha) {
-      const res = await window.vkmp.openVKCaptcha(redirectUri.value, remixstlid.value);
-      if (res && res.success) {
-        if (res.remixstlid) {
-          remixstlid.value = res.remixstlid;
-        }
-        submitCaptcha();
-      }
-    } else {
-      window.open(redirectUri.value, "_blank", "width=550,height=650,status=no,toolbar=no,menubar=no");
-    }
-  }
-}
-
-// Auto-focus captcha input when it becomes visible
-watch(showCaptchaPrompt, (newVal) => {
-  if (newVal && captchaImgUrl.value && !imgFailed.value) {
-    setTimeout(() => {
-      captchaInputRef.value?.focus();
-    }, 100);
-  }
+onBeforeUnmount(() => {
+  isAborted = true;
+  searchSession++;
+  isSearchingAll.value = false;
 });
 
 // Helper to determine if an API error is a VK rate limit
@@ -136,7 +75,7 @@ function isVkCaptchaError(err: any): boolean {
   if (err instanceof APIError) {
     const code = err.detail?.code;
     const kind = err.detail?.kind;
-    return kind === "vk_error" && code === 14;
+    return kind === "vk_error" && (code === 14 || code === 17);
   }
   return false;
 }
@@ -160,67 +99,31 @@ function cleanQueryStripRemix(artist: string, title: string): string {
 
 // Search with retry helper to handle 502/rate-limits/captcha from VK API
 async function searchWithRetry(q: string, count: number, retries = 2): Promise<Track[]> {
-  let activeSid: string | undefined;
-  let activeKey: string | undefined;
-  let activeRemixstlid: string | undefined;
+  const currentSession = searchSession;
+  if (isAborted || currentSession !== searchSession) return [];
   
   for (let attempt = 0; attempt <= retries; attempt++) {
+    if (isAborted || currentSession !== searchSession) return [];
     try {
       const res = await api.search({
         q,
         count,
-        captcha_sid: activeSid,
-        captcha_key: activeKey,
-        remixstlid: activeRemixstlid,
-        captcha_mode: selectedMode.value,
       });
       return res.items || [];
     } catch (err) {
-      if (err instanceof APIError && err.detail?.kind === "vk_error" && err.detail?.code === 14) {
-        const sid = err.detail.captcha_sid;
-        const img = err.detail.captcha_img;
-        const redirectUrl = err.detail.redirect_uri;
-        const remixstlidVal = err.detail.remixstlid;
-        if (sid) {
-          const result = await handleCaptchaChallenge(sid, img || "", redirectUrl, remixstlidVal);
-          if (result && result.reload) {
-            activeSid = undefined;
-            activeKey = undefined;
-            attempt--;
-            continue;
-          }
-          if (result && result.solved) {
-            if (result.key) {
-              activeSid = sid;
-              activeKey = result.key;
-              activeRemixstlid = undefined;
-            } else if (result.remixstlid) {
-              activeSid = undefined;
-              activeKey = undefined;
-              activeRemixstlid = result.remixstlid;
-            } else if (remixstlidVal) {
-              activeSid = undefined;
-              activeKey = undefined;
-              activeRemixstlid = remixstlidVal;
-            } else {
-              activeSid = undefined;
-              activeKey = undefined;
-              activeRemixstlid = undefined;
-            }
-            attempt--; // repeat this search attempt
-            continue;
-          } else {
-            throw err; // user cancelled captcha challenge
-          }
-        }
+      if (isAborted || currentSession !== searchSession) return [];
+      
+      // If VK requires captcha (code 14 or 17), we treat it as rate limit and throw immediately
+      if (err instanceof APIError && err.detail?.kind === "vk_error" && (err.detail?.code === 14 || err.detail?.code === 17)) {
+        throw err;
       }
       
       if (attempt === retries) {
         throw err;
       }
-      console.warn(`Search failed (attempt ${attempt + 1}/${retries + 1}), retrying after delay...`, err);
-      // Wait longer between attempts (1s, 2s)
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      // Wait longer between attempts (2s, 4s)
+      if (isAborted || currentSession !== searchSession) return [];
+      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
     }
   }
   return [];
@@ -341,7 +244,7 @@ async function fetchAlternativesForTrack(track: Track): Promise<Track[]> {
       return processed;
     }
   } catch (err) {
-    if (isVkRateLimitError(err)) {
+    if (isVkRateLimitError(err) || isVkCaptchaError(err)) {
       throw err; // propagate to stop bulk loops
     }
     console.error("Exact query search failed:", err);
@@ -359,7 +262,7 @@ async function fetchAlternativesForTrack(track: Track): Promise<Track[]> {
     const items = await searchWithRetry(fallbackQuery, 5);
     return processAlternatives(track, items);
   } catch (err) {
-    if (isVkRateLimitError(err)) {
+    if (isVkRateLimitError(err) || isVkCaptchaError(err)) {
       throw err; // propagate to stop bulk loops
     }
     console.error("Fallback query search failed:", err);
@@ -386,10 +289,8 @@ async function findAlternative(track: Track) {
     console.error("Failed to search alternatives:", err);
     searchResults.value[key] = [];
     
-    if (isVkRateLimitError(err)) {
-      ui.notify("Превышен лимит запросов ВКонтакте. Пожалуйста, подождите пару минут.", "error");
-    } else if (isVkCaptchaError(err)) {
-      ui.notify("Поиск отменен: требуется ввод капчи.", "info");
+    if (isVkRateLimitError(err) || isVkCaptchaError(err)) {
+      ui.notify("Превышен лимит запросов ВКонтакте. Пожалуйста, попробуйте позже.", "error");
     }
   } finally {
     searchLoading.value[key] = false;
@@ -400,15 +301,23 @@ async function findAlternative(track: Track) {
 async function handleAutoSearchAll() {
   if (isSearchingAll.value) return;
   isSearchingAll.value = true;
+  const currentSession = searchSession;
   
   const targets = [...props.tracks];
   for (const track of targets) {
+    if (isAborted || currentSession !== searchSession) {
+      break;
+    }
     const key = getTrackKey(track);
     if (searchResults.value[key]) continue; // skip already searched
     
     searchLoading.value[key] = true;
     try {
       const validItems = await fetchAlternativesForTrack(track);
+      if (isAborted || currentSession !== searchSession) {
+        searchLoading.value[key] = false;
+        break;
+      }
       searchResults.value[key] = validItems;
       // Load cover for the best candidate
       if (validItems.length > 0) {
@@ -418,22 +327,23 @@ async function handleAutoSearchAll() {
       console.error(`Auto-search failed for ${track.title}:`, err);
       searchResults.value[key] = [];
       
-      if (isVkRateLimitError(err)) {
-        ui.notify("Поиск приостановлен: превышен лимит запросов ВКонтакте. Пожалуйста, подождите пару минут.", "error");
-        searchLoading.value[key] = false;
-        break; // Stop loop immediately
-      } else if (isVkCaptchaError(err)) {
-        ui.notify("Поиск приостановлен: требуется ввод капчи.", "info");
+      if (isVkRateLimitError(err) || isVkCaptchaError(err)) {
+        ui.notify("Поиск приостановлен: превышен лимит запросов ВКонтакте. Пожалуйста, попробуйте позже.", "error");
         searchLoading.value[key] = false;
         break; // Stop loop immediately
       }
     } finally {
       searchLoading.value[key] = false;
     }
-    // Rate limit safeguard: wait 1200ms between tracks to avoid triggering 502/rate-limits
-    await new Promise(resolve => setTimeout(resolve, 1200));
+    // Rate limit safeguard: wait 3000ms between tracks to avoid triggering 502/rate-limits
+    if (isAborted || currentSession !== searchSession) {
+      break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 3000));
   }
-  isSearchingAll.value = false;
+  if (currentSession === searchSession) {
+    isSearchingAll.value = false;
+  }
 }
 
 // Trigger replacement process
@@ -479,10 +389,8 @@ async function performManualSearch() {
   } catch (err) {
     console.error("Manual search failed:", err);
     manualSearchResults.value = [];
-    if (isVkRateLimitError(err)) {
-      ui.notify("Превышен лимит запросов ВКонтакте. Пожалуйста, подождите пару минут.", "error");
-    } else if (isVkCaptchaError(err)) {
-      ui.notify("Поиск отменен: требуется ввод капчи.", "info");
+    if (isVkRateLimitError(err) || isVkCaptchaError(err)) {
+      ui.notify("Превышен лимит запросов ВКонтакте. Пожалуйста, попробуйте позже.", "error");
     }
   } finally {
     manualSearchLoading.value = false;
@@ -778,69 +686,6 @@ onBeforeUnmount(() => {
             <button class="btn btn--primary" @click="emit('close')">Готово</button>
           </template>
         </div>
-
-        <!-- CAPTCHA PROMPT OVERLAY -->
-        <Transition name="captcha-fade">
-          <div v-if="showCaptchaPrompt" class="captcha-overlay">
-            <div class="captcha-box" :class="{ 'captcha-box--redirect': redirectUri && (!captchaImgUrl || imgFailed) }">
-              <div class="captcha-header">
-                <h3>Проверка безопасности ВКонтакте</h3>
-                <p v-if="captchaImgUrl && !imgFailed">Введите код с картинки, чтобы продолжить поиск</p>
-                <p v-else-if="redirectUri">Это ограничение лимитов ВК (Rate Limit), а не сбой плеера</p>
-                <p v-else>Введите код с картинки, чтобы продолжить поиск</p>
-              </div>
-              <div class="captcha-mode-container" style="padding: 0 24px; margin-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px;">
-                <span style="color: var(--text-muted);">Режим загрузки капчи:</span>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                  <select v-model="selectedMode" class="select-mode" style="background: var(--bg-3); border: 1px solid var(--border); color: var(--text-0); padding: 4px 8px; border-radius: var(--radius-sm); font-size: 13px; outline: none; cursor: pointer;">
-                    <option value="auto">Авто (Режимы 1 ➜ 2 ➜ 3)</option>
-                    <option value="mode1">Режим 1 (Через сессию)</option>
-                    <option value="mode2">Режим 2 (Анонимно)</option>
-                    <option value="mode3">Режим 3 (Прямой URL)</option>
-                  </select>
-                  <button class="btn btn--ghost" style="padding: 4px 8px; height: auto; min-height: 0; font-size: 12px; border: 1px solid var(--border);" @click="reloadCaptcha">
-                    Обновить
-                  </button>
-                </div>
-              </div>
-              <div class="captcha-body">
-                <template v-if="captchaImgUrl && !imgFailed">
-                  <img :src="captchaImgUrl" alt="VK Captcha" class="captcha-image" @error="imgFailed = true" />
-                  <input 
-                    ref="captchaInputRef"
-                    v-model="captchaKey" 
-                    type="text" 
-                    class="captcha-input" 
-                    placeholder="Код капчи" 
-                    @keyup.enter="submitCaptcha"
-                  />
-                </template>
-                <template v-else-if="redirectUri">
-                  <div class="captcha-redirect-info">
-                    Из-за частых запросов ВКонтакте временно ограничил поиск и требует подтвердить, что вы человек. Пожалуйста, пройдите проверку в открывшемся окне.
-                  </div>
-                  <button class="btn btn--primary btn-open-verify" @click="openVerificationWindow">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;">
-                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                      <polyline points="15 3 21 3 21 9"></polyline>
-                      <line x1="10" y1="14" x2="21" y2="3"></line>
-                    </svg>
-                    Открыть окно проверки
-                  </button>
-                </template>
-                <template v-else>
-                  <p class="error-text" style="color: var(--text-muted); text-align: center;">Не удалось загрузить изображение капчи.</p>
-                </template>
-              </div>
-              <div class="captcha-footer">
-                <button class="btn btn--ghost" @click="cancelCaptcha">Отмена</button>
-                <button class="btn btn--primary" :disabled="captchaImgUrl && !imgFailed ? !captchaKey.trim() : !redirectUri" @click="submitCaptcha">
-                  {{ captchaImgUrl && !imgFailed ? 'Отправить' : 'Я прошел проверку' }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Transition>
       </div>
     </div>
   </Transition>

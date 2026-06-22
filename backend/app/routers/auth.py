@@ -136,3 +136,5 @@ async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
 async def logout() -> AuthStatus:
     storage.clear()
     return AuthStatus(authenticated=False)
+
+

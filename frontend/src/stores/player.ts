@@ -358,6 +358,53 @@ export const usePlayerStore = defineStore("player", () => {
   let backend: PlaybackBackend | null = null;
   let nearEndCallback: (() => void) | null = null;
 
+  let prefetchAudio: HTMLAudioElement | null = null;
+  let prefetchHls: Hls | null = null;
+  let prefetchTimeout: number | null = null;
+
+  function destroyPrefetch() {
+    if (prefetchTimeout) {
+      window.clearTimeout(prefetchTimeout);
+      prefetchTimeout = null;
+    }
+    if (prefetchAudio) {
+      prefetchAudio.pause();
+      prefetchAudio.removeAttribute("src");
+      prefetchAudio.load();
+      prefetchAudio = null;
+    }
+    if (prefetchHls) {
+      prefetchHls.destroy();
+      prefetchHls = null;
+    }
+  }
+
+  function prefetchNextTrack() {
+    destroyPrefetch();
+
+    const nextIdx = index.value + 1;
+    if (nextIdx < 0 || nextIdx >= queue.value.length) return;
+
+    const nextTrack = queue.value[nextIdx];
+    if (!nextTrack || !nextTrack.url) return;
+
+    console.log(`[Player] Prefetching next track: ${nextTrack.title}`);
+    if (isHlsUrl(nextTrack.url)) {
+      if (Hls.isSupported()) {
+        prefetchAudio = new Audio();
+        prefetchAudio.preload = "auto";
+        prefetchHls = new Hls({ enableWorker: true });
+        prefetchHls.loadSource(nextTrack.url);
+        prefetchHls.attachMedia(prefetchAudio);
+      }
+    } else {
+      prefetchAudio = new Audio();
+      prefetchAudio.preload = "auto";
+      prefetchAudio.src = nextTrack.url;
+      prefetchAudio.load();
+    }
+  }
+
   const current = computed<Track | null>(() => {
     if (index.value < 0 || index.value >= queue.value.length) return null;
     return queue.value[index.value];
@@ -452,6 +499,7 @@ export const usePlayerStore = defineStore("player", () => {
 
   function destroyBackend() {
     stopTick();
+    destroyPrefetch();
     if (backend) {
       backend.destroy();
       backend = null;
@@ -486,6 +534,10 @@ export const usePlayerStore = defineStore("player", () => {
         if (backend !== thisBackend) return;
         isPlaying.value = true;
         startTick();
+        if (prefetchTimeout) window.clearTimeout(prefetchTimeout);
+        prefetchTimeout = window.setTimeout(() => {
+          prefetchNextTrack();
+        }, 1000);
       },
       onPause: () => {
         if (backend !== thisBackend) return;
@@ -681,6 +733,7 @@ export const usePlayerStore = defineStore("player", () => {
 
   function clear() {
     destroyBackend();
+    destroyPrefetch();
     queue.value = [];
     originalQueue.value = [];
     index.value = -1;

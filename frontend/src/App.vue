@@ -11,12 +11,27 @@ import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
 import { useAuthStore } from "@/stores/auth";
+import { useLibraryStore } from "@/stores/library";
 
 const route = useRoute();
 const router = useRouter();
 const isBlank = computed(() => route.meta.layout === "blank");
 const player = usePlayerStore();
 const ui = useUIStore();
+const auth = useAuthStore();
+const library = useLibraryStore();
+
+watch(
+  () => auth.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      void library.loadAllMyMusic();
+    } else {
+      library.reset();
+    }
+  },
+  { immediate: true }
+);
 
 let detachMediaKey: (() => void) | null = null;
 

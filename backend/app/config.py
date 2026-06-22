@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     vk_client_secret: str = Field(default="lxhD8OD7dMsqtXIm5IUY", alias="VK_CLIENT_SECRET")
     vk_api_version: str = Field(default="5.131", alias="VK_API_VERSION")
     vk_user_agent: str = Field(
-        default="KateMobileAndroid/113 v1-543 (Android 13; SDK 33; arm64-v8a; unknown Unknown; ru)",
+        default="VKAndroidApp/8.43-17684 (Android 11; SDK 30; armeabi-v7a; Realme RMX3263; ru; 320x720)",
         alias="VK_USER_AGENT",
     )
 

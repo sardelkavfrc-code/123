@@ -185,6 +185,9 @@ export const useLibraryStore = defineStore("library", () => {
     const key = `${track.owner_id}_${track.id}`;
     const added = await api.addTrack(track.id, track.owner_id);
     myMusic.value = [added, ...myMusic.value];
+    if (myMusicAll.value.length > 0) {
+      myMusicAll.value = [added, ...myMusicAll.value];
+    }
     addedOriginals.value.add(key);
     addedTracksMap.value.set(key, added);
     refreshMyMusicIndex(myMusic.value);
@@ -202,6 +205,9 @@ export const useLibraryStore = defineStore("library", () => {
 
     await api.removeTrack(targetId, targetOwnerId);
     myMusic.value = myMusic.value.filter((t) => !(t.id === targetId && t.owner_id === targetOwnerId));
+    if (myMusicAll.value.length > 0) {
+      myMusicAll.value = myMusicAll.value.filter((t) => !(t.id === targetId && t.owner_id === targetOwnerId));
+    }
     addedOriginals.value.delete(key);
     addedTracksMap.value.delete(key);
     refreshMyMusicIndex(myMusic.value);
@@ -214,6 +220,7 @@ export const useLibraryStore = defineStore("library", () => {
 
   function reset() {
     myMusic.value = [];
+    myMusicAll.value = [];
     myMusicIdSet.value = new Set();
     addedOriginals.value = new Set();
     addedTracksMap.value = new Map();

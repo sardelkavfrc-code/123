@@ -23,6 +23,17 @@ export function setBackendUrl(url: string): void {
   http.defaults.baseURL = url;
 }
 
+let globalRemixstlid = localStorage.getItem("vkmp:remixstlid") || "";
+
+export function setGlobalRemixstlid(val: string): void {
+  globalRemixstlid = val;
+  localStorage.setItem("vkmp:remixstlid", val);
+}
+
+export function getGlobalRemixstlid(): string {
+  return globalRemixstlid;
+}
+
 export interface APIErrorDetail {
   kind: string;
   message?: string;
@@ -69,6 +80,12 @@ http.interceptors.response.use(
 );
 
 export const api = {
+  setGlobalRemixstlid(val: string): void {
+    setGlobalRemixstlid(val);
+  },
+  getGlobalRemixstlid(): string {
+    return getGlobalRemixstlid();
+  },
   async authStatus(): Promise<AuthStatus> {
     const { data } = await http.get<AuthStatus>("/auth/status");
     return data;
@@ -108,8 +125,10 @@ export const api = {
     captcha_sid?: string;
     captcha_key?: string;
     remixstlid?: string;
-    captcha_mode?: string;
   }): Promise<TrackList> {
+    if (!params.remixstlid && globalRemixstlid) {
+      params.remixstlid = globalRemixstlid;
+    }
     const { data } = await http.get<TrackList>("/audio/search", { params });
     return data;
   },

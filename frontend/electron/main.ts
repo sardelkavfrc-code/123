@@ -20,12 +20,16 @@ const isDev = !app.isPackaged;
 const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 const APP_NAME = "VK Music Player";
 
+
+let DESKTOP_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+const _MOBILE_UA = "Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Mobile Safari/537.36";
+
 app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+app.commandLine.appendSwitch("disable-blink-features", "AutomationControlled");
 
 let mainWindow: BrowserWindow | null = null;
-let captchaWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -310,6 +314,15 @@ app.on("second-instance", (event, commandLine) => {
 });
 
 app.whenReady().then(() => {
+  try {
+    DESKTOP_UA = session.defaultSession.getUserAgent()
+      .replace(/Electron\/[\d.]+\s?/g, "")
+      .replace(/vk-music-player\/[\d.]+\s?/gi, "")
+      .trim();
+  } catch (err) {
+    console.error("Failed to update desktop UA:", err);
+  }
+
   cleanLegacyRegistry();
   mainWindow = createWindow();
   createTray();
@@ -427,8 +440,7 @@ type OAuthResult =
 const VK_OAUTH_CLIENT_ID = 6287487;
 const VK_OAUTH_SCOPE = "1073737727";
 const OAUTH_REDIRECT_PREFIX = "https://oauth.vk.com/blank.html";
-const DESKTOP_UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 
 function parseOAuthFragment(rawUrl: string): OAuthResult | null {
   const hashIndex = rawUrl.indexOf("#");
@@ -501,118 +513,4 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
 
     void oauthWin.loadURL(url);
   });
-});
-
-ipcMain.handle("auth:open-vk-captcha", async (_event, redirectUrl: string, remixstlid: string) => {
-  const cookieVal = String(remixstlid);
-  
-  try {
-    await session.defaultSession.cookies.set({
-      url: "https://vk.com",
-      name: "remixstlid",
-      value: cookieVal,
-      domain: ".vk.com",
-      path: "/",
-      secure: true,
-      expirationDate: Math.floor(Date.now() / 1000) + 3600 * 24 * 365,
-    });
-    await session.defaultSession.cookies.set({
-      url: "https://id.vk.com",
-      name: "remixstlid",
-      value: cookieVal,
-      domain: ".vk.com",
-      path: "/",
-      secure: true,
-      expirationDate: Math.floor(Date.now() / 1000) + 3600 * 24 * 365,
-    });
-  } catch (err) {
-    console.error("Failed to set remixstlid cookie:", err);
-  }
-
-  const captchaWin = new BrowserWindow({
-    width: 550,
-    height: 650,
-    parent: mainWindow ?? undefined,
-    modal: false,
-    autoHideMenuBar: true,
-    title: "Подтверждение безопасности",
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-  captchaWin.removeMenu();
-  captchaWin.webContents.setUserAgent(DESKTOP_UA);
-  captchaWindow = captchaWin;
-
-  return new Promise<{ success: boolean; remixstlid?: string }>((resolve) => {
-    let settled = false;
-
-    const getUpdatedCookie = async (): Promise<string | undefined> => {
-      try {
-        const cookies = await session.defaultSession.cookies.get({
-          name: "remixstlid",
-        });
-        console.log("[Captcha] remixstlid cookies in session:", cookies.map(c => `${c.domain || ""}: ${c.value}`));
-        const vkCookie = cookies.find(c => c.domain?.includes("vk.com") || c.domain?.includes("vk.ru"));
-        return vkCookie?.value || cookies[0]?.value;
-      } catch (err) {
-        console.error("[Captcha] Failed to get updated cookie:", err);
-        return undefined;
-      }
-    };
-
-    const finalize = async (success: boolean) => {
-      if (settled) return;
-      settled = true;
-      let newCookieVal: string | undefined;
-      if (success) {
-        newCookieVal = await getUpdatedCookie();
-      }
-      try {
-        captchaWin.close();
-      } catch {
-        // ignore
-      }
-      if (captchaWindow === captchaWin) {
-        captchaWindow = null;
-      }
-      resolve({ success, remixstlid: newCookieVal });
-    };
-
-    captchaWin.webContents.on("will-redirect", (_e, url) => {
-      console.log("[Captcha] Window will-redirect to:", url);
-      if (url.includes("blank.html") || url.includes("close") || url.includes("success") || 
-          (!url.includes("act=auth_captcha") && !url.includes("captcha") && (url.includes("vk.com") || url.includes("vk.ru")))) {
-        void finalize(true);
-      }
-    });
-    captchaWin.webContents.on("did-navigate", (_e, url) => {
-      console.log("[Captcha] Window did-navigate to:", url);
-      if (url.includes("blank.html") || url.includes("close") || url.includes("success") || 
-          (!url.includes("act=auth_captcha") && !url.includes("captcha") && (url.includes("vk.com") || url.includes("vk.ru")))) {
-        void finalize(true);
-      }
-    });
-
-    captchaWin.on("closed", () => {
-      if (captchaWindow === captchaWin) {
-        captchaWindow = null;
-      }
-      void finalize(true);
-    });
-
-    void captchaWin.loadURL(redirectUrl);
-  });
-});
-
-ipcMain.handle("auth:close-vk-captcha", () => {
-  if (captchaWindow) {
-    try {
-      captchaWindow.close();
-    } catch {
-      // ignore
-    }
-    captchaWindow = null;
-  }
 });
