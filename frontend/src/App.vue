@@ -20,6 +20,7 @@ const player = usePlayerStore();
 const ui = useUIStore();
 const auth = useAuthStore();
 const library = useLibraryStore();
+const settings = useSettingsStore();
 
 watch(
   () => auth.isAuthenticated,
@@ -43,7 +44,6 @@ onMounted(() => {
       else if (key === "prev") player.prev();
     });
 
-    const settings = useSettingsStore();
     if (settings.autoUpdateCheck) {
       window.vkmp.updater?.checkForUpdates().catch(() => {});
     }
@@ -110,7 +110,7 @@ watch(
     <TitleBar />
     <div v-if="isBlank" class="blank-host">
       <router-view v-slot="{ Component }">
-        <transition name="page-fade" mode="out-in">
+        <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
           <component :is="Component" />
         </transition>
       </router-view>
@@ -119,7 +119,7 @@ watch(
       <Sidebar class="app-grid__sidebar" />
       <main class="app-grid__main">
         <router-view v-slot="{ Component }">
-          <transition name="page-fade" mode="out-in">
+          <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
             <keep-alive>
               <component :is="Component" />
             </keep-alive>

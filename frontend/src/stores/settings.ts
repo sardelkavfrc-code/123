@@ -30,6 +30,7 @@ export type AccentName =
 export type StyleName = "default" | "matte" | "flat" | "noise" | "glow";
 export type CustomAccentType = "solid" | "gradient";
 export type DragHandleStyle = "dots" | "lines" | "grip";
+export type RouterAnimation = "fade" | "slide" | "zoom" | "none";
 
 export const FONT_OPTIONS = [
   "Nunito",
@@ -83,6 +84,7 @@ interface PersistedSettings {
   discordRpcText: string;
   discordRpcShowTrack: boolean;
   dragHandleStyle: DragHandleStyle;
+  routerAnimation: RouterAnimation;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -117,6 +119,7 @@ const defaults: PersistedSettings = {
   discordRpcText: "Слушает музыку",
   discordRpcShowTrack: true,
   dragHandleStyle: "lines",
+  routerAnimation: "fade",
 };
 
 function load(): PersistedSettings {
@@ -158,6 +161,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const fadeDurationMs = ref(initial.fadeDurationMs ?? 500);
   const autoScrollQueue = ref(initial.autoScrollQueue ?? defaults.autoScrollQueue);
   const dragHandleStyle = ref<DragHandleStyle>(initial.dragHandleStyle ?? defaults.dragHandleStyle);
+  const routerAnimation = ref<RouterAnimation>(initial.routerAnimation ?? defaults.routerAnimation);
   const prefetchEnabled = ref(initial.prefetchEnabled ?? defaults.prefetchEnabled);
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
@@ -218,6 +222,7 @@ export const useSettingsStore = defineStore("settings", () => {
       fadeDurationMs: fadeDurationMs.value,
       autoScrollQueue: autoScrollQueue.value,
       dragHandleStyle: dragHandleStyle.value,
+      routerAnimation: routerAnimation.value,
       prefetchEnabled: prefetchEnabled.value,
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
@@ -254,6 +259,8 @@ export const useSettingsStore = defineStore("settings", () => {
       crossfade,
       crossfadeDuration,
       autoScrollQueue,
+      dragHandleStyle,
+      routerAnimation,
       prefetchEnabled,
       discordRpc,
       discordRpcText,
@@ -308,6 +315,8 @@ export const useSettingsStore = defineStore("settings", () => {
     crossfade.value = defaults.crossfade;
     crossfadeDuration.value = defaults.crossfadeDuration;
     autoScrollQueue.value = defaults.autoScrollQueue;
+    dragHandleStyle.value = defaults.dragHandleStyle;
+    routerAnimation.value = defaults.routerAnimation;
     prefetchEnabled.value = defaults.prefetchEnabled;
     discordRpc.value = defaults.discordRpc;
     discordRpcText.value = defaults.discordRpcText;
@@ -340,6 +349,7 @@ export const useSettingsStore = defineStore("settings", () => {
     fadeDurationMs,
     autoScrollQueue,
     dragHandleStyle,
+    routerAnimation,
     prefetchEnabled,
     discordRpc,
     discordRpcText,

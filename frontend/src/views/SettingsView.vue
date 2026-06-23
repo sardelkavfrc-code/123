@@ -44,6 +44,7 @@ const {
   discordRpcText,
   discordRpcShowTrack,
   dragHandleStyle,
+  routerAnimation,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -344,6 +345,46 @@ async function checkForUpdates() {
               <span class="settings__font-name">{{ f }}</span>
               <span class="settings__font-sample">Aa</span>
             </button>
+          </div>
+        </article>
+
+        <article class="settings__card">
+          <h2>Анимации</h2>
+          <div class="settings__row" style="align-items: flex-start;">
+            <div>
+              <div class="settings__row-title">Анимация перехода между страницами</div>
+              <div class="settings__row-sub">Эффект при переходе по вкладкам приложения</div>
+            </div>
+            <div class="settings__segmented">
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': routerAnimation === 'fade' }"
+                @click="routerAnimation = 'fade'"
+              >
+                Fade
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': routerAnimation === 'slide' }"
+                @click="routerAnimation = 'slide'"
+              >
+                Slide
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': routerAnimation === 'zoom' }"
+                @click="routerAnimation = 'zoom'"
+              >
+                Zoom
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': routerAnimation === 'none' }"
+                @click="routerAnimation = 'none'"
+              >
+                Выкл
+              </button>
+            </div>
           </div>
         </article>
 
