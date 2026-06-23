@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useUIStore } from "@/stores/ui";
+import { useSettingsStore } from "@/stores/settings";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 const player = usePlayerStore();
 const library = useLibraryStore();
 const ui = useUIStore();
+const settings = useSettingsStore();
 const router = useRouter();
 
 const inLibrary = computed(() => library.isInLibrary(props.track));
@@ -99,10 +101,23 @@ function addToQueue() {
     }"
   >
     <span class="queue__handle" aria-hidden="true">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-        <circle cx="8" cy="6" r="1.6" /><circle cx="8" cy="12" r="1.6" /><circle cx="8" cy="18" r="1.6" />
-        <circle cx="16" cy="6" r="1.6" /><circle cx="16" cy="12" r="1.6" /><circle cx="16" cy="18" r="1.6" />
-      </svg>
+      <template v-if="settings.dragHandleStyle === 'lines'">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <path d="M4 7h16v2H4zm0 4h16v2H4zm0 4h16v2H4z"/>
+        </svg>
+      </template>
+      <template v-else-if="settings.dragHandleStyle === 'grip'">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <circle cx="6" cy="10" r="1.6" /><circle cx="12" cy="10" r="1.6" /><circle cx="18" cy="10" r="1.6" />
+          <circle cx="6" cy="14" r="1.6" /><circle cx="12" cy="14" r="1.6" /><circle cx="18" cy="14" r="1.6" />
+        </svg>
+      </template>
+      <template v-else>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+          <circle cx="8" cy="6" r="1.6" /><circle cx="8" cy="12" r="1.6" /><circle cx="8" cy="18" r="1.6" />
+          <circle cx="16" cy="6" r="1.6" /><circle cx="16" cy="12" r="1.6" /><circle cx="16" cy="18" r="1.6" />
+        </svg>
+      </template>
     </span>
     <span class="queue__index">
       <template v-if="current">

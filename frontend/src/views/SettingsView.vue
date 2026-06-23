@@ -43,6 +43,7 @@ const {
   discordRpc,
   discordRpcText,
   discordRpcShowTrack,
+  dragHandleStyle,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -343,6 +344,30 @@ async function checkForUpdates() {
               <span class="settings__font-name">{{ f }}</span>
               <span class="settings__font-sample">Aa</span>
             </button>
+          </div>
+        </article>
+
+        <article class="settings__card">
+          <h2>Списки и очередь</h2>
+          <div class="settings__row" style="align-items: flex-start;">
+            <div>
+              <div class="settings__row-title">Стиль иконки перетаскивания</div>
+              <div class="settings__row-sub">Иконка, за которую можно тянуть треки в очереди</div>
+            </div>
+            <div class="settings__custom-row" style="margin-top: 0;">
+              <label class="settings__radio">
+                <input type="radio" v-model="dragHandleStyle" value="dots" />
+                <span>Точечки</span>
+              </label>
+              <label class="settings__radio">
+                <input type="radio" v-model="dragHandleStyle" value="lines" />
+                <span>Полосочки</span>
+              </label>
+              <label class="settings__radio">
+                <input type="radio" v-model="dragHandleStyle" value="grip" />
+                <span>Хват</span>
+              </label>
+            </div>
           </div>
         </article>
       </template>

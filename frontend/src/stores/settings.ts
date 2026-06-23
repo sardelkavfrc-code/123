@@ -29,6 +29,7 @@ export type AccentName =
 
 export type StyleName = "default" | "matte" | "flat" | "noise" | "glow";
 export type CustomAccentType = "solid" | "gradient";
+export type DragHandleStyle = "dots" | "lines" | "grip";
 
 export const FONT_OPTIONS = [
   "Nunito",
@@ -81,6 +82,7 @@ interface PersistedSettings {
   discordRpc: boolean;
   discordRpcText: string;
   discordRpcShowTrack: boolean;
+  dragHandleStyle: DragHandleStyle;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -114,6 +116,7 @@ const defaults: PersistedSettings = {
   discordRpc: false,
   discordRpcText: "Слушает музыку",
   discordRpcShowTrack: true,
+  dragHandleStyle: "dots",
 };
 
 function load(): PersistedSettings {
@@ -153,8 +156,9 @@ export const useSettingsStore = defineStore("settings", () => {
   const crossfadeDuration = ref(initial.crossfadeDuration);
   const fadeEnabled = ref(initial.fadeEnabled ?? true);
   const fadeDurationMs = ref(initial.fadeDurationMs ?? 500);
-  const autoScrollQueue = ref(initial.autoScrollQueue ?? true);
-  const prefetchEnabled = ref(initial.prefetchEnabled ?? true);
+  const autoScrollQueue = ref(initial.autoScrollQueue ?? defaults.autoScrollQueue);
+  const dragHandleStyle = ref<DragHandleStyle>(initial.dragHandleStyle ?? defaults.dragHandleStyle);
+  const prefetchEnabled = ref(initial.prefetchEnabled ?? defaults.prefetchEnabled);
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
   const discordRpcShowTrack = ref(initial.discordRpcShowTrack ?? true);
@@ -213,6 +217,7 @@ export const useSettingsStore = defineStore("settings", () => {
       fadeEnabled: fadeEnabled.value,
       fadeDurationMs: fadeDurationMs.value,
       autoScrollQueue: autoScrollQueue.value,
+      dragHandleStyle: dragHandleStyle.value,
       prefetchEnabled: prefetchEnabled.value,
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
@@ -334,6 +339,7 @@ export const useSettingsStore = defineStore("settings", () => {
     fadeEnabled,
     fadeDurationMs,
     autoScrollQueue,
+    dragHandleStyle,
     prefetchEnabled,
     discordRpc,
     discordRpcText,
