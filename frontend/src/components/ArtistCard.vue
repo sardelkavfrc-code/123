@@ -82,7 +82,7 @@ function openArtist() {
   object-fit: cover;
 }
 .artist-card__placeholder {
-  font-size: 40px;
+  font-size: calc(40px * var(--font-scale, 1));
   font-weight: 700;
   color: var(--text-2);
 }
@@ -102,7 +102,7 @@ function openArtist() {
   opacity: 1;
 }
 .artist-card__name {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-0);
   text-align: center;
@@ -112,7 +112,7 @@ function openArtist() {
   text-overflow: ellipsis;
 }
 .artist-card__sub {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   margin-top: -6px;
 }

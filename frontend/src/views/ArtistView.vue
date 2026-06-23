@@ -349,7 +349,7 @@ function playAll() {
   gap: 8px;
 }
 .artist__eyebrow {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   text-transform: uppercase;
   letter-spacing: 0.15em;
   opacity: 0.9;
@@ -357,7 +357,7 @@ function playAll() {
 }
 .artist__name {
   margin: 0;
-  font-size: 48px;
+  font-size: calc(48px * var(--font-scale, 1));
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.1;
@@ -368,7 +368,7 @@ function playAll() {
   align-items: center;
   gap: 12px;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 500;
 }
 .artist__actions {
@@ -379,7 +379,7 @@ function playAll() {
   border-radius: 999px;
   padding: 0 24px;
   height: 44px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
 }
 .artist__actions .btn--primary {
@@ -410,7 +410,7 @@ function playAll() {
 .artist__error {
   color: var(--danger);
   padding: 12px 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .artist__warn {
   color: var(--text-2);
@@ -418,7 +418,7 @@ function playAll() {
   border-radius: var(--radius-md);
   padding: 10px 14px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .artist__tabs {
   display: inline-flex;
@@ -432,7 +432,7 @@ function playAll() {
 .artist__tab {
   padding: 6px 16px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-2);
   transition:
@@ -465,7 +465,7 @@ function playAll() {
 }
 .artist__section-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
   color: var(--text-0);
 }

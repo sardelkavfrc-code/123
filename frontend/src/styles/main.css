@@ -21,7 +21,8 @@ body,
     "Segoe UI",
     Roboto,
     sans-serif;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
+  letter-spacing: var(--letter-spacing, 0px);
   color: var(--text-0);
   background: var(--bg-0);
   -webkit-font-smoothing: antialiased;
@@ -180,7 +181,7 @@ img {
   background: var(--bg-2);
   color: var(--text-1);
   border: 1px solid var(--border);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 500;
 }
 .chip--active {

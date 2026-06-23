@@ -25,7 +25,7 @@ defineProps<{
   padding: 28px 32px 12px;
 }
 .page-header__eyebrow {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-2);
@@ -33,7 +33,7 @@ defineProps<{
 }
 .page-header__title {
   margin: 0;
-  font-size: 30px;
+  font-size: calc(30px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -41,7 +41,7 @@ defineProps<{
   margin: 0;
   color: var(--text-2);
   max-width: 720px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
 }
 .page-header__actions {
   margin-top: 14px;

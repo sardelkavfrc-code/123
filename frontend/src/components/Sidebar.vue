@@ -120,7 +120,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
 }
 .sidebar__logo-text {
   font-weight: 800;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -154,7 +154,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   justify-content: center;
   color: var(--text-1);
   font-weight: 600;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
 }
 .sidebar__profile-text {
   min-width: 0;
@@ -171,7 +171,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
 }
 .sidebar__profile-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: var(--text-0);
   white-space: nowrap;
   overflow: hidden;
@@ -204,7 +204,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   border-radius: var(--radius-md);
   color: var(--text-1);
   font-weight: 500;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   transition:
     background-color var(--motion-duration-fast) var(--motion-ease-out),
     color var(--motion-duration-fast) var(--motion-ease-out);

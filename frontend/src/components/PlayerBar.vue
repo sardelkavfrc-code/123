@@ -483,14 +483,14 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 }
 .player__artist {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   text-align: left;
   display: inline;
   transition: color var(--motion-duration-base) var(--motion-ease-out);
 }
 .player__time {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   min-width: 40px;
   text-align: center;
@@ -505,7 +505,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   color: var(--text-1);
 }
 .player__artist-comma {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
 }
 .player__artist:hover {
@@ -591,7 +591,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   position: absolute;
   bottom: 2px;
   right: 2px;
-  font-size: 9px;
+  font-size: calc(9px * var(--font-scale, 1));
   font-weight: 700;
   background: var(--accent-1);
   color: #fff;
@@ -608,7 +608,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 .player__time {
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   min-width: 38px;
   text-align: center;
 }

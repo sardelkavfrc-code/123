@@ -104,7 +104,7 @@ function playAll() {
 }
 .similar__head {
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   margin-bottom: 8px;
 }
 .similar__loading {
@@ -117,6 +117,6 @@ function playAll() {
 .similar__error {
   color: var(--danger);
   padding: 12px 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 </style>

@@ -342,7 +342,7 @@ function playMany(tracks: Track[]) {
 .search__seg {
   padding: 6px 16px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-2);
   transition:
@@ -368,7 +368,7 @@ function playMany(tracks: Track[]) {
   margin-bottom: 24px;
 }
 .search__section-title {
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 700;
   margin: 0;
   color: var(--text-0);
@@ -433,7 +433,7 @@ function playMany(tracks: Track[]) {
   align-items: center;
   justify-content: space-between;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .search__loading {
   display: inline-flex;
@@ -445,6 +445,6 @@ function playMany(tracks: Track[]) {
 .search__error {
   color: var(--danger);
   padding: 12px 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 </style>

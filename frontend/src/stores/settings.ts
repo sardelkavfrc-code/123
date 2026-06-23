@@ -85,6 +85,8 @@ interface PersistedSettings {
   discordRpcShowTrack: boolean;
   dragHandleStyle: DragHandleStyle;
   routerAnimation: RouterAnimation;
+  fontSizeScale: number;
+  letterSpacing: number;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -120,6 +122,8 @@ const defaults: PersistedSettings = {
   discordRpcShowTrack: true,
   dragHandleStyle: "lines",
   routerAnimation: "slide",
+  fontSizeScale: 1.0,
+  letterSpacing: 0,
 };
 
 function load(): PersistedSettings {
@@ -162,6 +166,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const autoScrollQueue = ref(initial.autoScrollQueue ?? defaults.autoScrollQueue);
   const dragHandleStyle = ref<DragHandleStyle>(initial.dragHandleStyle ?? defaults.dragHandleStyle);
   const routerAnimation = ref<RouterAnimation>(initial.routerAnimation ?? defaults.routerAnimation);
+  const fontSizeScale = ref(initial.fontSizeScale ?? defaults.fontSizeScale);
+  const letterSpacing = ref(initial.letterSpacing ?? defaults.letterSpacing);
   const prefetchEnabled = ref(initial.prefetchEnabled ?? defaults.prefetchEnabled);
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
@@ -177,6 +183,8 @@ export const useSettingsStore = defineStore("settings", () => {
     html.dataset.perf = performanceMode.value ? "on" : "off";
     html.dataset.reduceMotion = reduceMotion.value ? "on" : "off";
     html.style.setProperty("--font-family", `"${fontFamily.value || 'Nunito'}", sans-serif`);
+    html.style.setProperty("--font-scale", fontSizeScale.value.toString());
+    html.style.setProperty("--letter-spacing", `${letterSpacing.value}px`);
 
     if (customAccent.value) {
       if (customAccentType.value === "solid") {
@@ -223,6 +231,8 @@ export const useSettingsStore = defineStore("settings", () => {
       autoScrollQueue: autoScrollQueue.value,
       dragHandleStyle: dragHandleStyle.value,
       routerAnimation: routerAnimation.value,
+      fontSizeScale: fontSizeScale.value,
+      letterSpacing: letterSpacing.value,
       prefetchEnabled: prefetchEnabled.value,
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
@@ -261,6 +271,8 @@ export const useSettingsStore = defineStore("settings", () => {
       autoScrollQueue,
       dragHandleStyle,
       routerAnimation,
+      fontSizeScale,
+      letterSpacing,
       prefetchEnabled,
       discordRpc,
       discordRpcText,
@@ -317,6 +329,8 @@ export const useSettingsStore = defineStore("settings", () => {
     autoScrollQueue.value = defaults.autoScrollQueue;
     dragHandleStyle.value = defaults.dragHandleStyle;
     routerAnimation.value = defaults.routerAnimation;
+    fontSizeScale.value = defaults.fontSizeScale;
+    letterSpacing.value = defaults.letterSpacing;
     prefetchEnabled.value = defaults.prefetchEnabled;
     discordRpc.value = defaults.discordRpc;
     discordRpcText.value = defaults.discordRpcText;
@@ -350,6 +364,8 @@ export const useSettingsStore = defineStore("settings", () => {
     autoScrollQueue,
     dragHandleStyle,
     routerAnimation,
+    fontSizeScale,
+    letterSpacing,
     prefetchEnabled,
     discordRpc,
     discordRpcText,

@@ -45,6 +45,8 @@ const {
   discordRpcShowTrack,
   dragHandleStyle,
   routerAnimation,
+  fontSizeScale,
+  letterSpacing,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -346,6 +348,26 @@ async function checkForUpdates() {
               <span class="settings__font-sample">Aa</span>
             </button>
           </div>
+          <label class="settings__row" style="margin-top: 16px;">
+            <div>
+              <div class="settings__row-title">Масштаб текста</div>
+              <div class="settings__row-sub">Увеличение или уменьшение шрифта везде</div>
+            </div>
+            <div class="settings__range">
+              <input v-model.number="fontSizeScale" type="range" min="0.8" max="1.5" step="0.05" />
+              <span>{{ Math.round(fontSizeScale * 100) }}%</span>
+            </div>
+          </label>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Межбуквенный интервал</div>
+              <div class="settings__row-sub">Расстояние между символами в тексте</div>
+            </div>
+            <div class="settings__range">
+              <input v-model.number="letterSpacing" type="range" min="-1" max="2" step="0.1" />
+              <span>{{ letterSpacing > 0 ? '+' : '' }}{{ letterSpacing }}px</span>
+            </div>
+          </label>
         </article>
 
         <article class="settings__card">
@@ -589,7 +611,7 @@ async function checkForUpdates() {
         <article class="settings__card" v-if="electronAvailable">
           <div style="display: flex; align-items: baseline; justify-content: space-between;">
             <h2>Обновления</h2>
-            <span v-if="appVersion" style="color: var(--text-2); font-size: 13px; margin-right: 32px;">v{{ appVersion }}</span>
+            <span v-if="appVersion" style="color: var(--text-2); font-size: calc(13px * var(--font-scale, 1)); margin-right: 32px;">v{{ appVersion }}</span>
           </div>
           <label class="settings__row">
             <div>
@@ -707,7 +729,7 @@ async function checkForUpdates() {
   padding: 8px 16px;
   background: transparent;
   border: none;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-2);
   cursor: pointer;
@@ -749,7 +771,7 @@ async function checkForUpdates() {
 }
 .settings__card h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 700;
   letter-spacing: -0.005em;
 }
@@ -796,7 +818,7 @@ async function checkForUpdates() {
   border-radius: 8px;
 }
 .settings__tile-label {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   text-align: center;
   color: var(--text-1);
@@ -821,12 +843,12 @@ async function checkForUpdates() {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-1) 18%, transparent);
 }
 .settings__style-title {
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-0);
 }
 .settings__style-desc {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
 }
 
@@ -853,7 +875,7 @@ async function checkForUpdates() {
 }
 .settings__sub-title {
   margin: 0 0 12px 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-1);
 }
@@ -869,7 +891,7 @@ async function checkForUpdates() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: var(--text-0);
   cursor: pointer;
 }
@@ -889,7 +911,7 @@ async function checkForUpdates() {
   justify-content: center;
   padding: 6px 12px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 500;
   color: var(--text-2);
   cursor: pointer;
@@ -909,7 +931,7 @@ async function checkForUpdates() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   color: var(--text-0);
 }
 .settings__color-picker input[type="color"] {
@@ -950,11 +972,11 @@ async function checkForUpdates() {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-1) 18%, transparent);
 }
 .settings__font-name {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--text-2);
 }
 .settings__font-sample {
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   color: var(--text-0);
 }
 
@@ -981,7 +1003,7 @@ async function checkForUpdates() {
 }
 .settings__row-sub {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   max-width: 360px;
 }
 
@@ -1086,7 +1108,7 @@ async function checkForUpdates() {
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
 }
 .settings__text-input {
   background: var(--bg-3);
@@ -1095,7 +1117,7 @@ async function checkForUpdates() {
   color: var(--text-0);
   padding: 8px 12px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   width: 200px;
   outline: none;
   transition: border-color var(--motion-duration-fast);
@@ -1105,7 +1127,7 @@ async function checkForUpdates() {
 }
 .settings__hint {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   line-height: 1.6;
 }

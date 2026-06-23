@@ -302,7 +302,7 @@ function remove(i: number) {
   font-variant-numeric: tabular-nums;
   text-align: center;
   color: var(--text-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
 }
 :deep(.queue__row--current .queue__index) {
   color: var(--accent-1);
@@ -343,7 +343,7 @@ function remove(i: number) {
 }
 :deep(.queue__artist) {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -355,14 +355,14 @@ function remove(i: number) {
 }
 :deep(.queue__artist-comma) {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
 }
 :deep(.queue__artist:hover) {
   color: var(--text-0);
 }
 :deep(.queue__duration) {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-variant-numeric: tabular-nums;
 }
 :deep(.queue__actions) {

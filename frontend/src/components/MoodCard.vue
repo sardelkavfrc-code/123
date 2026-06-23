@@ -86,7 +86,7 @@ const emit = defineEmits<{ click: [] }>();
   z-index: 1;
 }
 .mood-card__title {
-  font-size: 17px;
+  font-size: calc(17px * var(--font-scale, 1));
   font-weight: 700;
   line-height: 1.2;
   display: -webkit-box;

@@ -238,7 +238,7 @@ async function toggleLibrary() {
 .row__index {
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .row:hover .row__index {
   display: none;
@@ -306,7 +306,7 @@ async function toggleLibrary() {
   background: var(--bg-3);
   color: var(--text-1);
   padding: 0 5px;
-  font-size: 9px;
+  font-size: calc(9px * var(--font-scale, 1));
   border-radius: 3px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -319,13 +319,13 @@ async function toggleLibrary() {
 }
 .row__artist {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   text-align: left;
   display: inline-block;
 }
 .row__artist-comma {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
 }
 .row__artist:hover {
@@ -382,7 +382,7 @@ async function toggleLibrary() {
 .row__duration {
   font-variant-numeric: tabular-nums;
   color: var(--text-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   text-align: right;
 }
 </style>

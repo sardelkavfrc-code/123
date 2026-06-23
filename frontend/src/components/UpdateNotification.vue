@@ -146,12 +146,12 @@ async function installAndRestart() {
 }
 .update-notification__header h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--accent-1);
 }
 .update-notification__notes {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-1);
   max-height: 60px;
   overflow-y: auto;
@@ -167,7 +167,7 @@ async function installAndRestart() {
 .update-notification__link {
   display: inline-block;
   margin-top: 6px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--accent-1);
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -193,7 +193,7 @@ async function installAndRestart() {
   transition: width 0.2s linear;
 }
 .update-notification__progress-text {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
   min-width: 32px;
@@ -208,7 +208,7 @@ async function installAndRestart() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-1);
 }
 .loader {
@@ -226,7 +226,7 @@ async function installAndRestart() {
   background: transparent;
   border: none;
   color: var(--text-2);
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;

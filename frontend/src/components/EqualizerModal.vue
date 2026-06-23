@@ -225,7 +225,7 @@ const activeGains = computed(() => {
 }
 .eq-modal__title-group h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
 }
 
@@ -250,7 +250,7 @@ const activeGains = computed(() => {
   background: var(--bg-3);
   border: none;
   color: var(--text-1);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 600;
   padding: 7px 13px;
   border-radius: 999px;
@@ -285,7 +285,7 @@ const activeGains = computed(() => {
   justify-content: space-between;
   height: 140px;
   color: var(--text-3);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   font-weight: 600;
   text-align: right;
   width: 24px;
@@ -357,7 +357,7 @@ const activeGains = computed(() => {
 }
 
 .eq-hz {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   color: var(--text-2);
   font-weight: 600;
   text-align: center;
@@ -382,7 +382,7 @@ const activeGains = computed(() => {
   background: var(--bg-3);
   border: none;
   color: var(--text-1);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   font-weight: 600;
   padding: 8px 16px;
   border-radius: 8px;
@@ -412,7 +412,7 @@ const activeGains = computed(() => {
   background: var(--bg-1);
   border: 1px solid var(--border-strong);
   color: var(--text-0);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   padding: 8px 12px;
   border-radius: 8px;
   outline: none;

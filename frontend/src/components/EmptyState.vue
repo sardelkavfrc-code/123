@@ -28,17 +28,17 @@ defineProps<{
   min-height: 240px;
 }
 .empty__icon {
-  font-size: 48px;
+  font-size: calc(48px * var(--font-scale, 1));
   opacity: 0.5;
   margin-bottom: 8px;
 }
 .empty__title {
   color: var(--text-0);
   font-weight: 600;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
 }
 .empty__subtitle {
   max-width: 360px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 </style>

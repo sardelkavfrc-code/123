@@ -136,7 +136,7 @@ const tileVariants = (i: number) =>
   align-items: center;
   justify-content: center;
   color: var(--text-1);
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
   flex-shrink: 0;
   position: relative;
@@ -153,7 +153,7 @@ const tileVariants = (i: number) =>
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale, 1));
 }
 .friends__info {
   flex-grow: 1;
@@ -161,14 +161,14 @@ const tileVariants = (i: number) =>
 }
 .friends__name {
   font-weight: 600;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   color: var(--text-0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .friends__sub {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-3);
   margin-top: 2px;
 }

@@ -145,7 +145,7 @@ const background = computed(() => {
   gap: 4px;
 }
 .rec-card__title {
-  font-size: 22px;
+  font-size: calc(22px * var(--font-scale, 1));
   font-weight: 800;
   line-height: 1.15;
   display: -webkit-box;
@@ -155,7 +155,7 @@ const background = computed(() => {
   word-break: break-word;
 }
 .rec-card__subtitle {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   opacity: 0.85;
   font-weight: 500;
   display: -webkit-box;
@@ -180,7 +180,7 @@ const background = computed(() => {
   left: 0;
   right: 0;
   text-align: center;
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   font-weight: 700;
   color: rgba(255, 255, 255, 0.95);
   opacity: 0;

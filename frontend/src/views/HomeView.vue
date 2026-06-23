@@ -327,18 +327,18 @@ async function playAlbum(album: AlbumSummary) {
   flex: 1 1 auto;
 }
 .home__mix-eyebrow {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   text-transform: uppercase;
   letter-spacing: 0.12em;
   opacity: 0.85;
 }
 .home__mix-title {
-  font-size: 28px;
+  font-size: calc(28px * var(--font-scale, 1));
   font-weight: 800;
   line-height: 1.1;
 }
 .home__mix-sub {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   opacity: 0.9;
   display: inline-flex;
   align-items: center;
@@ -384,7 +384,7 @@ async function playAlbum(album: AlbumSummary) {
 }
 .home__section-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
 }
 .home__section {
@@ -450,7 +450,7 @@ async function playAlbum(album: AlbumSummary) {
   align-items: center;
   gap: 10px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   padding: 12px 0;
 }
 .home__loading--soft {
@@ -464,7 +464,7 @@ async function playAlbum(album: AlbumSummary) {
   gap: 12px;
   padding: 60px 0;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
 }
 .home__content-sections {
   display: contents;

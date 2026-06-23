@@ -55,7 +55,7 @@ function close() {
   align-items: center;
   gap: 10px;
   font-weight: 600;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-1);

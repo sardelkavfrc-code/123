@@ -135,6 +135,6 @@ function playAll() {
 .friend-music__error {
   color: var(--danger);
   padding: 12px 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 </style>

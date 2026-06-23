@@ -148,38 +148,38 @@ async function submit() {
 }
 .auth__title {
   margin: 0;
-  font-size: 24px;
+  font-size: calc(24px * var(--font-scale, 1));
   font-weight: 700;
 }
 .auth__subtitle {
   margin: 4px 0 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .auth__pitch {
   margin: 0;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   line-height: 1.55;
 }
 .auth__pitch--muted {
   color: var(--text-3);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
 }
 .auth__pitch code {
   background: var(--bg-2);
   padding: 0 4px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
 }
 .auth__error {
   margin: 0;
   color: var(--danger);
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .auth__submit {
   width: 100%;
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   padding: 14px 16px;
   display: inline-flex;
   align-items: center;
@@ -188,7 +188,7 @@ async function submit() {
 }
 .auth__fallback-link {
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .auth__fallback-link a {
   color: var(--text-2);

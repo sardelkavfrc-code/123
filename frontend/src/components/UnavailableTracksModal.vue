@@ -738,7 +738,7 @@ onBeforeUnmount(() => {
 }
 .modal-title-group h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: calc(18px * var(--font-scale, 1));
   font-weight: 700;
 }
 .modal-close {
@@ -793,7 +793,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   align-items: flex-start;
   margin: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-1);
   line-height: 1.5;
   background: rgba(255, 171, 0, 0.08);
@@ -823,7 +823,7 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--accent-1) 16%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent-1) 30%, transparent);
   color: var(--accent-1);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   padding: 6px 12px;
   border-radius: var(--radius-md);
@@ -877,14 +877,14 @@ onBeforeUnmount(() => {
 .track-title {
   color: var(--text-0);
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .track-artist {
   color: var(--text-2);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -952,7 +952,7 @@ onBeforeUnmount(() => {
 }
 
 .alternative-header-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -960,7 +960,7 @@ onBeforeUnmount(() => {
 }
 
 .alternative-empty {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-2);
   display: flex;
   align-items: center;
@@ -972,7 +972,7 @@ onBeforeUnmount(() => {
   background: transparent;
   border: none;
   color: var(--accent-1);
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -1047,14 +1047,14 @@ onBeforeUnmount(() => {
 .alt-track-title {
   color: var(--text-0);
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .alt-track-artist {
   color: var(--text-2);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1067,7 +1067,7 @@ onBeforeUnmount(() => {
 }
 
 .btn-alt {
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   font-weight: 600;
   padding: 6px 12px;
   border-radius: var(--radius-sm);
@@ -1106,7 +1106,7 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 .original-label {
-  font-size: 10px;
+  font-size: calc(10px * var(--font-scale, 1));
   font-weight: 700;
   text-transform: uppercase;
   color: var(--accent-1);
@@ -1116,7 +1116,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   color: var(--text-0);
   flex-wrap: wrap;
@@ -1146,7 +1146,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-0);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -1191,7 +1191,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   height: 250px;
   color: var(--text-2);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   text-align: center;
   padding: 0 24px;
 }
@@ -1228,14 +1228,14 @@ onBeforeUnmount(() => {
 .alt-list-item-full .alt-list-title {
   color: var(--text-0);
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .alt-list-item-full .alt-list-artist {
   color: var(--text-2);
-  font-size: 11px;
+  font-size: calc(11px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1255,7 +1255,7 @@ onBeforeUnmount(() => {
   background: var(--bg-3);
   border: none;
   color: var(--text-1);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   padding: 10px 20px;
   border-radius: var(--radius-md);
@@ -1361,13 +1361,13 @@ onBeforeUnmount(() => {
 }
 .captcha-header h3 {
   margin: 0 0 6px 0;
-  font-size: 16px;
+  font-size: calc(16px * var(--font-scale, 1));
   font-weight: 700;
   color: var(--text-0);
 }
 .captcha-header p {
   margin: 0;
-  font-size: 12px;
+  font-size: calc(12px * var(--font-scale, 1));
   color: var(--text-2);
   line-height: 1.4;
 }
@@ -1392,7 +1392,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   color: var(--text-0);
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   text-align: center;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -1409,14 +1409,14 @@ onBeforeUnmount(() => {
 .captcha-footer .btn {
   flex: 1;
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 
 .captcha-box--redirect {
   max-width: 380px;
 }
 .captcha-redirect-info {
-  font-size: 13px;
+  font-size: calc(13px * var(--font-scale, 1));
   color: var(--text-1);
   line-height: 1.5;
 }
@@ -1426,7 +1426,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 100%;
   padding: 12px;
-  font-size: 14px;
+  font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
   gap: 8px;
 }
