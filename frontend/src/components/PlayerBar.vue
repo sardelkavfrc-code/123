@@ -140,13 +140,11 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 <template>
   <footer class="player">
     <div class="player__track">
-      <div class="player__cover-wrap">
-        <Transition name="fade">
-          <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.id : 'empty'">
-            <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
-          </div>
-        </Transition>
-      </div>
+      <TransitionGroup tag="div" name="track-anim" class="player__cover-wrap">
+        <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.owner_id + '_' + current.id : 'empty'">
+          <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
+        </div>
+      </TransitionGroup>
       
       <TransitionGroup tag="div" name="track-anim" class="player__info-group">
         <div v-if="current" class="player__info-wrap" :key="current.owner_id + '_' + current.id">
@@ -432,25 +430,6 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s var(--motion-ease-out), transform 0.3s var(--motion-ease-out);
-}
-.fade-leave-active {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-}
-.fade-enter-from {
-  opacity: 0;
-  transform: translateY(4px);
-}
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
 }
 .player__cover-fallback {
   position: absolute;
