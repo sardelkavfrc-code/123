@@ -139,15 +139,12 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 
 <template>
   <footer class="player">
-    <div class="player__track">
-      <Transition name="track-fade" mode="out-in">
-        <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.id : 'empty'">
-          <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
-        </div>
-      </Transition>
+    <TransitionGroup tag="div" class="player__track" name="track-anim">
+      <div class="player__cover" v-lazy-bg="displayCover" :key="'cover-' + (current ? current.id : 'empty')">
+        <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
+      </div>
       
-      <Transition name="track-fade" mode="out-in">
-        <div v-if="current" class="player__track-info" :key="current.owner_id + '_' + current.id">
+      <div v-if="current" class="player__track-info" :key="'info-' + current.owner_id + '_' + current.id">
           <div class="player__title" :title="current.title">
             {{ current.title }}
           </div>
@@ -168,9 +165,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
             <div class="player__artist player__artist--empty">из любого списка ниже</div>
           </div>
         </div>
-      </Transition>
       <button
         v-if="current"
+        key="lib-btn"
         class="player__icon-btn player__icon-btn--lib"
         :class="{ 'player__icon-btn--active': inLibrary }"
         :aria-label="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
@@ -187,8 +184,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <path d="M6 6l12 12M18 6 6 18" />
         </svg>
       </button>
-      <!-- Other actions moved to right side -->
-    </div>
+    </TransitionGroup>
 
     <div class="player__controls">
       <div class="player__buttons">
@@ -366,6 +362,30 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   align-items: center;
   gap: 12px;
   flex: 1 1 30%;
+  min-width: 0;
+  position: relative;
+}
+.track-anim-move,
+.track-anim-enter-active,
+.track-anim-leave-active {
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.track-anim-leave-active {
+  position: absolute;
+  pointer-events: none;
+}
+.track-anim-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+}
+.track-anim-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+}
+.player__track-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   min-width: 0;
 }
 .player__cover {

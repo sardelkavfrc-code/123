@@ -56,13 +56,13 @@ const tileVariants = (i: number) =>
         title="Нет друзей с открытой музыкой"
         subtitle="ВК API возвращает только тех, у кого настройки приватности позволяют просмотр аудио"
       />
-      <div v-else class="friends__grid">
+      <div v-else class="friends__list">
         <RouterLink
           v-for="(friend, i) in visibleFriends"
           :key="friend.id"
           :to="{ name: 'friend-music', params: { id: friend.id } }"
-          class="friends__card hover-lift"
-          :class="{ 'friends__card--locked': !friend.audio_visible }"
+          class="friends__list-item hover-lift"
+          :class="{ 'friends__list-item--locked': !friend.audio_visible }"
           v-motion="tileVariants(i)"
         >
           <div
@@ -72,8 +72,15 @@ const tileVariants = (i: number) =>
             <span v-if="!friend.photo">{{ friend.first_name.charAt(0) }}</span>
             <span v-if="!friend.audio_visible" class="friends__lock" title="Музыка скрыта">🔒</span>
           </div>
-          <div class="friends__name">{{ friend.first_name }} {{ friend.last_name }}</div>
-          <div class="friends__sub">{{ friend.audio_visible ? 'Музыка открыта' : 'Музыка скрыта' }}</div>
+          <div class="friends__info">
+            <div class="friends__name">{{ friend.first_name }} {{ friend.last_name }}</div>
+            <div class="friends__sub">{{ friend.audio_visible ? 'Музыка открыта' : 'Музыка скрыта' }}</div>
+          </div>
+          <div class="friends__arrow">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </div>
         </RouterLink>
       </div>
     </section>
@@ -95,28 +102,34 @@ const tileVariants = (i: number) =>
   color: var(--text-2);
   padding: 12px 0;
 }
-.friends__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 14px;
-}
-.friends__card {
+.friends__list {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+.friends__list-item {
+  display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 18px 12px;
+  gap: 16px;
+  padding: 12px 20px;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  text-align: center;
+  text-decoration: none;
+  transition: all var(--motion-duration-fast);
 }
-.friends__card--locked {
+.friends__list-item:hover {
+  background: var(--bg-2);
+  border-color: var(--border-strong);
+}
+.friends__list-item--locked {
   opacity: 0.5;
 }
 .friends__avatar {
-  width: 80px;
-  height: 80px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   background-color: var(--bg-3);
   background-size: cover;
@@ -125,33 +138,50 @@ const tileVariants = (i: number) =>
   align-items: center;
   justify-content: center;
   color: var(--text-1);
-  font-size: 26px;
+  font-size: 18px;
   font-weight: 700;
+  flex-shrink: 0;
   position: relative;
 }
 .friends__lock {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
+  bottom: -4px;
+  right: -4px;
   background: var(--bg-1);
   border: 1px solid var(--border-strong);
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 10px;
+}
+.friends__info {
+  flex-grow: 1;
+  min-width: 0;
 }
 .friends__name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .friends__sub {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  margin-top: 2px;
+}
+.friends__arrow {
+  color: var(--text-3);
+  display: flex;
+  align-items: center;
+  transition: transform var(--motion-duration-fast), color var(--motion-duration-fast);
+}
+.friends__list-item:hover .friends__arrow {
+  color: var(--accent-1);
+  transform: translateX(4px);
 }
 </style>
