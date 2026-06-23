@@ -437,6 +437,13 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 .fade-leave-active {
   transition: opacity 0.3s var(--motion-ease-out), transform 0.3s var(--motion-ease-out);
 }
+.fade-leave-active {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
 .fade-enter-from {
   opacity: 0;
   transform: translateY(4px);
