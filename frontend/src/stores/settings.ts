@@ -116,7 +116,7 @@ const defaults: PersistedSettings = {
   discordRpc: false,
   discordRpcText: "Слушает музыку",
   discordRpcShowTrack: true,
-  dragHandleStyle: "dots",
+  dragHandleStyle: "lines",
 };
 
 function load(): PersistedSettings {
