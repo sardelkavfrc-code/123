@@ -106,8 +106,6 @@ const tileVariants = (i: number) =>
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-width: 700px;
-  margin: 0 auto;
 }
 .friends__list-item {
   display: flex;
