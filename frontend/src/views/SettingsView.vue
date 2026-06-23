@@ -354,19 +354,28 @@ async function checkForUpdates() {
               <div class="settings__row-title">Стиль иконки перетаскивания</div>
               <div class="settings__row-sub">Иконка, за которую можно тянуть треки в очереди</div>
             </div>
-            <div class="settings__custom-row" style="margin-top: 0;">
-              <label class="settings__radio">
-                <input type="radio" v-model="dragHandleStyle" value="dots" />
-                <span>Точечки</span>
-              </label>
-              <label class="settings__radio">
-                <input type="radio" v-model="dragHandleStyle" value="lines" />
-                <span>Полосочки</span>
-              </label>
-              <label class="settings__radio">
-                <input type="radio" v-model="dragHandleStyle" value="grip" />
-                <span>Хват</span>
-              </label>
+            <div class="settings__segmented">
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': dragHandleStyle === 'dots' }"
+                @click="dragHandleStyle = 'dots'"
+              >
+                Точечки
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': dragHandleStyle === 'lines' }"
+                @click="dragHandleStyle = 'lines'"
+              >
+                Полосочки
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': dragHandleStyle === 'grip' }"
+                @click="dragHandleStyle = 'grip'"
+              >
+                Хват
+              </button>
             </div>
           </div>
         </article>
@@ -825,6 +834,35 @@ async function checkForUpdates() {
 }
 .settings__radio input {
   accent-color: var(--accent-1);
+}
+.settings__segmented {
+  display: inline-flex;
+  background: var(--bg-3);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+.settings__segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all var(--motion-duration-fast);
+}
+.settings__segmented-btn:hover {
+  color: var(--text-0);
+}
+.settings__segmented-btn--active {
+  background: var(--bg-1);
+  color: var(--text-0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .settings__color-picker {
   display: flex;
