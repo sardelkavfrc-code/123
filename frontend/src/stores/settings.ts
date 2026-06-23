@@ -119,7 +119,7 @@ const defaults: PersistedSettings = {
   discordRpcText: "Слушает музыку",
   discordRpcShowTrack: true,
   dragHandleStyle: "lines",
-  routerAnimation: "fade",
+  routerAnimation: "slide",
 };
 
 function load(): PersistedSettings {
