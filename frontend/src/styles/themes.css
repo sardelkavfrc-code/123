@@ -188,13 +188,13 @@
   --bg-player: rgba(18, 18, 18, 0.5);
 
   --text-0: #ffffff;
-  --text-1: #b3b3b3;
-  --text-2: #808080;
-  --text-3: #535353;
+  --text-1: rgba(255, 255, 255, 0.75);
+  --text-2: rgba(255, 255, 255, 0.55);
+  --text-3: rgba(255, 255, 255, 0.35);
 
-  --border: rgba(255, 255, 255, 0.05);
-  --border-strong: rgba(255, 255, 255, 0.1);
-  --divider: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+  --divider: rgba(255, 255, 255, 0.04);
 }
 
 [data-accent="blue"] {
