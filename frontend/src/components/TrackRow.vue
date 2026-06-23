@@ -118,6 +118,7 @@ async function toggleLibrary() {
         v-else
         class="row__play"
         :aria-label="isCurrent && isPlaying ? 'Пауза' : 'Воспроизвести'"
+        :title="isCurrent && isPlaying ? 'Пауза' : 'Воспроизвести'"
         @click.stop="isCurrent ? player.togglePlay() : playOne()"
       >
         <svg v-if="isCurrent && isPlaying" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
@@ -205,8 +206,8 @@ async function toggleLibrary() {
   padding: 8px 12px;
   border-radius: var(--radius-md);
   transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    transform var(--motion-duration-fast) var(--motion-ease-out);
+    transform var(--motion-duration-base) var(--motion-ease-out),
+    color var(--motion-duration-base) var(--motion-ease-out);
   content-visibility: auto;
   contain-intrinsic-size: auto 60px;
 }
@@ -249,9 +250,16 @@ async function toggleLibrary() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  justify-content: center;
   color: var(--text-0);
   background: var(--bg-3);
   opacity: 0;
+  transition: opacity var(--motion-duration-base) var(--motion-ease-out),
+              background var(--motion-duration-base) var(--motion-ease-out),
+              transform var(--motion-duration-base) var(--motion-ease-out);
+}
+.row__play:hover {
+  transform: scale(var(--motion-scale-hover));
 }
 .row:hover .row__play,
 .row--playing .row__play {
@@ -327,7 +335,7 @@ async function toggleLibrary() {
   display: inline-flex;
   gap: 4px;
   opacity: 0;
-  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+  transition: color var(--motion-duration-base) var(--motion-ease-out);
 }
 .row:hover .row__actions {
   opacity: 1;
@@ -340,11 +348,14 @@ async function toggleLibrary() {
   align-items: center;
   justify-content: center;
   color: var(--text-2);
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+  transition: background var(--motion-duration-base) var(--motion-ease-out),
+              color var(--motion-duration-base) var(--motion-ease-out),
+              transform var(--motion-duration-base) var(--motion-ease-out);
 }
 .row__action:hover {
   background: var(--bg-3);
   color: var(--text-0);
+  transform: scale(var(--motion-scale-hover));
 }
 .row__action--lib {
   position: relative;

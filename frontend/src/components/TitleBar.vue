@@ -22,13 +22,13 @@ function close() {
       <span class="titlebar__name">VK Music</span>
     </div>
     <div v-if="!isMac" class="titlebar__controls app-titlebar-no-drag">
-      <button class="titlebar__btn" aria-label="Свернуть" @click="minimize">
+      <button class="titlebar__btn" aria-label="Свернуть" title="Свернуть" @click="minimize">
         <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="1" rx="0.5" fill="currentColor"/></svg>
       </button>
-      <button class="titlebar__btn" aria-label="Развернуть" @click="maximize">
+      <button class="titlebar__btn" aria-label="Развернуть" title="Развернуть" @click="maximize">
         <svg width="12" height="12" viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1" stroke="currentColor" fill="none"/></svg>
       </button>
-      <button class="titlebar__btn titlebar__btn--close" aria-label="Закрыть" @click="close">
+      <button class="titlebar__btn titlebar__btn--close" aria-label="Закрыть" title="Закрыть" @click="close">
         <svg width="12" height="12" viewBox="0 0 12 12">
           <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-linecap="round"/>
         </svg>

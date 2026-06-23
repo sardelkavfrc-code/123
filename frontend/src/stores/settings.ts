@@ -77,6 +77,7 @@ interface PersistedSettings {
   fadeEnabled: boolean;
   fadeDurationMs: number;
   autoScrollQueue: boolean;
+  prefetchEnabled: boolean;
   discordRpc: boolean;
   discordRpcText: string;
   discordRpcShowTrack: boolean;
@@ -85,7 +86,7 @@ interface PersistedSettings {
 const STORAGE_KEY = "vkmp:settings";
 
 const defaults: PersistedSettings = {
-  theme: "dark",
+  theme: "spotify-cover",
   accent: "blue",
   style: "default",
   customAccent: false,
@@ -109,6 +110,7 @@ const defaults: PersistedSettings = {
   fadeEnabled: true,
   fadeDurationMs: 500,
   autoScrollQueue: true,
+  prefetchEnabled: true,
   discordRpc: false,
   discordRpcText: "Слушает музыку",
   discordRpcShowTrack: true,
@@ -152,6 +154,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const fadeEnabled = ref(initial.fadeEnabled ?? true);
   const fadeDurationMs = ref(initial.fadeDurationMs ?? 500);
   const autoScrollQueue = ref(initial.autoScrollQueue ?? true);
+  const prefetchEnabled = ref(initial.prefetchEnabled ?? true);
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
   const discordRpcShowTrack = ref(initial.discordRpcShowTrack ?? true);
@@ -210,6 +213,7 @@ export const useSettingsStore = defineStore("settings", () => {
       fadeEnabled: fadeEnabled.value,
       fadeDurationMs: fadeDurationMs.value,
       autoScrollQueue: autoScrollQueue.value,
+      prefetchEnabled: prefetchEnabled.value,
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
       discordRpcShowTrack: discordRpcShowTrack.value,
@@ -245,6 +249,7 @@ export const useSettingsStore = defineStore("settings", () => {
       crossfade,
       crossfadeDuration,
       autoScrollQueue,
+      prefetchEnabled,
       discordRpc,
       discordRpcText,
       discordRpcShowTrack,
@@ -298,6 +303,7 @@ export const useSettingsStore = defineStore("settings", () => {
     crossfade.value = defaults.crossfade;
     crossfadeDuration.value = defaults.crossfadeDuration;
     autoScrollQueue.value = defaults.autoScrollQueue;
+    prefetchEnabled.value = defaults.prefetchEnabled;
     discordRpc.value = defaults.discordRpc;
     discordRpcText.value = defaults.discordRpcText;
     discordRpcShowTrack.value = defaults.discordRpcShowTrack;
@@ -328,6 +334,7 @@ export const useSettingsStore = defineStore("settings", () => {
     fadeEnabled,
     fadeDurationMs,
     autoScrollQueue,
+    prefetchEnabled,
     discordRpc,
     discordRpcText,
     discordRpcShowTrack,

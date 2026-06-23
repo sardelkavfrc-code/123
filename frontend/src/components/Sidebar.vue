@@ -59,7 +59,7 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
     </nav>
 
     <div class="sidebar__footer">
-      <button class="sidebar__toggle" @click="ui.toggleSidebar()" :aria-label="ui.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'">
+      <button class="sidebar__toggle" @click="ui.toggleSidebar()" :aria-label="ui.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'" :title="ui.sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline :points="ui.sidebarCollapsed ? '9 18 15 12 9 6' : '15 18 9 12 15 6'" />
         </svg>
@@ -287,10 +287,14 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   align-items: center;
   justify-content: center;
   color: var(--text-2);
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background var(--motion-duration-base) var(--motion-ease-out),
+    color var(--motion-duration-base) var(--motion-ease-out),
+    transform var(--motion-duration-base) var(--motion-ease-out);
 }
 .sidebar__toggle:hover {
   background: var(--bg-2);
   color: var(--text-0);
+  transform: scale(var(--motion-scale-hover));
 }
 </style>

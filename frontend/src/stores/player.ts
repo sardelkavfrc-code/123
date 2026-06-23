@@ -382,6 +382,8 @@ export const usePlayerStore = defineStore("player", () => {
   function prefetchNextTrack() {
     destroyPrefetch();
 
+    if (!settings.prefetchEnabled) return;
+
     const nextIdx = index.value + 1;
     if (nextIdx < 0 || nextIdx >= queue.value.length) return;
 

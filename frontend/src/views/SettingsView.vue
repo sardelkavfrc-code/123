@@ -39,6 +39,7 @@ const {
   cacheSize,
   externalCovers,
   autoScrollQueue,
+  prefetchEnabled,
   discordRpc,
   discordRpcText,
   discordRpcShowTrack,
@@ -92,8 +93,8 @@ const themes: { value: ThemeName; label: string; preview: string }[] = [
   { value: "forest", label: "Лес", preview: "linear-gradient(135deg, #19302a, #0a1410)" },
   { value: "sunset", label: "Закат", preview: "linear-gradient(135deg, #3d251f, #1a0d0b)" },
   { value: "mocha", label: "Кофе", preview: "linear-gradient(135deg, #342a24, #161210)" },
-  { value: "spotify", label: "Spotify (Цвета)", preview: "radial-gradient(circle at top left, #1db954, #191414)" },
-  { value: "spotify-cover", label: "Spotify (Обложка)", preview: "linear-gradient(135deg, #1a8cff, #ff5e7e)" },
+  { value: "spotify", label: "Динамическая", preview: "radial-gradient(circle at top left, #1db954, #191414)" },
+  { value: "spotify-cover", label: "Живая обложка", preview: "linear-gradient(135deg, #1a8cff, #ff5e7e)" },
 ];
 
 const styles: { value: StyleName; label: string; desc: string }[] = [
@@ -132,12 +133,6 @@ function estimateCache(): number {
   return Math.round((bytes / (1024 * 1024)) * 100) / 100;
 }
 
-async function clearCache() {
-  localStorage.clear();
-  library.reset();
-  cacheUsage.value = estimateCache();
-  ui.notify("Кеш очищен", "success");
-}
 
 async function logout() {
   player.clear();
@@ -390,6 +385,13 @@ async function checkForUpdates() {
             </div>
             <input v-model="autoScrollQueue" type="checkbox" class="settings__switch" />
           </label>
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Предзагрузка треков без прерываний</div>
+              <div class="settings__row-sub">Заранее подгружать следующую песню в фоне для мгновенного перехода</div>
+            </div>
+            <input v-model="prefetchEnabled" type="checkbox" class="settings__switch" />
+          </label>
         </article>
 
         <article class="settings__card">
@@ -541,20 +543,16 @@ async function checkForUpdates() {
             </div>
             <input v-model="externalCovers" type="checkbox" class="settings__switch" />
           </label>
-          <p class="settings__hint" style="margin-top: 16px;">Сейчас используется ≈ {{ cacheUsage }} MB на этом ПК.</p>
           <label class="settings__row">
             <div>
               <div class="settings__row-title">Лимит локального кеша</div>
-              <div class="settings__row-sub">Цели хранения: индекс библиотеки, рекомендации, последние треки</div>
+              <div class="settings__row-sub">Цели хранения: индекс библиотеки, рекомендации, последние треки (сейчас используется ≈ {{ cacheUsage }} MB)</div>
             </div>
             <div class="settings__range">
               <input v-model.number="cacheSize" type="range" min="50" max="2000" step="50" />
               <span>{{ cacheSize }} MB</span>
             </div>
           </label>
-          <div class="settings__row settings__row--actions">
-            <button class="btn btn--ghost" @click="clearCache">Очистить кеш</button>
-          </div>
         </article>
 
         <article class="settings__card">
@@ -886,31 +884,43 @@ async function checkForUpdates() {
 .settings__switch {
   -webkit-appearance: none;
   appearance: none;
-  width: 40px;
-  height: 22px;
+  width: 44px;
+  height: 24px;
   border-radius: 999px;
   background: var(--bg-3);
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out);
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+              box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+  overflow: hidden;
+}
+.settings__switch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.settings__switch:checked::before {
+  opacity: 1;
 }
 .settings__switch::after {
   content: "";
   position: absolute;
   top: 2px;
   left: 2px;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: white;
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
-}
-.settings__switch:checked {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
 }
 .settings__switch:checked::after {
-  transform: translateX(18px);
+  transform: translateX(20px);
 }
 .settings__range {
   display: inline-flex;
@@ -919,36 +929,53 @@ async function checkForUpdates() {
   flex-shrink: 0;
 }
 .settings__range input[type="range"] {
-  width: 140px;
+  width: 160px;
   -webkit-appearance: none;
   appearance: none;
   background: var(--border-strong);
-  height: 4px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
+  transition: background var(--motion-duration-fast);
+}
+.settings__range input[type="range"]:hover {
+  background: var(--text-3);
 }
 .settings__range input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--accent-1);
+  background: var(--text-0);
+  border: 3px solid var(--accent-1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast), box-shadow var(--motion-duration-fast);
+}
+.settings__range input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
 }
 .settings__range input[type="range"]::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: var(--accent-1);
+  background: var(--text-0);
+  border: 3px solid var(--accent-1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
   cursor: pointer;
-  border: none;
+  transition: transform var(--motion-duration-fast), box-shadow var(--motion-duration-fast);
+}
+.settings__range input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
 }
 .settings__range input[type="range"]::-moz-range-track {
-  background: var(--border-strong);
-  height: 4px;
-  border-radius: 2px;
+  background: transparent;
+  height: 6px;
+  border-radius: 3px;
 }
 .settings__range span {
   min-width: 70px;

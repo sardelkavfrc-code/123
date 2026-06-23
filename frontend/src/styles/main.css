@@ -129,9 +129,9 @@ img {
   color: var(--text-0);
   font-weight: 600;
   transition:
-    transform var(--motion-duration-fast) var(--motion-ease-out),
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    border-color var(--motion-duration-fast) var(--motion-ease-out);
+    transform var(--motion-duration-base) var(--motion-ease-out),
+    background var(--motion-duration-base) var(--motion-ease-out),
+    border-color var(--motion-duration-base) var(--motion-ease-out);
 }
 .btn:hover {
   transform: scale(var(--motion-scale-hover));

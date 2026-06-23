@@ -204,6 +204,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           class="player__icon-btn"
           :class="{ 'player__icon-btn--active': shuffle }"
           :aria-label="shuffle ? 'Выключить перемешивание' : 'Включить перемешивание'"
+          :title="shuffle ? 'Выключить перемешивание' : 'Включить перемешивание'"
           @click="player.toggleShuffle()"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -214,10 +215,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
             <path d="M4 4l5 5" />
           </svg>
         </button>
-        <button class="player__icon-btn" :disabled="!player.hasPrev" aria-label="Предыдущий" @click="player.prev()">
+        <button class="player__icon-btn" :disabled="!player.hasPrev" aria-label="Предыдущий" title="Предыдущий трек" @click="player.prev()">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L8 12z" /></svg>
         </button>
-        <button class="player__play" :aria-label="isPlaying ? 'Пауза' : 'Воспроизвести'" @click="player.togglePlay()">
+        <button class="player__play" :aria-label="isPlaying ? 'Пауза' : 'Воспроизвести'" :title="isPlaying ? 'Пауза' : 'Воспроизвести'" @click="player.togglePlay()">
           <svg v-if="loadingTrack" viewBox="0 0 24 24" width="22" height="22" class="player__spinner">
             <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="14 30" />
           </svg>
@@ -226,13 +227,14 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           </svg>
           <svg v-else viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
         </button>
-        <button class="player__icon-btn" :disabled="!player.hasNext" aria-label="Следующий" @click="player.next()">
+        <button class="player__icon-btn" :disabled="!player.hasNext" aria-label="Следующий" title="Следующий трек" @click="player.next()">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l12-7z" /></svg>
         </button>
         <button
           class="player__icon-btn"
           :class="{ 'player__icon-btn--active': repeat !== 'off' }"
           :aria-label="`Повтор: ${repeat}`"
+          :title="repeat === 'off' ? 'Включить повтор' : (repeat === 'all' ? 'Повторять один трек' : 'Выключить повтор')"
           @click="player.cycleRepeat()"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -294,34 +296,37 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
             <line x1="18" y1="10" x2="22" y2="10" />
           </svg>
         </button>
-        <button
-          class="player__icon-btn"
-        :aria-label="muted ? 'Включить звук' : 'Выключить звук'"
-        @click="player.toggleMute()"
-      >
-        <svg v-if="muted || volume === 0" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M16.5 12 22 6.5l-1.4-1.4L15 10.6 9.4 5 8 6.4 13.6 12 8 17.6 9.4 19 15 13.4l5.6 5.6 1.4-1.4z" />
-        </svg>
-        <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" />
-        </svg>
-      </button>
-      <div
-        class="player__volume-track"
-        :style="{ '--volume-pos': volumeSliderPos }"
-      >
-        <div class="player__volume-fill" />
-        <input
-          class="player__volume-input"
-          type="range"
-          min="0"
-          max="1"
-          step="0.001"
-          :value="volumeSliderPos"
-          :aria-valuetext="`${volumePct}%`"
-          @input="onVolumeInput"
-        />
-      </div>
+        <div class="player__volume-slider-wrap">
+          <button
+            class="player__icon-btn"
+          :aria-label="muted ? 'Включить звук' : 'Выключить звук'"
+          :title="muted ? 'Включить звук' : 'Выключить звук'"
+          @click="player.toggleMute()"
+        >
+          <svg v-if="muted || volume === 0" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M16.5 12 22 6.5l-1.4-1.4L15 10.6 9.4 5 8 6.4 13.6 12 8 17.6 9.4 19 15 13.4l5.6 5.6 1.4-1.4z" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" />
+          </svg>
+        </button>
+        <div
+          class="player__volume-track"
+          :style="{ '--volume-pos': volumeSliderPos }"
+        >
+          <div class="player__volume-fill" />
+          <input
+            class="player__volume-input"
+            type="range"
+            min="0"
+            max="1"
+            step="0.001"
+            :value="volumeSliderPos"
+            :aria-valuetext="`${volumePct}%`"
+            @input="onVolumeInput"
+          />
+        </div>
+        </div>
       </div>
     </div>
     
@@ -411,7 +416,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   color: var(--text-2);
   text-align: left;
   display: inline;
-  transition: color var(--motion-duration-fast) var(--motion-ease-out);
+  transition: color var(--motion-duration-base) var(--motion-ease-out);
 }
 .player__time {
   font-size: 12px;
@@ -473,7 +478,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform var(--motion-duration-fast) var(--motion-ease-out);
+  transition: transform var(--motion-duration-base) var(--motion-ease-out);
 }
 .player__play:hover {
   transform: scale(var(--motion-scale-hover));
@@ -498,7 +503,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   justify-content: center;
   color: var(--text-1);
   position: relative;
-  transition: background var(--motion-duration-fast) var(--motion-ease-out), color var(--motion-duration-fast) var(--motion-ease-out);
+  transition: background var(--motion-duration-base) var(--motion-ease-out), color var(--motion-duration-base) var(--motion-ease-out);
 }
 .player__icon-btn:hover:not(:disabled) {
   background: var(--bg-2);
@@ -617,6 +622,11 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   flex: 1;
   min-width: 0;
   justify-content: flex-end;
+}
+.player__volume-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
 }
 .player__actions-right {
   display: flex;

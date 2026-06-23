@@ -353,6 +353,10 @@ function remove(i: number) {
   border: none;
   cursor: pointer;
 }
+:deep(.queue__artist-comma) {
+  color: var(--text-2);
+  font-size: 12px;
+}
 :deep(.queue__artist:hover) {
   color: var(--text-0);
 }
@@ -365,7 +369,7 @@ function remove(i: number) {
   display: inline-flex;
   gap: 4px;
   opacity: 0;
-  transition: opacity var(--motion-duration-fast) var(--motion-ease-out);
+  transition: opacity var(--motion-duration-base) var(--motion-ease-out);
 }
 :deep(.queue__row:hover .queue__actions) {
   opacity: 1;
@@ -379,12 +383,14 @@ function remove(i: number) {
   justify-content: center;
   color: var(--text-2);
   transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
+    background var(--motion-duration-base) var(--motion-ease-out),
+    color var(--motion-duration-base) var(--motion-ease-out),
+    transform var(--motion-duration-base) var(--motion-ease-out);
 }
 :deep(.queue__action:hover) {
   background: var(--bg-3);
   color: var(--text-0);
+  transform: scale(var(--motion-scale-hover));
 }
 :deep(.queue__remove) {
   width: 32px;
@@ -396,9 +402,10 @@ function remove(i: number) {
   color: var(--text-2);
   opacity: 0;
   transition:
-    opacity var(--motion-duration-fast) var(--motion-ease-out),
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
+    opacity var(--motion-duration-base) var(--motion-ease-out),
+    background var(--motion-duration-base) var(--motion-ease-out),
+    color var(--motion-duration-base) var(--motion-ease-out),
+    transform var(--motion-duration-base) var(--motion-ease-out);
 }
 :deep(.queue__row:hover .queue__remove) {
   opacity: 1;
@@ -406,6 +413,7 @@ function remove(i: number) {
 :deep(.queue__remove:hover) {
   background: rgba(255, 94, 126, 0.16);
   color: var(--danger);
+  transform: scale(var(--motion-scale-hover));
 }
 .queue__loader {
   height: 60px;
