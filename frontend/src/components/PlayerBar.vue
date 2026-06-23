@@ -140,30 +140,35 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 <template>
   <footer class="player">
     <div class="player__track">
-      <div class="player__cover" v-lazy-bg="displayCover">
-        <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
-      </div>
-      <div v-if="current" class="player__track-info">
-        <div class="player__title" :title="current.title">
-          {{ current.title }}
+      <Transition name="track-fade" mode="out-in">
+        <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.id : 'empty'">
+          <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
         </div>
-        <div class="player__artist-wrap" :title="current.artist">
-          <template v-if="current.main_artists?.length">
-            <template v-for="(artist, idx) in current.main_artists" :key="artist.id || artist.name">
-              <button class="player__artist" @click="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < current.main_artists.length - 1" class="player__artist-comma">, </span>
+      </Transition>
+      
+      <Transition name="track-fade" mode="out-in">
+        <div v-if="current" class="player__track-info" :key="current.owner_id + '_' + current.id">
+          <div class="player__title" :title="current.title">
+            {{ current.title }}
+          </div>
+          <div class="player__artist-wrap" :title="current.artist">
+            <template v-if="current.main_artists?.length">
+              <template v-for="(artist, idx) in current.main_artists" :key="artist.id || artist.name">
+                <button class="player__artist" @click="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < current.main_artists.length - 1" class="player__artist-comma">, </span>
+              </template>
             </template>
-          </template>
-          <template v-else>
-            <button class="player__artist" @click="gotoSpecificArtist(undefined, current.artist)">{{ current.artist }}</button>
-          </template>
+            <template v-else>
+              <button class="player__artist" @click="gotoSpecificArtist(undefined, current.artist)">{{ current.artist }}</button>
+            </template>
+          </div>
         </div>
-      </div>
-      <div v-else class="player__track-info">
-        <div class="player__title player__title--empty">Выберите трек</div>
-        <div class="player__artist-wrap">
-          <div class="player__artist player__artist--empty">из любого списка ниже</div>
+        <div v-else class="player__track-info" key="empty-info">
+          <div class="player__title player__title--empty">Выберите трек</div>
+          <div class="player__artist-wrap">
+            <div class="player__artist player__artist--empty">из любого списка ниже</div>
+          </div>
         </div>
-      </div>
+      </Transition>
       <button
         v-if="current"
         class="player__icon-btn player__icon-btn--lib"
