@@ -139,52 +139,63 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 
 <template>
   <footer class="player">
-    <TransitionGroup tag="div" class="player__track" name="track-anim">
-      <div class="player__cover" v-lazy-bg="displayCover" :key="'cover-' + (current ? current.id : 'empty')">
-        <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
+    <div class="player__track">
+      <div class="player__cover-wrap">
+        <Transition name="fade">
+          <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.id : 'empty'">
+            <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
+          </div>
+        </Transition>
       </div>
       
-      <div v-if="current" class="player__track-info" :key="'info-' + current.owner_id + '_' + current.id">
-          <div class="player__title" :title="current.title">
-            {{ current.title }}
-          </div>
-          <div class="player__artist-wrap" :title="current.artist">
-            <template v-if="current.main_artists?.length">
-              <template v-for="(artist, idx) in current.main_artists" :key="artist.id || artist.name">
-                <button class="player__artist" @click="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < current.main_artists.length - 1" class="player__artist-comma">, </span>
+      <TransitionGroup tag="div" name="track-anim" class="player__info-group">
+        <div v-if="current" class="player__info-wrap" :key="current.owner_id + '_' + current.id">
+            <div class="player__title" :title="current.title">
+              {{ current.title }}
+            </div>
+            <div class="player__artist-wrap" :title="current.artist">
+              <template v-if="current.main_artists?.length">
+                <template v-for="(artist, idx) in current.main_artists" :key="artist.id || artist.name">
+                  <button class="player__artist" @click="gotoSpecificArtist(artist.id, artist.name)">{{ artist.name }}</button><span v-if="idx < current.main_artists.length - 1" class="player__artist-comma">, </span>
+                </template>
               </template>
-            </template>
-            <template v-else>
-              <button class="player__artist" @click="gotoSpecificArtist(undefined, current.artist)">{{ current.artist }}</button>
-            </template>
-          </div>
+              <template v-else>
+                <button class="player__artist" @click="gotoSpecificArtist(undefined, current.artist)">{{ current.artist }}</button>
+              </template>
+            </div>
         </div>
-        <div v-else class="player__track-info" key="empty-info">
+        <div v-else class="player__info-wrap" key="empty-info">
           <div class="player__title player__title--empty">Выберите трек</div>
           <div class="player__artist-wrap">
             <div class="player__artist player__artist--empty">из любого списка ниже</div>
           </div>
         </div>
-      <button
-        v-if="current"
-        key="lib-btn"
-        class="player__icon-btn player__icon-btn--lib"
-        :class="{ 'player__icon-btn--active': inLibrary }"
-        :aria-label="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
-        :title="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
-        @click="toggleLibrary"
-      >
-        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        <svg v-else class="player__lib-check" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
-        </svg>
-        <svg v-if="inLibrary" class="player__lib-remove" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M6 6l12 12M18 6 6 18" />
-        </svg>
-      </button>
-    </TransitionGroup>
+
+        <div class="player__lib-wrap" key="lib-btn">
+          <button
+            v-if="current"
+            :key="inLibrary ? 'in' : 'out'"
+            class="player__icon-btn player__icon-btn--lib"
+            :class="{ 'player__icon-btn--active': inLibrary }"
+            :aria-label="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
+            :title="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
+            @click="toggleLibrary"
+          >
+            <svg v-if="!inLibrary" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            <template v-else>
+              <svg class="player__lib-check" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+              </svg>
+              <svg class="player__lib-remove" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </template>
+          </button>
+        </div>
+      </TransitionGroup>
+    </div>
 
     <div class="player__controls">
       <div class="player__buttons">
@@ -363,7 +374,36 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   gap: 12px;
   flex: 1 1 30%;
   min-width: 0;
+}
+.player__cover-wrap {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
   position: relative;
+}
+.player__cover {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  background-color: var(--bg-3);
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+.player__info-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  min-width: 0;
+}
+.player__info-wrap {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
 }
 .track-anim-move,
 .track-anim-enter-active,
@@ -372,6 +412,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 }
 .track-anim-leave-active {
   position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  max-width: 100%;
   pointer-events: none;
 }
 .track-anim-enter-from {
@@ -382,22 +426,24 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   opacity: 0;
   transform: translateY(-10px) scale(0.95);
 }
-.player__track-info {
+.player__lib-wrap {
+  flex-shrink: 0;
+  width: 32px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  min-width: 0;
 }
-.player__cover {
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
-  background-color: var(--bg-3);
-  background-size: cover;
-  background-position: center;
-  position: relative;
-  overflow: hidden;
-  flex: 0 0 56px;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s var(--motion-ease-out), transform 0.3s var(--motion-ease-out);
+}
+.fade-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 .player__cover-fallback {
   position: absolute;
