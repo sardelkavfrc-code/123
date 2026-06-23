@@ -26,7 +26,7 @@ defineProps<{
 }
 .page-header__eyebrow {
   font-size: calc(11px * var(--font-scale, 1));
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em + var(--letter-spacing, 0px));
   text-transform: uppercase;
   color: var(--text-2);
   font-weight: 600;
@@ -35,7 +35,7 @@ defineProps<{
   margin: 0;
   font-size: calc(30px * var(--font-scale, 1));
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: calc(-0.01em + var(--letter-spacing, 0px));
 }
 .page-header__subtitle {
   margin: 0;

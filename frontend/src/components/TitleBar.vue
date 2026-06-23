@@ -56,7 +56,7 @@ function close() {
   gap: 10px;
   font-weight: 600;
   font-size: calc(12px * var(--font-scale, 1));
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em + var(--letter-spacing, 0px));
   text-transform: uppercase;
   color: var(--text-1);
 }

@@ -329,7 +329,7 @@ async function playAlbum(album: AlbumSummary) {
 .home__mix-eyebrow {
   font-size: calc(11px * var(--font-scale, 1));
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: calc(0.12em + var(--letter-spacing, 0px));
   opacity: 0.85;
 }
 .home__mix-title {

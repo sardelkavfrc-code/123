@@ -192,7 +192,7 @@ const background = computed(() => {
   align-items: center;
   gap: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--letter-spacing, 0px));
   text-shadow: 0 1px 4px rgba(0,0,0,0.5);
 }
 .rec-card--hover-meta:hover .rec-card__hover-meta {

@@ -955,7 +955,7 @@ onBeforeUnmount(() => {
   font-size: calc(11px * var(--font-scale, 1));
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--letter-spacing, 0px));
   color: var(--text-3);
 }
 
@@ -1110,7 +1110,7 @@ onBeforeUnmount(() => {
   font-weight: 700;
   text-transform: uppercase;
   color: var(--accent-1);
-  letter-spacing: 0.05em;
+  letter-spacing: calc(0.05em + var(--letter-spacing, 0px));
 }
 .original-details {
   display: flex;

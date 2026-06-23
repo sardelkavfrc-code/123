@@ -334,7 +334,16 @@ async function checkForUpdates() {
         </article>
 
         <article class="settings__card">
-          <h2>Шрифт</h2>
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <h2>Шрифт</h2>
+            <button 
+              class="settings__reset-btn" 
+              @click="fontFamily = 'Nunito'; fontSizeScale = 1.0; letterSpacing = 0;"
+              title="Сбросить настройки шрифта"
+            >
+              Сбросить
+            </button>
+          </div>
           <div class="settings__grid settings__grid--fonts">
             <button
               v-for="f in FONT_OPTIONS"
@@ -773,7 +782,7 @@ async function checkForUpdates() {
   margin: 0;
   font-size: calc(15px * var(--font-scale, 1));
   font-weight: 700;
-  letter-spacing: -0.005em;
+  letter-spacing: calc(-0.005em + var(--letter-spacing, 0px));
 }
 .settings__card--danger {
   border-color: rgba(255, 94, 126, 0.25);
@@ -1191,5 +1200,20 @@ async function checkForUpdates() {
 
 .settings__row--flash .settings__row-title {
   animation: flash-text 0.8s ease-in-out;
+}
+.settings__reset-btn {
+  background: none;
+  border: none;
+  color: var(--text-2);
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all var(--motion-duration-fast);
+}
+.settings__reset-btn:hover {
+  color: var(--text-0);
+  background: var(--bg-2);
 }
 </style>

@@ -309,7 +309,7 @@ async function toggleLibrary() {
   font-size: calc(9px * var(--font-scale, 1));
   border-radius: 3px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: calc(0.04em + var(--letter-spacing, 0px));
 }
 .row__artist-wrap {
   white-space: nowrap;

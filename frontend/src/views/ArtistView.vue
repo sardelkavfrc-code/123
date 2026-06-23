@@ -351,7 +351,7 @@ function playAll() {
 .artist__eyebrow {
   font-size: calc(11px * var(--font-scale, 1));
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: calc(0.15em + var(--letter-spacing, 0px));
   opacity: 0.9;
   font-weight: 700;
 }
@@ -359,7 +359,7 @@ function playAll() {
   margin: 0;
   font-size: calc(48px * var(--font-scale, 1));
   font-weight: 800;
-  letter-spacing: -0.02em;
+  letter-spacing: calc(-0.02em + var(--letter-spacing, 0px));
   line-height: 1.1;
   text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
