@@ -4,6 +4,43 @@
  * driven by the settings store.
  */
 
+@property --bg-0 { syntax: '<color>'; inherits: true; initial-value: #0b0c10; }
+@property --bg-1 { syntax: '<color>'; inherits: true; initial-value: #111319; }
+@property --bg-2 { syntax: '<color>'; inherits: true; initial-value: #161922; }
+@property --bg-3 { syntax: '<color>'; inherits: true; initial-value: #1c2030; }
+@property --bg-elev { syntax: '<color>'; inherits: true; initial-value: rgba(28, 32, 48, 0.72); }
+@property --bg-overlay { syntax: '<color>'; inherits: true; initial-value: rgba(8, 9, 14, 0.78); }
+@property --text-0 { syntax: '<color>'; inherits: true; initial-value: #f4f5f9; }
+@property --text-1 { syntax: '<color>'; inherits: true; initial-value: #b8bcd0; }
+@property --text-2 { syntax: '<color>'; inherits: true; initial-value: #7d8298; }
+@property --text-3 { syntax: '<color>'; inherits: true; initial-value: #565a6f; }
+@property --border { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.06); }
+@property --border-strong { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.12); }
+@property --divider { syntax: '<color>'; inherits: true; initial-value: rgba(255, 255, 255, 0.04); }
+@property --accent-1 { syntax: '<color>'; inherits: true; initial-value: #1a8cff; }
+@property --accent-2 { syntax: '<color>'; inherits: true; initial-value: #6d3cff; }
+@property --accent-3 { syntax: '<color>'; inherits: true; initial-value: #c930ff; }
+
+:root {
+  transition: 
+    --bg-0 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --bg-1 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --bg-2 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --bg-3 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --bg-elev 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --bg-overlay 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --text-0 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --text-1 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --text-2 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --text-3 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --border 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --border-strong 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --divider 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --accent-1 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --accent-2 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    --accent-3 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 :root,
 [data-theme="dark"] {
   color-scheme: dark;
@@ -172,7 +209,9 @@
 }
 
 [data-theme="spotify"],
-[data-theme="spotify-cover"] {
+[data-theme="spotify-cover"],
+[data-theme="custom"],
+[data-custom-bg="on"] {
   color-scheme: dark;
 
   /* Semi-transparent backgrounds to let the dynamic gradient shine through */

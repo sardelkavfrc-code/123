@@ -14,7 +14,7 @@ import hashlib
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response, HTTPException
 
 from ..models.audio import CoverLookup
 
@@ -189,3 +189,24 @@ async def search(
         _CACHE[key] = result
         _trim_cache()
         return result
+
+
+@router.get("/proxy")
+async def proxy(url: str = Query(..., min_length=1)) -> Response:
+    """Proxy image request to avoid CORS issues in client."""
+    try:
+        resp = await _client().get(url, timeout=12.0, follow_redirects=True)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail="Failed to fetch image via proxy")
+        
+        headers = {}
+        content_type = resp.headers.get("content-type")
+        if content_type:
+            headers["Content-Type"] = content_type
+            
+        headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return Response(content=resp.content, headers=headers)
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"HTTP error from remote server: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

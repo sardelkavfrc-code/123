@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
+import { getBgImage, saveBgImage, clearBgImage } from "@/utils/bgStorage";
+import { http } from "@/api/client";
 
 export type ThemeName =
   | "dark"
@@ -10,7 +12,8 @@ export type ThemeName =
   | "sunset"
   | "mocha"
   | "spotify"
-  | "spotify-cover";
+  | "spotify-cover"
+  | "custom";
 export type AccentName =
   | "blue"
   | "magenta"
@@ -87,6 +90,14 @@ interface PersistedSettings {
   routerAnimation: RouterAnimation;
   fontSizeScale: number;
   letterSpacing: number;
+  customBgEnabled: boolean;
+  customBgUrl: string;
+  customBgBlur: number;
+  customBgZoom: number;
+  customBgPosX: number;
+  customBgPosY: number;
+  customBgBrightness: number;
+  coverBgBlur: number;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -124,6 +135,14 @@ const defaults: PersistedSettings = {
   routerAnimation: "slide",
   fontSizeScale: 1.0,
   letterSpacing: 0,
+  customBgEnabled: false,
+  customBgUrl: "",
+  customBgBlur: 0,
+  customBgZoom: 1.0,
+  customBgPosX: 50,
+  customBgPosY: 50,
+  customBgBrightness: 100,
+  coverBgBlur: 90,
 };
 
 function load(): PersistedSettings {
@@ -172,6 +191,100 @@ export const useSettingsStore = defineStore("settings", () => {
   const discordRpc = ref(initial.discordRpc);
   const discordRpcText = ref(initial.discordRpcText);
   const discordRpcShowTrack = ref(initial.discordRpcShowTrack ?? true);
+  const customBgEnabled = ref(initial.customBgEnabled ?? false);
+  const customBgUrl = ref(initial.customBgUrl ?? "");
+  const customBgBlur = ref(initial.customBgBlur ?? 0);
+  const customBgZoom = ref(initial.customBgZoom ?? 1.0);
+  const customBgPosX = ref(initial.customBgPosX ?? 50);
+  const customBgPosY = ref(initial.customBgPosY ?? 50);
+  const customBgBrightness = ref(initial.customBgBrightness ?? 100);
+  const coverBgBlur = ref(initial.coverBgBlur ?? 90);
+
+  const customBgCachedUrl = ref("");
+
+  watch(theme, (newTheme) => {
+    customBgEnabled.value = (newTheme === "custom");
+  }, { immediate: true });
+
+  async function loadCachedBg() {
+    try {
+      const blob = await getBgImage();
+      if (blob) {
+        if (customBgCachedUrl.value) {
+          URL.revokeObjectURL(customBgCachedUrl.value);
+        }
+        customBgCachedUrl.value = URL.createObjectURL(blob);
+      } else {
+        customBgCachedUrl.value = "";
+      }
+    } catch (err) {
+      console.error("Failed to load cached background image:", err);
+    }
+  }
+
+  async function setCustomBgFile(file: File) {
+    try {
+      await saveBgImage(file);
+      customBgUrl.value = "";
+      customBgBlur.value = 0;
+      customBgZoom.value = 1.0;
+      customBgPosX.value = 50;
+      customBgPosY.value = 50;
+      customBgBrightness.value = 100;
+      await loadCachedBg();
+      persist();
+    } catch (err) {
+      console.error("Failed to save local background image:", err);
+      throw err;
+    }
+  }
+
+  async function setCustomBgUrl(url: string) {
+    try {
+      let response: Response;
+      try {
+        response = await fetch(url);
+      } catch {
+        const proxyUrl = `${http.defaults.baseURL}/art/proxy?url=${encodeURIComponent(url)}`;
+        response = await fetch(proxyUrl);
+      }
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.statusText}`);
+      }
+      
+      const blob = await response.blob();
+      await saveBgImage(blob);
+      customBgUrl.value = url;
+      customBgBlur.value = 0;
+      customBgZoom.value = 1.0;
+      customBgPosX.value = 50;
+      customBgPosY.value = 50;
+      customBgBrightness.value = 100;
+      await loadCachedBg();
+      persist();
+    } catch (err) {
+      console.error("Failed to save remote background image:", err);
+      throw err;
+    }
+  }
+
+  async function clearCustomBg() {
+    try {
+      await clearBgImage();
+      customBgUrl.value = "";
+      if (customBgCachedUrl.value) {
+        URL.revokeObjectURL(customBgCachedUrl.value);
+      }
+      customBgCachedUrl.value = "";
+      persist();
+    } catch (err) {
+      console.error("Failed to clear background image:", err);
+    }
+  }
+
+  // Load immediately
+  loadCachedBg();
 
   const motionDisabled = computed(() => performanceMode.value || reduceMotion.value);
 
@@ -182,9 +295,15 @@ export const useSettingsStore = defineStore("settings", () => {
     html.dataset.accent = customAccent.value ? "custom" : accent.value;
     html.dataset.perf = performanceMode.value ? "on" : "off";
     html.dataset.reduceMotion = reduceMotion.value ? "on" : "off";
+    html.dataset.customBg = customBgEnabled.value ? "on" : "off";
     html.style.setProperty("--font-family", `"${fontFamily.value || 'Nunito'}", sans-serif`);
     html.style.setProperty("--font-scale", fontSizeScale.value.toString());
     html.style.setProperty("--letter-spacing", `${letterSpacing.value}px`);
+    html.style.setProperty("--custom-bg-blur", `${customBgBlur.value}px`);
+    html.style.setProperty("--custom-bg-zoom", customBgZoom.value.toString());
+    html.style.setProperty("--custom-bg-pos-x", `${customBgPosX.value}%`);
+    html.style.setProperty("--custom-bg-pos-y", `${customBgPosY.value}%`);
+    html.style.setProperty("--custom-bg-brightness", `${customBgBrightness.value}%`);
 
     if (customAccent.value) {
       if (customAccentType.value === "solid") {
@@ -237,6 +356,14 @@ export const useSettingsStore = defineStore("settings", () => {
       discordRpc: discordRpc.value,
       discordRpcText: discordRpcText.value,
       discordRpcShowTrack: discordRpcShowTrack.value,
+      customBgEnabled: customBgEnabled.value,
+      customBgUrl: customBgUrl.value,
+      customBgBlur: customBgBlur.value,
+      customBgZoom: customBgZoom.value,
+      customBgPosX: customBgPosX.value,
+      customBgPosY: customBgPosY.value,
+      customBgBrightness: customBgBrightness.value,
+      coverBgBlur: coverBgBlur.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -277,6 +404,14 @@ export const useSettingsStore = defineStore("settings", () => {
       discordRpc,
       discordRpcText,
       discordRpcShowTrack,
+      customBgEnabled,
+      customBgUrl,
+      customBgBlur,
+      customBgZoom,
+      customBgPosX,
+      customBgPosY,
+      customBgBrightness,
+      coverBgBlur,
     ],
     () => {
       applyToDocument();
@@ -335,6 +470,14 @@ export const useSettingsStore = defineStore("settings", () => {
     discordRpc.value = defaults.discordRpc;
     discordRpcText.value = defaults.discordRpcText;
     discordRpcShowTrack.value = defaults.discordRpcShowTrack;
+    customBgEnabled.value = defaults.customBgEnabled;
+    customBgUrl.value = defaults.customBgUrl;
+    customBgBlur.value = defaults.customBgBlur;
+    customBgZoom.value = defaults.customBgZoom;
+    customBgPosX.value = defaults.customBgPosX;
+    customBgPosY.value = defaults.customBgPosY;
+    customBgBrightness.value = defaults.customBgBrightness;
+    coverBgBlur.value = defaults.coverBgBlur;
   }
 
   return {
@@ -370,6 +513,18 @@ export const useSettingsStore = defineStore("settings", () => {
     discordRpc,
     discordRpcText,
     discordRpcShowTrack,
+    customBgEnabled,
+    customBgUrl,
+    customBgBlur,
+    customBgZoom,
+    customBgPosX,
+    customBgPosY,
+    customBgBrightness,
+    coverBgBlur,
+    customBgCachedUrl,
+    setCustomBgFile,
+    setCustomBgUrl,
+    clearCustomBg,
     motionDisabled,
     applyToDocument,
     syncAutoStartWithOS,

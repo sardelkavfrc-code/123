@@ -47,6 +47,14 @@ const {
   routerAnimation,
   fontSizeScale,
   letterSpacing,
+  customBgUrl,
+  customBgBlur,
+  customBgZoom,
+  customBgPosX,
+  customBgPosY,
+  customBgBrightness,
+  customBgCachedUrl,
+  coverBgBlur,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -96,9 +104,9 @@ const themes: { value: ThemeName; label: string; preview: string }[] = [
   { value: "midnight", label: "Полночь", preview: "linear-gradient(135deg, #221d4e, #0a0820)" },
   { value: "forest", label: "Лес", preview: "linear-gradient(135deg, #19302a, #0a1410)" },
   { value: "sunset", label: "Закат", preview: "linear-gradient(135deg, #3d251f, #1a0d0b)" },
-  { value: "mocha", label: "Кофе", preview: "linear-gradient(135deg, #342a24, #161210)" },
   { value: "spotify", label: "Динамическая", preview: "radial-gradient(circle at top left, #1db954, #191414)" },
   { value: "spotify-cover", label: "Живая обложка", preview: "linear-gradient(135deg, #1a8cff, #ff5e7e)" },
+  { value: "custom", label: "Кастомная", preview: "linear-gradient(135deg, #8a2387, #e94057, #f27121)" },
 ];
 
 const styles: { value: StyleName; label: string; desc: string }[] = [
@@ -237,6 +245,166 @@ async function checkForUpdates() {
     isCheckingUpdate.value = false;
   }
 }
+
+const isEditingBg = ref(false);
+const inputUrl = ref(customBgUrl.value);
+
+watch(customBgUrl, (newVal) => {
+  inputUrl.value = newVal;
+}, { immediate: true });
+
+watch(activeTab, () => {
+  isEditingBg.value = false;
+});
+
+async function onCustomBgFileChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  if (!file) return;
+  
+  if (file.size > 8 * 1024 * 1024) {
+    ui.notify("Файл слишком большой. Выберите изображение менее 8 МБ.", "error");
+    return;
+  }
+
+  try {
+    await settings.setCustomBgFile(file);
+    ui.notify("Фон успешно загружен!", "success");
+    isEditingBg.value = false;
+  } catch (err) {
+    ui.notify("Не удалось сохранить изображение", "error");
+    console.error(err);
+  }
+}
+
+async function applyCustomBgUrl() {
+  const url = inputUrl.value.trim();
+  if (!url) return;
+  try {
+    ui.notify("Загрузка фонового изображения...", "info");
+    await settings.setCustomBgUrl(url);
+    ui.notify("Фон успешно загружен!", "success");
+    isEditingBg.value = false;
+  } catch (err) {
+    ui.notify("Не удалось загрузить изображение по ссылке. Проверьте правильность URL.", "error");
+    console.error(err);
+  }
+}
+
+async function removeCustomBg() {
+  await settings.clearCustomBg();
+  ui.notify("Кастомный фон удален", "success");
+  isEditingBg.value = false;
+}
+
+
+function onBeforeEnter(el: Element) {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = "0";
+  htmlEl.style.opacity = "0";
+  htmlEl.style.marginBottom = "-16px";
+  htmlEl.style.overflow = "hidden";
+  htmlEl.style.paddingTop = "0";
+  htmlEl.style.paddingBottom = "0";
+  htmlEl.style.borderTopWidth = "0";
+  htmlEl.style.borderBottomWidth = "0";
+}
+
+function onEnter(el: Element, done: () => void) {
+  const htmlEl = el as HTMLElement;
+  
+  // 1. Measure natural height before collapsing
+  htmlEl.style.height = "";
+  htmlEl.style.paddingTop = "";
+  htmlEl.style.paddingBottom = "";
+  htmlEl.style.borderTopWidth = "";
+  htmlEl.style.borderBottomWidth = "";
+  
+  const naturalHeight = htmlEl.scrollHeight;
+  
+  // 2. Set starting collapsed styles
+  htmlEl.style.height = "0";
+  htmlEl.style.paddingTop = "0";
+  htmlEl.style.paddingBottom = "0";
+  htmlEl.style.borderTopWidth = "0";
+  htmlEl.style.borderBottomWidth = "0";
+  
+  // Force layout reflow
+  void htmlEl.offsetHeight;
+  
+  // 3. Set transition styles
+  htmlEl.style.transition = "height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, margin-bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), border-width 0.35s cubic-bezier(0.4, 0, 0.2, 1)";
+  
+  // 4. Set target styles (explicit values to avoid browser snapping bugs)
+  htmlEl.style.height = `${naturalHeight}px`;
+  htmlEl.style.opacity = "1";
+  htmlEl.style.marginBottom = "0";
+  htmlEl.style.paddingTop = "22px";
+  htmlEl.style.paddingBottom = "18px";
+  htmlEl.style.borderTopWidth = "1px";
+  htmlEl.style.borderBottomWidth = "1px";
+  
+  setTimeout(done, 380);
+}
+
+function onAfterEnter(el: Element) {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = "";
+  htmlEl.style.opacity = "";
+  htmlEl.style.marginBottom = "";
+  htmlEl.style.overflow = "";
+  htmlEl.style.paddingTop = "";
+  htmlEl.style.paddingBottom = "";
+  htmlEl.style.borderTopWidth = "";
+  htmlEl.style.borderBottomWidth = "";
+  htmlEl.style.transition = "";
+}
+
+function onLeave(el: Element, done: () => void) {
+  const htmlEl = el as HTMLElement;
+  
+  // Measure current height
+  const currentHeight = htmlEl.scrollHeight;
+  
+  htmlEl.style.height = `${currentHeight}px`;
+  htmlEl.style.opacity = "1";
+  htmlEl.style.marginBottom = "0";
+  htmlEl.style.overflow = "hidden";
+  htmlEl.style.paddingTop = "22px";
+  htmlEl.style.paddingBottom = "18px";
+  htmlEl.style.borderTopWidth = "1px";
+  htmlEl.style.borderBottomWidth = "1px";
+  
+  // Force layout reflow
+  void htmlEl.offsetHeight;
+  
+  // Set transition styles
+  htmlEl.style.transition = "height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease, margin-bottom 0.35s cubic-bezier(0.4, 0, 0.2, 1), padding 0.35s cubic-bezier(0.4, 0, 0.2, 1), border-width 0.35s cubic-bezier(0.4, 0, 0.2, 1)";
+  
+  // Target collapsed styles
+  htmlEl.style.height = "0";
+  htmlEl.style.opacity = "0";
+  htmlEl.style.marginBottom = "-16px";
+  htmlEl.style.paddingTop = "0";
+  htmlEl.style.paddingBottom = "0";
+  htmlEl.style.borderTopWidth = "0";
+  htmlEl.style.borderBottomWidth = "0";
+  
+  setTimeout(done, 380);
+}
+
+function onAfterLeave(el: Element) {
+  const htmlEl = el as HTMLElement;
+  htmlEl.style.height = "";
+  htmlEl.style.opacity = "";
+  htmlEl.style.marginBottom = "";
+  htmlEl.style.overflow = "";
+  htmlEl.style.paddingTop = "";
+  htmlEl.style.paddingBottom = "";
+  htmlEl.style.borderTopWidth = "";
+  htmlEl.style.borderBottomWidth = "";
+  htmlEl.style.transition = "";
+}
 </script>
 
 <template>
@@ -275,6 +443,158 @@ async function checkForUpdates() {
             </button>
           </div>
         </article>
+
+        <!-- Настройки кастомного фона (слайд-ин анимка при выборе темы custom) -->
+        <Transition
+          :css="false"
+          @before-enter="onBeforeEnter"
+          @enter="onEnter"
+          @after-enter="onAfterEnter"
+          @leave="onLeave"
+          @after-leave="onAfterLeave"
+        >
+          <article v-if="theme === 'custom'" key="custom-settings" class="settings__card" style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <h2>Настройки кастомного фона</h2>
+                <button 
+                  class="settings__reset-btn" 
+                  @click="customBgBlur = 0; customBgZoom = 1.0; customBgBrightness = 100; customBgPosX = 50; customBgPosY = 50;"
+                  title="Сбросить настройки кастомного фона"
+                >
+                  Сбросить
+                </button>
+              </div>
+              
+              <!-- Отображение текущего фона, если он установлен -->
+              <div v-if="customBgCachedUrl" class="settings__row settings__row--bg-preview" style="display: flex; gap: 16px; align-items: center; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 12px; border-radius: 8px;">
+                <img :src="customBgCachedUrl" style="width: 60px; height: 60px; border-radius: 6px; object-fit: cover; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);" />
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 4px;">
+                  <div class="settings__row-title" style="font-weight: 600; font-size: 0.95rem;">Кастомный фон установлен</div>
+                  <div class="settings__row-sub" style="word-break: break-all; font-size: 0.8rem; opacity: 0.7; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ customBgUrl ? customBgUrl : 'Локальный файл с ПК' }}
+                  </div>
+                </div>
+                <div style="display: flex; gap: 8px; flex-direction: column; align-items: stretch; width: 110px;">
+                  <button type="button" class="btn btn--ghost" @click="isEditingBg = !isEditingBg" style="padding: 4px 8px; font-size: 0.8rem; text-align: center;">
+                    {{ isEditingBg ? 'Скрыть' : 'Изменить' }}
+                  </button>
+                  <button type="button" class="btn btn--ghost" @click="removeCustomBg" style="padding: 4px 8px; font-size: 0.8rem; color: #ef4444; border-color: rgba(239, 68, 68, 0.2); background: rgba(239, 68, 68, 0.05); text-align: center;">
+                    Удалить
+                  </button>
+                </div>
+              </div>
+
+              <!-- Блок загрузки/редактирования изображения -->
+              <div v-if="!customBgCachedUrl || isEditingBg" class="settings__bg-editor-panel" style="display: flex; flex-direction: column; gap: 12px; border: 1px solid rgba(255, 255, 255, 0.08); padding: 14px; border-radius: 8px; background: rgba(255, 255, 255, 0.02);">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div class="settings__row-title" style="font-size: 0.9rem;">Ссылка на изображение</div>
+                  <div style="display: flex; gap: 8px;">
+                    <input v-model="inputUrl" type="text" class="settings__text-input" placeholder="https://example.com/image.jpg" style="flex: 1; height: 36px; padding: 0 10px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff;" @keydown.enter="applyCustomBgUrl" />
+                    <button type="button" class="btn btn--primary" @click="applyCustomBgUrl" style="height: 36px; padding: 0 16px; font-size: 0.85rem; border-radius: 6px;">
+                      ОК
+                    </button>
+                  </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                  <div class="settings__row-title" style="font-size: 0.9rem;">Выбрать локальный файл</div>
+                  <input type="file" accept="image/*" @change="onCustomBgFileChange" class="settings__file-input" style="width: 100%; color: var(--text-2); font-size: 0.85rem;" />
+                </div>
+              </div>
+
+              <!-- Ползунки настроек (только если фон установлен) -->
+              <template v-if="customBgCachedUrl">
+                <label class="settings__row">
+                  <div>
+                    <div class="settings__row-title">Размытие (Blur)</div>
+                    <div class="settings__row-sub">Степень размытия фонового изображения</div>
+                  </div>
+                  <div class="settings__range">
+                    <input v-model.number="customBgBlur" type="range" min="0" max="120" step="1" />
+                    <span>{{ customBgBlur }} px</span>
+                  </div>
+                </label>
+
+                <label class="settings__row">
+                  <div>
+                    <div class="settings__row-title">Масштаб (Zoom)</div>
+                    <div class="settings__row-sub">Приближение фонового изображения</div>
+                  </div>
+                  <div class="settings__range">
+                    <input v-model.number="customBgZoom" type="range" min="1" max="2.5" step="0.05" />
+                    <span>{{ Math.round(customBgZoom * 100) }}%</span>
+                  </div>
+                </label>
+
+                <label class="settings__row">
+                  <div>
+                    <div class="settings__row-title">Яркость (Brightness)</div>
+                    <div class="settings__row-sub">Регулировка яркости фонового изображения</div>
+                  </div>
+                  <div class="settings__range">
+                    <input v-model.number="customBgBrightness" type="range" min="20" max="100" step="1" />
+                    <span>{{ customBgBrightness }}%</span>
+                  </div>
+                </label>
+
+                <label class="settings__row">
+                  <div>
+                    <div class="settings__row-title">Положение по X</div>
+                    <div class="settings__row-sub">Горизонтальное смещение центра изображения</div>
+                  </div>
+                  <div class="settings__range">
+                    <input v-model.number="customBgPosX" type="range" min="0" max="100" step="1" />
+                    <span>{{ customBgPosX }}%</span>
+                  </div>
+                </label>
+
+                <label class="settings__row">
+                  <div>
+                    <div class="settings__row-title">Положение по Y</div>
+                    <div class="settings__row-sub">Вертикальное смещение центра изображения</div>
+                  </div>
+                  <div class="settings__range">
+                    <input v-model.number="customBgPosY" type="range" min="0" max="100" step="1" />
+                    <span>{{ customBgPosY }}%</span>
+                  </div>
+                </label>
+              </template>
+            </article>
+          </Transition>
+
+        <!-- Настройки живой обложки (слайд-ин анимка при выборе темы spotify-cover) -->
+        <Transition
+          :css="false"
+          @before-enter="onBeforeEnter"
+          @enter="onEnter"
+          @after-enter="onAfterEnter"
+          @leave="onLeave"
+          @after-leave="onAfterLeave"
+        >
+          <article v-if="theme === 'spotify-cover'" key="cover-settings" class="settings__card" style="display: flex; flex-direction: column; gap: 16px;">
+              <div style="display: flex; align-items: baseline; justify-content: space-between;">
+                <h2>Настройки живой обложки</h2>
+                <button 
+                  class="settings__reset-btn" 
+                  @click="coverBgBlur = 90"
+                  title="Сбросить настройки живой обложки"
+                >
+                  Сбросить
+                </button>
+              </div>
+              
+              <label class="settings__row">
+                <div>
+                  <div class="settings__row-title">Размытие (Blur)</div>
+                  <div class="settings__row-sub">Степень размытия фона обложки</div>
+                </div>
+                <div class="settings__range">
+                  <input v-model.number="coverBgBlur" type="range" min="0" max="120" step="1" />
+                  <span>{{ coverBgBlur }} px</span>
+                </div>
+              </label>
+          </article>
+        </Transition>
 
         <article class="settings__card">
           <h2>Стиль (Материалы)</h2>
@@ -1159,6 +1479,9 @@ async function checkForUpdates() {
   transform: translateY(-10px);
 }
 
+
+
+
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-3px); }
@@ -1215,5 +1538,26 @@ async function checkForUpdates() {
 .settings__reset-btn:hover {
   color: var(--text-0);
   background: var(--bg-2);
+}
+.settings__file-input {
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text-2);
+  cursor: pointer;
+}
+.settings__file-input::-webkit-file-upload-button {
+  background: var(--bg-3);
+  color: var(--text-0);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: 12px;
+  transition: background var(--motion-duration-base) var(--motion-ease-out), transform var(--motion-duration-base) var(--motion-ease-out);
+}
+.settings__file-input::-webkit-file-upload-button:hover {
+  background: var(--bg-2);
+  transform: scale(1.02);
 }
 </style>
