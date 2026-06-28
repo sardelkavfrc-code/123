@@ -532,7 +532,7 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
             if (!oauthWin.isDestroyed()) {
               const currentUrl = oauthWin.webContents.getURL();
               if (!currentUrl.startsWith(OAUTH_REDIRECT_PREFIX)) {
-                void oauthWin.loadURL(url);
+                void oauthWin.loadURL(url.replace("revoke=1", "revoke=0"));
               }
             }
           } catch (e) {
