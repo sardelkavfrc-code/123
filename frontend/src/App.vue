@@ -112,6 +112,17 @@ watch(() => ui.isMouseOverTrackRow, (val) => {
   }
 });
 
+// Sync context menu mouse-hover state on open so that static hover matches cursor
+watch(() => ui.trackContextMenuOpen, (isOpen) => {
+  if (isOpen) {
+    isMouseOverTrackContextMenu.value = true;
+    if (trackLeaveTimeout) {
+      window.clearTimeout(trackLeaveTimeout);
+      trackLeaveTimeout = null;
+    }
+  }
+});
+
 function closeTrackContextMenu() {
   ui.trackContextMenuOpen = false;
   isMouseOverTrackContextMenu.value = false;
@@ -334,5 +345,17 @@ watch(
 .track-context-btn:hover {
   background: var(--bg-3);
   color: var(--text-0);
+}
+
+/* Context Menu Fade Transition */
+.context-menu-fade-enter-active,
+.context-menu-fade-leave-active {
+  transition: opacity 0.12s ease-out, transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.context-menu-fade-enter-from,
+.context-menu-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.92) translateY(4px);
 }
 </style>
