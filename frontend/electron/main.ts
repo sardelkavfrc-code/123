@@ -523,6 +523,25 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
       if (parsed) finalize(parsed);
     };
 
+    // Monitor session cookies to force authorization completion if 2FA login page hangs/fails to redirect
+    oauthWin.webContents.session.cookies.on("changed", (_event, cookie, _cause, removed) => {
+      if (!removed && cookie.domain && cookie.domain.includes(".vk.com") && cookie.name.startsWith("remixsid")) {
+        // Wait a short time to allow natural redirects, then force redirect to complete OAuth flow
+        setTimeout(() => {
+          try {
+            if (!oauthWin.isDestroyed()) {
+              const currentUrl = oauthWin.webContents.getURL();
+              if (!currentUrl.startsWith(OAUTH_REDIRECT_PREFIX)) {
+                void oauthWin.loadURL(url);
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }, 800);
+      }
+    });
+
     // Events for all forms of navigation, redirects, and subframe routing
     oauthWin.webContents.on("will-redirect", (_e, redirectUrl) => onUrl(redirectUrl));
     oauthWin.webContents.on("did-redirect-navigation", (_e, redirectUrl) => onUrl(redirectUrl));
@@ -539,6 +558,16 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
         }
       } catch {
         // ignore
+      }
+    });
+
+    // Close window and report error if loading main page fails (e.g. DNS or connection issue)
+    oauthWin.webContents.on("did-fail-load", (_e, errorCode, errorDescription, _validatedURL, isMainFrame) => {
+      if (isMainFrame) {
+        finalize({
+          ok: false,
+          error: `Не удалось загрузить страницу авторизации VK (${errorDescription}, код ${errorCode}). Проверьте интернет-соединение.`,
+        });
       }
     });
 
