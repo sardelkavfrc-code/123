@@ -4,6 +4,8 @@ import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { api } from "@/api/client";
 import type { AlbumSummary, Track } from "@/api/types";
+import { useSettingsStore } from "@/stores/settings";
+import { storeToRefs } from "pinia";
 
 import RecommendationCard from "@/components/RecommendationCard.vue";
 import MoodCard from "@/components/MoodCard.vue";
@@ -16,6 +18,37 @@ import { useUIStore } from "@/stores/ui";
 const library = useLibraryStore();
 const player = usePlayerStore();
 const ui = useUIStore();
+const settings = useSettingsStore();
+
+const {
+  homeCardsBrightness,
+  homeCardsBrightnessAuto,
+  homeCardsBrightnessDimmed,
+  homeCardsBrightnessTimeStart,
+  homeCardsBrightnessTimeEnd,
+} = storeToRefs(settings);
+
+const dropdownRef = ref<HTMLElement | null>(null);
+const showDropdown = ref(false);
+
+function toggleSettings(event: MouseEvent) {
+  event.stopPropagation();
+  showDropdown.value = !showDropdown.value;
+}
+
+function handleWindowClick(event: MouseEvent) {
+  if (showDropdown.value && dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
+    showDropdown.value = false;
+  }
+}
+
+onMounted(() => {
+  window.addEventListener("click", handleWindowClick);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("click", handleWindowClick);
+});
 
 const algorithmsScroll = ref<HTMLElement | null>(null);
 const moodsScroll = ref<HTMLElement | null>(null);
@@ -205,10 +238,69 @@ async function playAlbum(album: AlbumSummary) {
 
 <template>
   <ScrollArea>
-    <PageHeader
-      title="Что послушаем сегодня?"
-      subtitle="Алгоритмы ВК подбирают свежий микс под твой вкус и обновляют его автоматически."
-    />
+    <div class="home__header-container">
+      <PageHeader
+        title="Что послушаем сегодня?"
+        subtitle="Алгоритмы ВК подбирают свежий микс под твой вкус и обновляют его автоматически."
+      />
+      <div class="home__actions" ref="dropdownRef">
+        <button class="home__settings-btn" :class="{ 'home__settings-btn--active': showDropdown }" @click="toggleSettings" aria-label="Настройки яркости">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        </button>
+        
+        <Transition name="dropdown-fade">
+          <div v-if="showDropdown" class="home__dropdown">
+            <div class="home__dropdown-title">Яркость карточек</div>
+            
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Постоянная</span>
+                <span class="home__dropdown-label-sub">Яркость обложек на Главной</span>
+              </div>
+              <div class="home__dropdown-range">
+                <input v-model.number="homeCardsBrightness" type="range" min="10" max="100" step="1" />
+                <span class="home__dropdown-range-val">{{ homeCardsBrightness }}%</span>
+              </div>
+            </div>
+            
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">По таймеру</span>
+                <span class="home__dropdown-label-sub">Приглушать в ночное время</span>
+              </div>
+              <input v-model="homeCardsBrightnessAuto" type="checkbox" class="settings__switch" />
+            </div>
+
+            <Transition name="slide-up">
+              <div v-if="homeCardsBrightnessAuto" class="home__dropdown-sub-section">
+                <div class="home__dropdown-row">
+                  <div class="home__dropdown-label">
+                    <span class="home__dropdown-label-main">Яркость ночью</span>
+                  </div>
+                  <div class="home__dropdown-range">
+                    <input v-model.number="homeCardsBrightnessDimmed" type="range" min="10" max="100" step="1" />
+                    <span class="home__dropdown-range-val">{{ homeCardsBrightnessDimmed }}%</span>
+                  </div>
+                </div>
+
+                <div class="home__dropdown-row home__dropdown-row--times">
+                  <div class="home__dropdown-label">
+                    <span class="home__dropdown-label-main">Интервал времени</span>
+                  </div>
+                  <div class="home__dropdown-time-inputs">
+                    <input v-model="homeCardsBrightnessTimeStart" type="time" class="home__dropdown-time-input" />
+                    <span class="home__dropdown-time-sep">&mdash;</span>
+                    <input v-model="homeCardsBrightnessTimeEnd" type="time" class="home__dropdown-time-input" />
+                  </div>
+                </div>
+              </div>
+            </Transition>
+          </div>
+        </Transition>
+      </div>
+    </div>
 
     <section class="home__hero">
       <button class="home__mix" :disabled="mixLoading" @click="playMix" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
@@ -487,5 +579,233 @@ async function playAlbum(album: AlbumSummary) {
 .content-reveal-leave-to {
   opacity: 0;
   transform: translateY(-10px) scale(0.99);
+}
+
+/* Card brightness control styles */
+.home__mix,
+:deep(.rec-card),
+:deep(.mood-card) {
+  filter: brightness(var(--home-cards-brightness, 1));
+  transition: transform var(--motion-duration-fast) var(--motion-ease-out), filter 0.5s ease-out;
+}
+
+.home__header-container {
+  position: relative;
+  width: 100%;
+}
+.home__actions {
+  position: absolute;
+  top: 28px;
+  right: 32px;
+  z-index: 100;
+}
+.home__settings-btn {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.home__settings-btn:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+  border-color: var(--border-strong);
+  transform: rotate(30deg);
+}
+.home__settings-btn--active {
+  background: var(--accent-1);
+  color: #fff;
+  border-color: var(--accent-2);
+  transform: rotate(90deg) !important;
+}
+
+.home__dropdown {
+  position: absolute;
+  top: 46px;
+  right: 0;
+  width: 290px;
+  background: var(--bg-elev);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg, 12px);
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 101;
+  transform-origin: top right;
+}
+.home__dropdown-title {
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 700;
+  color: var(--text-0);
+  border-bottom: 1px solid var(--divider);
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+}
+.home__dropdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.home__dropdown-row--times {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 6px;
+}
+.home__dropdown-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.home__dropdown-label-main {
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text-0);
+}
+.home__dropdown-label-sub {
+  font-size: calc(11px * var(--font-scale, 1));
+  color: var(--text-2);
+  line-height: 1.3;
+}
+.home__dropdown-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.home__dropdown-range input[type="range"] {
+  width: 90px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border-strong);
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.home__dropdown-range input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--accent-1);
+  cursor: pointer;
+}
+.home__dropdown-range-val {
+  font-size: calc(11px * var(--font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  color: var(--text-1);
+  min-width: 32px;
+  text-align: right;
+}
+.home__dropdown-time-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.home__dropdown-time-input {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-0);
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: calc(12px * var(--font-scale, 1));
+  width: 48%;
+  outline: none;
+  text-align: center;
+}
+.home__dropdown-time-input:focus {
+  border-color: var(--accent-1);
+}
+.home__dropdown-time-sep {
+  color: var(--text-2);
+  font-size: 10px;
+}
+.home__dropdown-sub-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--divider);
+  padding-top: 12px;
+  margin-top: 2px;
+}
+
+/* Switch styling in dropdown */
+.home__dropdown .settings__switch {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 38px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--motion-duration-fast) var(--motion-ease-out),
+              box-shadow var(--motion-duration-fast) var(--motion-ease-out);
+  overflow: hidden;
+}
+.home__dropdown .settings__switch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.home__dropdown .settings__switch:checked::before {
+  opacity: 1;
+}
+.home__dropdown .settings__switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+.home__dropdown .settings__switch:checked::after {
+  transform: translateX(18px);
+}
+
+/* Dropdown Animations */
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-5px);
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 </style>

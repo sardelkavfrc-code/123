@@ -63,12 +63,17 @@ const PREDEFINED_ACCENTS: Record<string, string> = {
   crimson: "#ff2f7a",
 };
 
-function getLuminance(hex: string) {
+function hexToRgb(hex: string) {
   hex = hex.replace("#", "");
   if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
   const r = parseInt(hex.substring(0, 2), 16) || 0;
   const g = parseInt(hex.substring(2, 4), 16) || 0;
   const b = parseInt(hex.substring(4, 6), 16) || 0;
+  return { r, g, b };
+}
+
+function getLuminance(hex: string) {
+  const { r, g, b } = hexToRgb(hex);
   return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
@@ -123,6 +128,11 @@ interface PersistedSettings {
   customBgPosY: number;
   customBgBrightness: number;
   coverBgBlur: number;
+  homeCardsBrightness: number;
+  homeCardsBrightnessAuto: boolean;
+  homeCardsBrightnessDimmed: number;
+  homeCardsBrightnessTimeStart: string;
+  homeCardsBrightnessTimeEnd: string;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -168,6 +178,11 @@ const defaults: PersistedSettings = {
   customBgPosY: 50,
   customBgBrightness: 100,
   coverBgBlur: 90,
+  homeCardsBrightness: 100,
+  homeCardsBrightnessAuto: false,
+  homeCardsBrightnessDimmed: 50,
+  homeCardsBrightnessTimeStart: "22:00",
+  homeCardsBrightnessTimeEnd: "06:00",
 };
 
 function load(): PersistedSettings {
@@ -178,6 +193,34 @@ function load(): PersistedSettings {
     return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };
+  }
+}
+
+function isTimeBetween(start: string, end: string): boolean {
+  if (!start || !end) return false;
+  const startParts = start.split(":");
+  const endParts = end.split(":");
+  if (startParts.length !== 2 || endParts.length !== 2) return false;
+
+  const startH = parseInt(startParts[0], 10);
+  const startM = parseInt(startParts[1], 10);
+  const endH = parseInt(endParts[0], 10);
+  const endM = parseInt(endParts[1], 10);
+
+  if (isNaN(startH) || isNaN(startM) || isNaN(endH) || isNaN(endM)) return false;
+
+  const now = new Date();
+  const currentH = now.getHours();
+  const currentM = now.getMinutes();
+
+  const currentTime = currentH * 60 + currentM;
+  const startTime = startH * 60 + startM;
+  const endTime = endH * 60 + endM;
+
+  if (startTime < endTime) {
+    return currentTime >= startTime && currentTime < endTime;
+  } else {
+    return currentTime >= startTime || currentTime < endTime;
   }
 }
 
@@ -224,6 +267,47 @@ export const useSettingsStore = defineStore("settings", () => {
   const customBgPosY = ref(initial.customBgPosY ?? 50);
   const customBgBrightness = ref(initial.customBgBrightness ?? 100);
   const coverBgBlur = ref(initial.coverBgBlur ?? 90);
+
+  const homeCardsBrightness = ref(initial.homeCardsBrightness ?? 100);
+  const homeCardsBrightnessAuto = ref(initial.homeCardsBrightnessAuto ?? false);
+  const homeCardsBrightnessDimmed = ref(initial.homeCardsBrightnessDimmed ?? 50);
+  const homeCardsBrightnessTimeStart = ref(initial.homeCardsBrightnessTimeStart ?? "22:00");
+  const homeCardsBrightnessTimeEnd = ref(initial.homeCardsBrightnessTimeEnd ?? "06:00");
+
+  const currentHomeCardsBrightness = ref(100);
+
+  function updateAppliedBrightness() {
+    if (homeCardsBrightnessAuto.value) {
+      if (isTimeBetween(homeCardsBrightnessTimeStart.value, homeCardsBrightnessTimeEnd.value)) {
+        currentHomeCardsBrightness.value = homeCardsBrightnessDimmed.value;
+      } else {
+        currentHomeCardsBrightness.value = homeCardsBrightness.value;
+      }
+    } else {
+      currentHomeCardsBrightness.value = homeCardsBrightness.value;
+    }
+  }
+
+  // Initial check
+  updateAppliedBrightness();
+
+  // Schedule timer/interval
+  if (typeof window !== "undefined") {
+    window.setInterval(updateAppliedBrightness, 10000);
+  }
+
+  watch(
+    [
+      homeCardsBrightness,
+      homeCardsBrightnessAuto,
+      homeCardsBrightnessDimmed,
+      homeCardsBrightnessTimeStart,
+      homeCardsBrightnessTimeEnd,
+    ],
+    () => {
+      updateAppliedBrightness();
+    }
+  );
 
   const customBgCachedUrl = ref("");
 
@@ -329,6 +413,7 @@ export const useSettingsStore = defineStore("settings", () => {
     html.style.setProperty("--custom-bg-pos-x", `${customBgPosX.value}%`);
     html.style.setProperty("--custom-bg-pos-y", `${customBgPosY.value}%`);
     html.style.setProperty("--custom-bg-brightness", `${customBgBrightness.value}%`);
+    html.style.setProperty("--home-cards-brightness", `${currentHomeCardsBrightness.value / 100}`);
 
     if (customAccent.value) {
       if (customAccentType.value === "solid") {
@@ -396,6 +481,11 @@ export const useSettingsStore = defineStore("settings", () => {
       customBgPosY: customBgPosY.value,
       customBgBrightness: customBgBrightness.value,
       coverBgBlur: coverBgBlur.value,
+      homeCardsBrightness: homeCardsBrightness.value,
+      homeCardsBrightnessAuto: homeCardsBrightnessAuto.value,
+      homeCardsBrightnessDimmed: homeCardsBrightnessDimmed.value,
+      homeCardsBrightnessTimeStart: homeCardsBrightnessTimeStart.value,
+      homeCardsBrightnessTimeEnd: homeCardsBrightnessTimeEnd.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -444,6 +534,12 @@ export const useSettingsStore = defineStore("settings", () => {
       customBgPosY,
       customBgBrightness,
       coverBgBlur,
+      homeCardsBrightness,
+      homeCardsBrightnessAuto,
+      homeCardsBrightnessDimmed,
+      homeCardsBrightnessTimeStart,
+      homeCardsBrightnessTimeEnd,
+      currentHomeCardsBrightness,
     ],
     () => {
       applyToDocument();
@@ -510,6 +606,11 @@ export const useSettingsStore = defineStore("settings", () => {
     customBgPosY.value = defaults.customBgPosY;
     customBgBrightness.value = defaults.customBgBrightness;
     coverBgBlur.value = defaults.coverBgBlur;
+    homeCardsBrightness.value = defaults.homeCardsBrightness;
+    homeCardsBrightnessAuto.value = defaults.homeCardsBrightnessAuto;
+    homeCardsBrightnessDimmed.value = defaults.homeCardsBrightnessDimmed;
+    homeCardsBrightnessTimeStart.value = defaults.homeCardsBrightnessTimeStart;
+    homeCardsBrightnessTimeEnd.value = defaults.homeCardsBrightnessTimeEnd;
   }
 
   return {
@@ -553,6 +654,12 @@ export const useSettingsStore = defineStore("settings", () => {
     customBgPosY,
     customBgBrightness,
     coverBgBlur,
+    homeCardsBrightness,
+    homeCardsBrightnessAuto,
+    homeCardsBrightnessDimmed,
+    homeCardsBrightnessTimeStart,
+    homeCardsBrightnessTimeEnd,
+    currentHomeCardsBrightness,
     customBgCachedUrl,
     setCustomBgFile,
     setCustomBgUrl,

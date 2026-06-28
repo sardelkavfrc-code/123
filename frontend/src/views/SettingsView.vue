@@ -55,6 +55,11 @@ const {
   customBgBrightness,
   customBgCachedUrl,
   coverBgBlur,
+  homeCardsBrightness,
+  homeCardsBrightnessAuto,
+  homeCardsBrightnessDimmed,
+  homeCardsBrightnessTimeStart,
+  homeCardsBrightnessTimeEnd,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -770,6 +775,72 @@ function onAfterLeave(el: Element) {
               </button>
             </div>
           </div>
+        </article>
+
+        <article class="settings__card">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <h2>Яркость на Главной</h2>
+            <button 
+              class="settings__reset-btn" 
+              @click="homeCardsBrightness = 100; homeCardsBrightnessAuto = false; homeCardsBrightnessDimmed = 50; homeCardsBrightnessTimeStart = '22:00'; homeCardsBrightnessTimeEnd = '06:00';"
+              title="Сбросить настройки яркости карточек"
+            >
+              Сбросить
+            </button>
+          </div>
+          
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Постоянная яркость</div>
+              <div class="settings__row-sub">Степень яркости обложек на Главной</div>
+            </div>
+            <div class="settings__range">
+              <input v-model.number="homeCardsBrightness" type="range" min="10" max="100" step="1" />
+              <span>{{ homeCardsBrightness }}%</span>
+            </div>
+          </label>
+
+          <label class="settings__row">
+            <div>
+              <div class="settings__row-title">Яркость по таймеру</div>
+              <div class="settings__row-sub">Приглушать яркость обложек в установленное время</div>
+            </div>
+            <input v-model="homeCardsBrightnessAuto" type="checkbox" class="settings__switch" />
+          </label>
+
+          <Transition
+            :css="false"
+            @before-enter="onBeforeEnter"
+            @enter="onEnter"
+            @after-enter="onAfterEnter"
+            @leave="onLeave"
+            @after-leave="onAfterLeave"
+          >
+            <div v-if="homeCardsBrightnessAuto" style="display: flex; flex-direction: column; gap: 16px;">
+              <label class="settings__row" style="border-top: none; padding-top: 12px;">
+                <div>
+                  <div class="settings__row-title">Яркость ночью</div>
+                  <div class="settings__row-sub">Степень приглушения обложек</div>
+                </div>
+                <div class="settings__range">
+                  <input v-model.number="homeCardsBrightnessDimmed" type="range" min="10" max="100" step="1" />
+                  <span>{{ homeCardsBrightnessDimmed }}%</span>
+                </div>
+              </label>
+
+              <div class="settings__row">
+                <div>
+                  <div class="settings__row-title">Интервал времени</div>
+                  <div class="settings__row-sub">Когда применять ночную яркость</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input v-model="homeCardsBrightnessTimeStart" type="time" class="settings__text-input" style="width: 100px; text-align: center;" />
+                  <span style="color: var(--text-2); font-size: 14px;">&mdash;</span>
+                  <input v-model="homeCardsBrightnessTimeEnd" type="time" class="settings__text-input" style="width: 100px; text-align: center;" />
+                </div>
+              </div>
+            </div>
+          </Transition>
         </article>
       </template>
 
