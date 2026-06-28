@@ -1,29 +1,115 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, onMounted, onUnmounted, nextTick } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { useUIStore } from "@/stores/ui";
+import { useSettingsStore } from "@/stores/settings";
+import SidebarSettingsModal from "./SidebarSettingsModal.vue";
 
 const auth = useAuthStore();
 const ui = useUIStore();
+const settings = useSettingsStore();
+
 const photo = computed(() => auth.status.photo);
 const name = computed(() => auth.displayName);
 
-const items = [
-  { to: { name: "home" }, label: "Главная", icon: "home" },
-  { to: { name: "library" }, label: "Моя музыка", icon: "library" },
-  { to: { name: "friends" }, label: "Друзья", icon: "friends" },
-  { to: { name: "search" }, label: "Поиск", icon: "search" },
-  { to: { name: "queue" }, label: "Очередь", icon: "queue" },
-  { to: { name: "settings" }, label: "Настройки", icon: "settings" },
-];
+const ALL_SIDEBAR_ITEMS: Record<string, { to: { name: string }; label: string; icon: string }> = {
+  home: { to: { name: "home" }, label: "Главная", icon: "home" },
+  library: { to: { name: "library" }, label: "Моя музыка", icon: "library" },
+  friends: { to: { name: "friends" }, label: "Друзья", icon: "friends" },
+  search: { to: { name: "search" }, label: "Поиск", icon: "search" },
+  queue: { to: { name: "queue" }, label: "Очередь", icon: "queue" },
+  settings: { to: { name: "settings" }, label: "Настройки", icon: "settings" },
+};
+
+const items = computed(() => {
+  return settings.sidebarItems
+    .filter(item => item.visible)
+    .map(item => ALL_SIDEBAR_ITEMS[item.id])
+    .filter(Boolean);
+});
 
 const route = useRoute();
-const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.name));
+const activeIndex = computed(() => items.value.findIndex((i) => i.to.name === route.name));
+
+const showContextMenu = ref(false);
+const contextMenuPos = ref({ x: 0, y: 0 });
+
+const isMouseOverSidebar = ref(false);
+const isMouseOverContextMenu = ref(false);
+let leaveTimeout: number | null = null;
+
+function checkMouseLeave() {
+  if (leaveTimeout) window.clearTimeout(leaveTimeout);
+  leaveTimeout = window.setTimeout(() => {
+    if (!isMouseOverSidebar.value && !isMouseOverContextMenu.value) {
+      closeContextMenu();
+    }
+  }, 150); // 150ms transition grace period
+}
+
+function handleMouseLeaveSidebar() {
+  isMouseOverSidebar.value = false;
+  checkMouseLeave();
+}
+
+function handleMouseLeaveContextMenu() {
+  isMouseOverContextMenu.value = false;
+  checkMouseLeave();
+}
+
+function openContextMenu(event: MouseEvent) {
+  if (showContextMenu.value) {
+    showContextMenu.value = false;
+    nextTick(() => {
+      contextMenuPos.value = { x: event.clientX, y: event.clientY };
+      showContextMenu.value = true;
+      isMouseOverSidebar.value = true;
+    });
+  } else {
+    contextMenuPos.value = { x: event.clientX, y: event.clientY };
+    showContextMenu.value = true;
+    isMouseOverSidebar.value = true;
+  }
+  
+  if (leaveTimeout) {
+    window.clearTimeout(leaveTimeout);
+    leaveTimeout = null;
+  }
+}
+
+function closeContextMenu() {
+  showContextMenu.value = false;
+  isMouseOverContextMenu.value = false;
+  if (leaveTimeout) {
+    window.clearTimeout(leaveTimeout);
+    leaveTimeout = null;
+  }
+}
+
+function triggerEdit() {
+  closeContextMenu();
+  ui.sidebarSettingsOpen = true;
+}
+
+onMounted(() => {
+  window.addEventListener("click", closeContextMenu);
+  window.addEventListener("contextmenu", closeContextMenu);
+});
+onUnmounted(() => {
+  window.removeEventListener("click", closeContextMenu);
+  window.removeEventListener("contextmenu", closeContextMenu);
+});
 </script>
 
 <template>
-  <aside class="sidebar" :class="{ 'sidebar--collapsed': ui.sidebarCollapsed }">
+  <aside 
+    class="sidebar" 
+    :class="{ 'sidebar--collapsed': ui.sidebarCollapsed }"
+    @contextmenu.prevent.stop="openContextMenu($event)"
+    @mouseenter="isMouseOverSidebar = true"
+    @mouseleave="handleMouseLeaveSidebar"
+  >
     <div class="sidebar__logo-wrap">
       <img src="/logo.png" alt="VK Music" class="sidebar__logo" />
       <div class="sidebar__logo-text-wrapper">
@@ -65,6 +151,32 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
         </svg>
       </button>
     </div>
+
+    <!-- Custom Right-Click Context Menu -->
+    <Transition name="context-menu-fade">
+      <div 
+        v-if="showContextMenu" 
+        class="sidebar__context-menu" 
+        :style="{ top: `${contextMenuPos.y}px`, left: `${contextMenuPos.x}px` }"
+        @click.stop
+        @mouseenter="isMouseOverContextMenu = true"
+        @mouseleave="handleMouseLeaveContextMenu"
+      >
+        <button class="sidebar__context-btn" @click="triggerEdit">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+          Редактировать
+        </button>
+      </div>
+    </Transition>
+
+    <!-- Sidebar Settings Modal -->
+    <SidebarSettingsModal 
+      :show="ui.sidebarSettingsOpen" 
+      @close="ui.sidebarSettingsOpen = false" 
+    />
   </aside>
 </template>
 
@@ -296,5 +408,51 @@ const activeIndex = computed(() => items.findIndex((i) => i.to.name === route.na
   background: var(--bg-2);
   color: var(--text-0);
   transform: scale(var(--motion-scale-hover));
+}
+
+.sidebar__context-menu {
+  position: fixed;
+  background: var(--bg-elev);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md, 8px);
+  padding: 4px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  z-index: 3000;
+  min-width: 150px;
+}
+
+.sidebar__context-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 6px);
+  border: none;
+  background: transparent;
+  color: var(--text-0);
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, color 0.2s;
+}
+
+.sidebar__context-btn:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+}
+
+/* Context Menu Fade Transition */
+.context-menu-fade-enter-active,
+.context-menu-fade-leave-active {
+  transition: opacity 0.12s ease-out, transform 0.12s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.context-menu-fade-enter-from,
+.context-menu-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.92) translateY(4px);
 }
 </style>

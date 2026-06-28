@@ -35,6 +35,11 @@ export type CustomAccentType = "solid" | "gradient";
 export type DragHandleStyle = "dots" | "lines" | "grip";
 export type RouterAnimation = "fade" | "slide" | "zoom" | "none";
 
+export interface SidebarItemSetting {
+  id: string;
+  visible: boolean;
+}
+
 export const FONT_OPTIONS = [
   "Nunito",
   "Roboto",
@@ -133,6 +138,8 @@ interface PersistedSettings {
   homeCardsBrightnessDimmed: number;
   homeCardsBrightnessTimeStart: string;
   homeCardsBrightnessTimeEnd: string;
+  sidebarItems: SidebarItemSetting[];
+  trackItems: SidebarItemSetting[];
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -183,6 +190,20 @@ const defaults: PersistedSettings = {
   homeCardsBrightnessDimmed: 50,
   homeCardsBrightnessTimeStart: "22:00",
   homeCardsBrightnessTimeEnd: "06:00",
+  sidebarItems: [
+    { id: "home", visible: true },
+    { id: "library", visible: true },
+    { id: "friends", visible: true },
+    { id: "search", visible: true },
+    { id: "queue", visible: true },
+    { id: "settings", visible: true },
+  ],
+  trackItems: [
+    { id: "library", visible: true },
+    { id: "uncensored", visible: true },
+    { id: "similar", visible: true },
+    { id: "queue", visible: true },
+  ],
 };
 
 function load(): PersistedSettings {
@@ -190,6 +211,25 @@ function load(): PersistedSettings {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...defaults };
     const parsed = JSON.parse(raw) as Partial<PersistedSettings>;
+    
+    // Merge sidebar items to ensure none is lost during updates
+    if (parsed.sidebarItems) {
+      const defaultIds = defaults.sidebarItems.map(item => item.id);
+      const loadedItems = parsed.sidebarItems.filter(item => defaultIds.includes(item.id));
+      const loadedIds = loadedItems.map(item => item.id);
+      const missingItems = defaults.sidebarItems.filter(item => !loadedIds.includes(item.id));
+      parsed.sidebarItems = [...loadedItems, ...missingItems];
+    }
+    
+    // Merge track items to ensure none is lost during updates
+    if (parsed.trackItems) {
+      const defaultIds = defaults.trackItems.map(item => item.id);
+      const loadedItems = parsed.trackItems.filter(item => defaultIds.includes(item.id));
+      const loadedIds = loadedItems.map(item => item.id);
+      const missingItems = defaults.trackItems.filter(item => !loadedIds.includes(item.id));
+      parsed.trackItems = [...loadedItems, ...missingItems];
+    }
+    
     return { ...defaults, ...parsed };
   } catch {
     return { ...defaults };
@@ -267,6 +307,8 @@ export const useSettingsStore = defineStore("settings", () => {
   const customBgPosY = ref(initial.customBgPosY ?? 50);
   const customBgBrightness = ref(initial.customBgBrightness ?? 100);
   const coverBgBlur = ref(initial.coverBgBlur ?? 90);
+  const sidebarItems = ref<SidebarItemSetting[]>(initial.sidebarItems ?? defaults.sidebarItems);
+  const trackItems = ref<SidebarItemSetting[]>(initial.trackItems ?? defaults.trackItems);
 
   const homeCardsBrightness = ref(initial.homeCardsBrightness ?? 100);
   const homeCardsBrightnessAuto = ref(initial.homeCardsBrightnessAuto ?? false);
@@ -486,6 +528,8 @@ export const useSettingsStore = defineStore("settings", () => {
       homeCardsBrightnessDimmed: homeCardsBrightnessDimmed.value,
       homeCardsBrightnessTimeStart: homeCardsBrightnessTimeStart.value,
       homeCardsBrightnessTimeEnd: homeCardsBrightnessTimeEnd.value,
+      sidebarItems: sidebarItems.value,
+      trackItems: trackItems.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -540,12 +584,14 @@ export const useSettingsStore = defineStore("settings", () => {
       homeCardsBrightnessTimeStart,
       homeCardsBrightnessTimeEnd,
       currentHomeCardsBrightness,
+      sidebarItems,
+      trackItems,
     ],
     () => {
       applyToDocument();
       persist();
     },
-    { immediate: true, flush: "post" }
+    { immediate: true, flush: "post", deep: true }
   );
 
   async function syncAutoStartWithOS() {
@@ -611,6 +657,8 @@ export const useSettingsStore = defineStore("settings", () => {
     homeCardsBrightnessDimmed.value = defaults.homeCardsBrightnessDimmed;
     homeCardsBrightnessTimeStart.value = defaults.homeCardsBrightnessTimeStart;
     homeCardsBrightnessTimeEnd.value = defaults.homeCardsBrightnessTimeEnd;
+    sidebarItems.value = defaults.sidebarItems.map(item => ({ ...item }));
+    trackItems.value = defaults.trackItems.map(item => ({ ...item }));
   }
 
   return {
@@ -669,5 +717,7 @@ export const useSettingsStore = defineStore("settings", () => {
     syncAutoStartWithOS,
     setAutoStart,
     reset,
+    sidebarItems,
+    trackItems,
   };
 });

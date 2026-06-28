@@ -842,6 +842,40 @@ function onAfterLeave(el: Element) {
             </div>
           </Transition>
         </article>
+
+        <article class="settings__card">
+          <h2>Боковое меню (Сайдбар)</h2>
+          <div class="settings__row">
+            <div>
+              <div class="settings__row-title">Настройка вкладок</div>
+              <div class="settings__row-sub">Изменить порядок или видимость вкладок бокового меню</div>
+            </div>
+            <button class="btn btn--ghost" @click="ui.sidebarSettingsOpen = true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              Редактировать
+            </button>
+          </div>
+        </article>
+
+        <article class="settings__card">
+          <h2>Кнопки действий треков</h2>
+          <div class="settings__row">
+            <div>
+              <div class="settings__row-title">Настройка кнопок действий</div>
+              <div class="settings__row-sub">Изменить порядок или видимость быстрых кнопок в строках треков</div>
+            </div>
+            <button class="btn btn--ghost" @click="ui.trackSettingsOpen = true">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              Редактировать
+            </button>
+          </div>
+        </article>
       </template>
 
       <!-- Воспроизведение -->

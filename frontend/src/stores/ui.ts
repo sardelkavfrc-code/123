@@ -27,6 +27,25 @@ export const useUIStore = defineStore("ui", () => {
     sidebarCollapsed.value = true;
   }
 
+  const sidebarSettingsOpen = ref(false);
+  const trackSettingsOpen = ref(false);
+  const trackContextMenuOpen = ref(false);
+  const trackContextMenuPos = ref({ x: 0, y: 0 });
+  const isMouseOverTrackRow = ref(false);
+
+  function showTrackContextMenu(event: MouseEvent) {
+    if (trackContextMenuOpen.value) {
+      trackContextMenuOpen.value = false;
+      window.setTimeout(() => {
+        trackContextMenuPos.value = { x: event.clientX, y: event.clientY };
+        trackContextMenuOpen.value = true;
+      }, 0);
+    } else {
+      trackContextMenuPos.value = { x: event.clientX, y: event.clientY };
+      trackContextMenuOpen.value = true;
+    }
+  }
+
   function notify(message: string, kind: Toast["kind"] = "info") {
     const id = nextId++;
     toasts.value.push({ id, message, kind });
@@ -43,5 +62,17 @@ export const useUIStore = defineStore("ui", () => {
     sidebarCollapsed.value = !sidebarCollapsed.value;
   }
 
-  return { toasts, notify, dismiss, sidebarCollapsed, toggleSidebar };
+  return { 
+    toasts, 
+    notify, 
+    dismiss, 
+    sidebarCollapsed, 
+    toggleSidebar, 
+    sidebarSettingsOpen,
+    trackSettingsOpen,
+    trackContextMenuOpen,
+    trackContextMenuPos,
+    isMouseOverTrackRow,
+    showTrackContextMenu
+  };
 });

@@ -90,6 +90,10 @@ function addToQueue() {
   player.enqueueNext(props.track);
   ui.notify("Трек будет играть следующим", "success");
 }
+
+const trackItems = computed(() => {
+  return settings.trackItems.filter((item) => item.visible);
+});
 </script>
 
 <template>
@@ -99,6 +103,9 @@ function addToQueue() {
       'queue__row--current': current,
       'queue__row--playing': current && playing,
     }"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event)"
+    @mouseenter="ui.isMouseOverTrackRow = true"
+    @mouseleave="ui.isMouseOverTrackRow = false"
   >
     <span class="queue__handle" aria-hidden="true">
       <template v-if="settings.dragHandleStyle === 'lines'">
@@ -147,47 +154,50 @@ function addToQueue() {
       </div>
     </div>
     <div class="queue__actions">
-      <button
-        class="queue__action queue__action--lib"
-        :class="{ 'queue__action--in-lib': inLibrary }"
-        :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
-        @click.stop="toggleLibrary"
-      >
-        <svg v-if="!inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        <template v-else>
-          <svg class="queue__lib-check" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+      <template v-for="item in trackItems" :key="item.id">
+        <button
+          v-if="item.id === 'library'"
+          class="queue__action queue__action--lib"
+          :class="{ 'queue__action--in-lib': inLibrary }"
+          :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
+          @click.stop="toggleLibrary"
+        >
+          <svg v-if="!inLibrary" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14" />
           </svg>
-          <svg class="queue__lib-x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M6 6l12 12M18 6 6 18" />
+          <template v-else>
+            <svg class="queue__lib-check" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+              <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
+            </svg>
+            <svg class="queue__lib-x" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </template>
+        </button>
+        <button v-else-if="item.id === 'uncensored'" class="queue__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensored">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <line x1="20" y1="4" x2="8.12" y2="15.88" />
+            <line x1="14.47" y1="14.48" x2="20" y2="20" />
+            <line x1="8.12" y1="8.12" x2="12" y2="12" />
           </svg>
-        </template>
-      </button>
-      <button class="queue__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensored">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="6" cy="6" r="3" />
-          <circle cx="6" cy="18" r="3" />
-          <line x1="20" y1="4" x2="8.12" y2="15.88" />
-          <line x1="14.47" y1="14.48" x2="20" y2="20" />
-          <line x1="8.12" y1="8.12" x2="12" y2="12" />
-        </svg>
-      </button>
-      <button class="queue__action" title="Похожие" aria-label="Похожие" @click.stop="similar">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-        </svg>
-      </button>
-      <button class="queue__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="3" y1="6" x2="15" y2="6" />
-          <line x1="3" y1="12" x2="15" y2="12" />
-          <line x1="3" y1="18" x2="11" y2="18" />
-          <line x1="19" y1="9" x2="19" y2="19" />
-          <line x1="14" y1="14" x2="24" y2="14" />
-        </svg>
-      </button>
+        </button>
+        <button v-else-if="item.id === 'similar'" class="queue__action" title="Похожие" aria-label="Похожие" @click.stop="similar">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+          </svg>
+        </button>
+        <button v-else-if="item.id === 'queue'" class="queue__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="15" y2="6" />
+            <line x1="3" y1="12" x2="15" y2="12" />
+            <line x1="3" y1="18" x2="11" y2="18" />
+            <line x1="19" y1="9" x2="19" y2="19" />
+            <line x1="14" y1="14" x2="24" y2="14" />
+          </svg>
+        </button>
+      </template>
     </div>
     <span class="queue__duration">{{ formatDuration(track.duration) }}</span>
     <button

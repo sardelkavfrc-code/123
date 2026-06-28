@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, watch } from "vue";
+import { computed, onMounted, onUnmounted, watch, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import TitleBar from "@/components/TitleBar.vue";
 import Sidebar from "@/components/Sidebar.vue";
@@ -7,6 +7,7 @@ import PlayerBar from "@/components/PlayerBar.vue";
 import ToastHost from "@/components/ToastHost.vue";
 import UpdateNotification from "@/components/UpdateNotification.vue";
 import DynamicBackground from "@/components/DynamicBackground.vue";
+import TrackSettingsModal from "@/components/TrackSettingsModal.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
@@ -83,8 +84,102 @@ onMounted(() => {
   }, { immediate: true });
 });
 
+const isMouseOverTrackContextMenu = ref(false);
+let trackLeaveTimeout: number | null = null;
+
+function checkTrackMouseLeave() {
+  if (trackLeaveTimeout) window.clearTimeout(trackLeaveTimeout);
+  trackLeaveTimeout = window.setTimeout(() => {
+    if (!ui.isMouseOverTrackRow && !isMouseOverTrackContextMenu.value) {
+      ui.trackContextMenuOpen = false;
+    }
+  }, 150);
+}
+
+function handleMouseLeaveTrackContextMenu() {
+  isMouseOverTrackContextMenu.value = false;
+  checkTrackMouseLeave();
+}
+
+watch(() => ui.isMouseOverTrackRow, (val) => {
+  if (!val) {
+    checkTrackMouseLeave();
+  } else {
+    if (trackLeaveTimeout) {
+      window.clearTimeout(trackLeaveTimeout);
+      trackLeaveTimeout = null;
+    }
+  }
+});
+
+function closeTrackContextMenu() {
+  ui.trackContextMenuOpen = false;
+  isMouseOverTrackContextMenu.value = false;
+  if (trackLeaveTimeout) {
+    window.clearTimeout(trackLeaveTimeout);
+    trackLeaveTimeout = null;
+  }
+}
+
+function triggerTrackEdit() {
+  closeTrackContextMenu();
+  ui.trackSettingsOpen = true;
+}
+
+onMounted(() => {
+  if (window.vkmp) {
+    detachMediaKey = window.vkmp.onMediaKey((key) => {
+      if (key === "play-pause") player.togglePlay();
+      else if (key === "next") player.next();
+      else if (key === "prev") player.prev();
+    });
+
+    if (settings.autoUpdateCheck) {
+      window.vkmp.updater?.checkForUpdates().catch(() => {});
+    }
+    
+    // Check every hour
+    setInterval(() => {
+      if (useSettingsStore().autoUpdateCheck) {
+        window.vkmp?.updater?.checkForUpdates().catch(() => {});
+      }
+    }, 1000 * 60 * 60);
+  }
+
+  // Restore state after update
+  const unwatch = watch(() => useAuthStore().checked, (isChecked) => {
+    if (isChecked) {
+      unwatch();
+      try {
+        const rawState = localStorage.getItem("vkmp:update_restore_state");
+        if (rawState) {
+          localStorage.removeItem("vkmp:update_restore_state");
+          const state = JSON.parse(rawState);
+          if (state.queue && state.track) {
+            const idx = state.queue.findIndex((t: any) => t.id === state.track.id);
+            player.playQueue(state.queue, idx >= 0 ? idx : 0, {
+              autoPlay: state.playing,
+              startTime: state.time || 0,
+            });
+          }
+          if (state.path) {
+            router.push(state.path);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore update state", err);
+      }
+    }
+  }, { immediate: true });
+
+  window.addEventListener("click", closeTrackContextMenu);
+  window.addEventListener("contextmenu", closeTrackContextMenu);
+});
+
 onUnmounted(() => {
   detachMediaKey?.();
+  window.removeEventListener("click", closeTrackContextMenu);
+  window.removeEventListener("contextmenu", closeTrackContextMenu);
 });
 
 watch(
@@ -130,6 +225,31 @@ watch(
       <PlayerBar class="app-grid__player" />
     </div>
     <ToastHost />
+
+    <!-- Global Track Context Menu -->
+    <Transition name="context-menu-fade">
+      <div 
+        v-if="ui.trackContextMenuOpen" 
+        class="track-context-menu" 
+        :style="{ top: `${ui.trackContextMenuPos.y}px`, left: `${ui.trackContextMenuPos.x}px` }"
+        @click.stop
+        @mouseenter="isMouseOverTrackContextMenu = true"
+        @mouseleave="handleMouseLeaveTrackContextMenu"
+      >
+        <button class="track-context-btn" @click="triggerTrackEdit">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+          </svg>
+          Редактировать кнопки
+        </button>
+      </div>
+    </Transition>
+
+    <TrackSettingsModal 
+      :show="ui.trackSettingsOpen" 
+      @close="ui.trackSettingsOpen = false" 
+    />
   </div>
 </template>
 
@@ -180,5 +300,39 @@ watch(
 }
 .app-grid__player {
   grid-area: player;
+}
+
+.track-context-menu {
+  position: fixed;
+  background: var(--bg-elev);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md, 8px);
+  padding: 4px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  z-index: 3000;
+  min-width: 175px;
+}
+
+.track-context-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 6px);
+  border: none;
+  background: transparent;
+  color: var(--text-0);
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s, color 0.2s;
+}
+
+.track-context-btn:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
 }
 </style>
