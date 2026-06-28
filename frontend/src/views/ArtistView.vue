@@ -202,7 +202,12 @@ function playAll() {
     <template v-else>
       <section
         class="artist__hero"
-        :style="(artist?.banner || artist?.photo) ? { backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.banner || artist.photo})` } : undefined"
+        :style="(artist?.banner || artist?.photo) 
+          ? { 
+              backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.banner || artist.photo})`,
+              color: '#ffffff'
+            } 
+          : { color: 'var(--accent-text)' }"
       >
         <div class="artist__hero-inner">
           <div class="artist__hero-content">
@@ -320,7 +325,6 @@ function playAll() {
   background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
   background-size: cover;
   background-position: center 30%;
-  color: #fff;
   overflow: hidden;
   min-height: 280px;
   display: flex;
@@ -382,17 +386,9 @@ function playAll() {
   font-size: calc(14px * var(--font-scale, 1));
   font-weight: 600;
 }
-.artist__actions .btn--primary {
-  background: var(--text-0);
-  color: var(--bg-0);
-}
-.artist__actions .btn--primary:hover {
-  transform: scale(1.02);
-  background: #fff;
-}
 .artist__actions .btn--ghost {
   background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: inherit;
 }
 .artist__actions .btn--ghost:hover {
   background: rgba(255, 255, 255, 0.2);

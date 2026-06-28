@@ -47,6 +47,31 @@ export const FONT_OPTIONS = [
 
 export type FontName = typeof FONT_OPTIONS[number];
 
+const PREDEFINED_ACCENTS: Record<string, string> = {
+  blue: "#1a8cff",
+  magenta: "#c930ff",
+  cyan: "#16d1cf",
+  green: "#2bc48a",
+  orange: "#ff8c1a",
+  red: "#ff3b3b",
+  gold: "#ffc24a",
+  mint: "#4dd4ac",
+  lavender: "#b88dff",
+  electric: "#c4ff3a",
+  coral: "#ff7766",
+  sky: "#5cd0ff",
+  crimson: "#ff2f7a",
+};
+
+function getLuminance(hex: string) {
+  hex = hex.replace("#", "");
+  if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
+  const r = parseInt(hex.substring(0, 2), 16) || 0;
+  const g = parseInt(hex.substring(2, 4), 16) || 0;
+  const b = parseInt(hex.substring(4, 6), 16) || 0;
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
 interface PersistedSettings {
   theme: ThemeName;
   accent: AccentName;
@@ -320,6 +345,13 @@ export const useSettingsStore = defineStore("settings", () => {
       html.style.removeProperty("--accent-2");
       html.style.removeProperty("--accent-3");
     }
+
+    const currentAccentHex = customAccent.value 
+      ? customAccentColor1.value 
+      : PREDEFINED_ACCENTS[accent.value] || "#1a8cff";
+    
+    const lum = getLuminance(currentAccentHex);
+    html.style.setProperty("--accent-text", lum >= 160 ? "#000000" : "#ffffff");
   }
 
   function persist() {
