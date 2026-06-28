@@ -395,6 +395,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   gap: 12px;
   position: relative;
   min-width: 0;
+  flex: 1;
+  align-self: stretch;
 }
 .player__info-wrap {
   display: flex;
@@ -413,8 +415,11 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   left: 0;
   top: 0;
   bottom: 0;
-  max-width: 100%;
+  width: 100%;
   pointer-events: none;
+}
+.player__info-group > .track-anim-leave-active {
+  width: calc(100% - 44px);
 }
 .track-anim-enter-from {
   opacity: 0;
