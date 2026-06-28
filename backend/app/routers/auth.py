@@ -37,7 +37,7 @@ async def _resolve_user(vk: VKDep, token: str, *, has_audio: bool) -> AuthStatus
         response = await vk.call("users.get", token, fields="photo_200")
         user = parse_user(response)
     except VKError as exc:
-        if exc.code == 5:
+        if exc.code in (5, 1117, 28, 3610):
             raise HTTPException(
                 status.HTTP_401_UNAUTHORIZED,
                 detail={"kind": "vk_error", "message": exc.message},

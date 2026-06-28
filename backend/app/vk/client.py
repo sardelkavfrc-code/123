@@ -49,6 +49,8 @@ class VKClient:
         try:
             resp = await self._client.post(f"/method/{method}", data=payload)
             resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise VKError(code=-2, message=f"HTTP status error {exc.response.status_code}: {str(exc)}") from exc
         except httpx.RequestError as exc:
             raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
         

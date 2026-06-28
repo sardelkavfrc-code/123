@@ -489,9 +489,25 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
 
   return new Promise<OAuthResult>((resolve) => {
     let settled = false;
+
+    // Polling safety interval to ensure we capture URL changes (e.g. on client-side hash redirection)
+    const checkInterval = setInterval(() => {
+      try {
+        if (!oauthWin || oauthWin.isDestroyed()) {
+          clearInterval(checkInterval);
+          return;
+        }
+        const currentUrl = oauthWin.webContents.getURL();
+        onUrl(currentUrl);
+      } catch (err) {
+        clearInterval(checkInterval);
+      }
+    }, 250);
+
     const finalize = (result: OAuthResult) => {
       if (settled) return;
       settled = true;
+      clearInterval(checkInterval);
       try {
         oauthWin.close();
       } catch {
@@ -501,14 +517,31 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
     };
 
     const onUrl = (rawUrl: string) => {
+      if (!rawUrl) return;
       if (!rawUrl.startsWith(OAUTH_REDIRECT_PREFIX)) return;
       const parsed = parseOAuthFragment(rawUrl);
       if (parsed) finalize(parsed);
     };
 
+    // Events for all forms of navigation, redirects, and subframe routing
     oauthWin.webContents.on("will-redirect", (_e, redirectUrl) => onUrl(redirectUrl));
+    oauthWin.webContents.on("did-redirect-navigation", (_e, redirectUrl) => onUrl(redirectUrl));
     oauthWin.webContents.on("did-navigate", (_e, navUrl) => onUrl(navUrl));
     oauthWin.webContents.on("did-navigate-in-page", (_e, navUrl) => onUrl(navUrl));
+    oauthWin.webContents.on("did-start-navigation", (_e, navUrl) => onUrl(navUrl));
+    oauthWin.webContents.on("did-frame-navigate", (_e, navUrl) => onUrl(navUrl));
+    
+    // Check URL state when loading completes
+    oauthWin.webContents.on("did-stop-loading", () => {
+      try {
+        if (!oauthWin.isDestroyed()) {
+          onUrl(oauthWin.webContents.getURL());
+        }
+      } catch {
+        // ignore
+      }
+    });
+
     oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
 
     void oauthWin.loadURL(url);
