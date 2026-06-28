@@ -112,12 +112,14 @@ def main() -> None:
         threading.Thread(target=_watch_parent, args=(initial_ppid,), daemon=True).start()
         threading.Thread(target=_watch_parent_stdin, daemon=True).start()
 
+    is_dev = os.environ.get("VKMP_DEV") == "1"
+
     config = uvicorn.Config(
         app,
         host=host,
         port=port,
-        log_level="warning",
-        access_log=False,
+        log_level="info" if is_dev else "warning",
+        access_log=is_dev,
         loop="asyncio",
         lifespan="on",
     )

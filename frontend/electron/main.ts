@@ -11,8 +11,10 @@ import {
 } from "electron";
 import { autoUpdater } from "electron-updater";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
+import http from "node:http";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import type { Readable, Writable } from "node:stream";
 
@@ -33,10 +35,159 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
+let proxyServer: http.Server | null = null;
+let proxyPort = 0;
+
+function startProxy(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    if (proxyServer) {
+      resolve(proxyPort);
+      return;
+    }
+
+    const server = http.createServer((req, res) => {
+      try {
+        const urlStr = req.url || "";
+        if (!urlStr.startsWith("http://") && !urlStr.startsWith("https://")) {
+          res.writeHead(400);
+          res.end("Only absolute URLs are supported by this proxy.");
+          return;
+        }
+        const url = new URL(urlStr);
+        const options = {
+          hostname: url.hostname,
+          port: url.port || 80,
+          path: url.pathname + url.search,
+          method: req.method,
+          headers: req.headers,
+        };
+
+        const proxyReq = http.request(options, (proxyRes) => {
+          if (res.writableEnded) return;
+          res.writeHead(proxyRes.statusCode || 200, proxyRes.headers);
+          proxyRes.pipe(res);
+        });
+
+        proxyReq.on("error", (err) => {
+          if (res.writableEnded) return;
+          res.writeHead(502);
+          res.end(err.message);
+        });
+
+        req.pipe(proxyReq);
+      } catch (err: any) {
+        if (res.writableEnded) return;
+        res.writeHead(500);
+        res.end(err.message || "Proxy internal error");
+      }
+    });
+
+    server.on("connect", (req, clientSocket, head) => {
+      try {
+        const reqUrl = req.url || "";
+        const parts = reqUrl.split(":");
+        const hostname = parts[0];
+        const port = parseInt(parts[1], 10) || 443;
+
+        const serverSocket = net.connect(port, hostname, () => {
+          clientSocket.write("HTTP/1.1 200 Connection Established\r\n\r\n");
+          serverSocket.write(head);
+          serverSocket.pipe(clientSocket);
+          clientSocket.pipe(serverSocket);
+        });
+
+        serverSocket.on("error", () => {
+          clientSocket.end("HTTP/1.1 502 Bad Gateway\r\n\r\n");
+        });
+
+        clientSocket.on("error", () => {
+          serverSocket.end();
+        });
+      } catch {
+        clientSocket.end("HTTP/1.1 500 Internal Server Error\r\n\r\n");
+      }
+    });
+
+    server.on("error", (err) => {
+      reject(err);
+    });
+
+    server.listen(0, "127.0.0.1", () => {
+      const addr = server.address();
+      if (addr && typeof addr === "object") {
+        proxyServer = server;
+        proxyPort = addr.port;
+        console.log(`Electron main proxy listening on port ${proxyPort}`);
+        resolve(proxyPort);
+      } else {
+        reject(new Error("Failed to get proxy server port"));
+      }
+    });
+  });
+}
+
+function stopProxy(): void {
+  if (proxyServer) {
+    try {
+      proxyServer.close();
+    } catch {
+      // ignore
+    }
+    proxyServer = null;
+    proxyPort = 0;
+  }
+}
+
 let backendProc: ChildProcessByStdio<Writable, Readable, Readable> | null = null;
 let backendPort = 0;
 let backendReady = false;
 let backendReadyPromise: Promise<void> | null = null;
+
+function findDevPython(): string {
+  if (process.platform === "win32") {
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData/Local");
+    const poetryCacheDir = path.join(localAppData, "pypoetry/Cache/virtualenvs");
+    if (existsSync(poetryCacheDir)) {
+      try {
+        const dirs = readdirSync(poetryCacheDir);
+        const targetDir = dirs.find(d => d.startsWith("vk-music-backend-"));
+        if (targetDir) {
+          const pythonPath = path.join(poetryCacheDir, targetDir, "Scripts/python.exe");
+          if (existsSync(pythonPath)) {
+            console.log(`[main] Found virtualenv python: ${pythonPath}`);
+            return pythonPath;
+          }
+        }
+      } catch (err) {
+        console.error("[main] Failed to scan Poetry cache directory:", err);
+      }
+    }
+  } else {
+    const home = os.homedir();
+    const poetryCacheDirs = [
+      path.join(home, ".cache/pypoetry/virtualenvs"),
+      path.join(home, "Library/Caches/pypoetry/virtualenvs")
+    ];
+    for (const cacheDir of poetryCacheDirs) {
+      if (existsSync(cacheDir)) {
+        try {
+          const dirs = readdirSync(cacheDir);
+          const targetDir = dirs.find(d => d.startsWith("vk-music-backend-"));
+          if (targetDir) {
+            const pythonPath = path.join(cacheDir, targetDir, "bin/python");
+            if (existsSync(pythonPath)) {
+              console.log(`[main] Found virtualenv python: ${pythonPath}`);
+              return pythonPath;
+            }
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }
+  return "poetry";
+}
 
 function findBackendBinary(): string {
   const binaryName = process.platform === "win32" ? "vkmp-backend.exe" : "vkmp-backend";
@@ -72,12 +223,70 @@ function pickFreePort(): Promise<number> {
 }
 
 async function startBackend(): Promise<void> {
+  const localProxyPort = await startProxy();
+  const proxyUrl = `http://127.0.0.1:${localProxyPort}`;
+
   if (isDev && VITE_DEV_SERVER_URL) {
-    // In Vite dev mode the developer runs `poetry run fastapi dev … --port 8765` themselves.
-    backendPort = 8765;
-    backendReady = true;
-    return;
+    backendPort = await pickFreePort();
+    const backendDir = path.resolve(__dirname, "../../backend");
+    console.log(`[main] Starting backend in dev mode on port ${backendPort}...`);
+
+    const pythonPath = findDevPython();
+    const spawnCmd = pythonPath;
+    const spawnArgs = pythonPath === "poetry"
+      ? ["run", "python", "-m", "app.standalone"]
+      : ["-m", "app.standalone"];
+
+    backendProc = spawn(spawnCmd, spawnArgs, {
+      cwd: backendDir,
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: pythonPath === "poetry",
+      windowsHide: true,
+      env: {
+        ...process.env,
+        VKMP_BIND_HOST: "127.0.0.1",
+        VKMP_BIND_PORT: String(backendPort),
+        VKMP_WATCH_PARENT: "1",
+        HTTP_PROXY: proxyUrl,
+        HTTPS_PROXY: proxyUrl,
+        http_proxy: proxyUrl,
+        https_proxy: proxyUrl,
+        NO_PROXY: "localhost,127.0.0.1",
+        no_proxy: "localhost,127.0.0.1",
+        PYTHONPATH: ".",
+        VKMP_DEV: "1",
+      },
+    });
+
+    backendReadyPromise = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("backend dev boot timeout")), 30_000);
+      backendProc?.stdout?.on("data", (chunk: Buffer) => {
+        const text = chunk.toString();
+        if (text.includes("VKMP_BACKEND_READY")) {
+          clearTimeout(timer);
+          backendReady = true;
+          resolve();
+        }
+        const cleanText = text.trim();
+        if (cleanText) {
+          console.log(`[backend stdout] ${cleanText}`);
+        }
+      });
+      backendProc?.stderr?.on("data", (chunk: Buffer) => {
+        const cleanText = chunk.toString().trim();
+        if (cleanText) {
+          console.error(`[backend stderr] ${cleanText}`);
+        }
+      });
+      backendProc?.on("exit", (code) => {
+        clearTimeout(timer);
+        backendProc = null;
+        if (!backendReady) reject(new Error(`backend dev exited early with code ${code ?? "null"}`));
+      });
+    });
+    return backendReadyPromise;
   }
+
   const binary = findBackendBinary();
   if (!binary) {
     console.error(
@@ -98,6 +307,12 @@ async function startBackend(): Promise<void> {
       VKMP_BIND_HOST: "127.0.0.1",
       VKMP_BIND_PORT: String(backendPort),
       VKMP_WATCH_PARENT: "1",
+      HTTP_PROXY: proxyUrl,
+      HTTPS_PROXY: proxyUrl,
+      http_proxy: proxyUrl,
+      https_proxy: proxyUrl,
+      NO_PROXY: "localhost,127.0.0.1",
+      no_proxy: "localhost,127.0.0.1",
     },
   });
   backendReadyPromise = new Promise<void>((resolve, reject) => {
@@ -108,6 +323,16 @@ async function startBackend(): Promise<void> {
         clearTimeout(timer);
         backendReady = true;
         resolve();
+      }
+      const cleanText = text.trim();
+      if (cleanText) {
+        console.log(`[backend stdout] ${cleanText}`);
+      }
+    });
+    backendProc?.stderr?.on("data", (chunk: Buffer) => {
+      const cleanText = chunk.toString().trim();
+      if (cleanText) {
+        console.error(`[backend stderr] ${cleanText}`);
       }
     });
     backendProc?.on("exit", (code) => {
@@ -314,6 +539,10 @@ app.on("second-instance", (event, commandLine) => {
 });
 
 app.whenReady().then(() => {
+  startBackend().catch((err) => {
+    console.error("VK Music: failed to start backend", err);
+  });
+
   try {
     DESKTOP_UA = session.defaultSession.getUserAgent()
       .replace(/Electron\/[\d.]+\s?/g, "")
@@ -323,14 +552,12 @@ app.whenReady().then(() => {
     console.error("Failed to update desktop UA:", err);
   }
 
-  cleanLegacyRegistry();
+  setTimeout(() => {
+    cleanLegacyRegistry();
+  }, 5000);
   mainWindow = createWindow();
   createTray();
   registerMediaKeys();
-
-  startBackend().catch((err) => {
-    console.error("VK Music: failed to start backend", err);
-  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -348,11 +575,13 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   isQuitting = true;
   stopBackend();
+  stopProxy();
 });
 
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
   stopBackend();
+  stopProxy();
 });
 
 // Update setup
@@ -388,6 +617,7 @@ ipcMain.handle("update:download", () => autoUpdater.downloadUpdate());
 ipcMain.handle("update:install", () => {
   isQuitting = true;
   stopBackend();
+  stopProxy();
   // isSilent: true, isForceRunAfter: true
   autoUpdater.quitAndInstall(true, true);
 });
