@@ -9,6 +9,7 @@ import { useEqualizerStore } from "@/stores/equalizer";
 import { formatDuration } from "@/composables/useFormat";
 import { useExternalArt } from "@/composables/useExternalArt";
 import EqualizerModal from "./EqualizerModal.vue";
+import SvgIcon from "./SvgIcon.vue";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
@@ -179,16 +180,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
             :title="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
             @click="toggleLibrary"
           >
-            <svg v-if="!inLibrary" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <SvgIcon v-if="!inLibrary" name="plus" width="22" height="22" />
             <template v-else>
-              <svg class="player__lib-check" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M9 16.2 5.5 12.7 4 14.2 9 19.2 20 8.2 18.5 6.7z" />
-              </svg>
-              <svg class="player__lib-remove" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                <path d="M6 6l12 12M18 6 6 18" />
-              </svg>
+              <SvgIcon name="check" class="player__lib-check" width="22" height="22" />
+              <SvgIcon name="cross" class="player__lib-remove" width="22" height="22" />
             </template>
           </button>
         </div>
@@ -199,12 +194,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       <div class="player__buttons">
         <div class="player__actions">
           <button class="player__icon-btn" :disabled="!current" title="Без цензуры" aria-label="Без цензуры" @click="uncensoredSearch">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><line x1="20" y1="4" x2="8.12" y2="15.88" /><line x1="14.47" y1="14.48" x2="20" y2="20" /><line x1="8.12" y1="8.12" x2="12" y2="12" /></svg>
+            <SvgIcon name="uncensored" width="22" height="22" />
           </button>
           <button class="player__icon-btn" :disabled="!current" title="Похожие (рекомендации ВК)" aria-label="Похожие" @click="openSimilar">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-            </svg>
+            <SvgIcon name="similar" width="22" height="22" />
           </button>
         </div>
 
@@ -217,28 +210,20 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           :title="shuffle ? 'Выключить перемешивание' : 'Включить перемешивание'"
           @click="player.toggleShuffle()"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 3h5v5" />
-            <path d="M4 20 21 3" />
-            <path d="M21 16v5h-5" />
-            <path d="m15 15 6 6" />
-            <path d="M4 4l5 5" />
-          </svg>
+          <SvgIcon name="shuffle" width="22" height="22" />
         </button>
         <button class="player__icon-btn" :disabled="!player.hasPrev" aria-label="Предыдущий" title="Предыдущий трек" @click="player.prev()">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L8 12z" /></svg>
+          <SvgIcon name="prev" width="24" height="24" />
         </button>
         <button class="player__play" :aria-label="isPlaying ? 'Пауза' : 'Воспроизвести'" :title="isPlaying ? 'Пауза' : 'Воспроизвести'" @click="player.togglePlay()">
-          <svg v-if="loadingTrack" viewBox="0 0 24 24" width="22" height="22" class="player__spinner">
+          <svg v-if="loadingTrack" viewBox="0 0 24 24" width="24" height="24" class="player__spinner">
             <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="14 30" />
           </svg>
-          <svg v-else-if="isPlaying" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-            <rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          <SvgIcon v-else-if="isPlaying" name="pause" width="24" height="24" />
+          <SvgIcon v-else name="play" width="24" height="24" />
         </button>
         <button class="player__icon-btn" :disabled="!player.hasNext" aria-label="Следующий" title="Следующий трек" @click="player.next()">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16 5h2v14h-2zM4 5v14l12-7z" /></svg>
+          <SvgIcon name="next" width="24" height="24" />
         </button>
         <button
           class="player__icon-btn"
@@ -247,12 +232,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           :title="repeat === 'off' ? 'Включить повтор' : (repeat === 'all' ? 'Повторять один трек' : 'Выключить повтор')"
           @click="player.cycleRepeat()"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="17 1 21 5 17 9" />
-            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-            <polyline points="7 23 3 19 7 15" />
-            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-          </svg>
+          <SvgIcon name="repeat" width="22" height="22" />
           <span v-if="repeat === 'one'" class="player__repeat-badge">1</span>
         </button>
 
@@ -260,10 +240,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 
         <div class="player__actions">
           <button class="player__icon-btn" :disabled="!current" title="Слушать далее" aria-label="Слушать далее" @click="addToQueue">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="15" y2="6" /><line x1="3" y1="12" x2="15" y2="12" /><line x1="3" y1="18" x2="11" y2="18" /><line x1="19" y1="9" x2="19" y2="19" /><line x1="14" y1="14" x2="24" y2="14" /></svg>
+            <SvgIcon name="queue_add" width="22" height="22" />
           </button>
           <button class="player__icon-btn" :disabled="!current" title="Открыть очередь" aria-label="Очередь" @click="openQueue">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
+            <SvgIcon name="queue_list" width="22" height="22" />
           </button>
         </div>
       </div>
@@ -299,12 +279,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           aria-label="Эквалайзер" 
           @click="showEqModal = true"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 22v-8M4 10V2M12 22v-4M12 14V2M20 22v-12M20 6V2" />
-            <line x1="2" y1="14" x2="6" y2="14" />
-            <line x1="10" y1="18" x2="14" y2="18" />
-            <line x1="18" y1="10" x2="22" y2="10" />
-          </svg>
+          <SvgIcon name="equalizer" width="22" height="22" />
         </button>
         <div class="player__volume-slider-wrap">
           <button
@@ -313,12 +288,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           :title="muted ? 'Включить звук' : 'Выключить звук'"
           @click="player.toggleMute()"
         >
-          <svg v-if="muted || volume === 0" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M16.5 12 22 6.5l-1.4-1.4L15 10.6 9.4 5 8 6.4 13.6 12 8 17.6 9.4 19 15 13.4l5.6 5.6 1.4-1.4z" />
-          </svg>
-          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M3 9v6h4l5 5V4L7 9zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z" />
-          </svg>
+          <SvgIcon v-if="muted || volume === 0" name="volume_mute" width="22" height="22" />
+          <SvgIcon v-else name="volume_high" width="22" height="22" />
         </button>
         <div
           class="player__volume-track"

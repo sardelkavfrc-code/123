@@ -2,6 +2,8 @@
 import { useSettingsStore } from "@/stores/settings";
 import { storeToRefs } from "pinia";
 import draggable from "vuedraggable";
+import SvgIcon from "./SvgIcon.vue";
+import type { IconName } from "@/utils/icons";
 
 defineProps<{ show: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -9,7 +11,7 @@ const emit = defineEmits<{ close: [] }>();
 const settings = useSettingsStore();
 const { trackItems } = storeToRefs(settings);
 
-const ALL_ITEMS_MAP: Record<string, { label: string; icon: string }> = {
+const ALL_ITEMS_MAP: Record<string, { label: string; icon: IconName }> = {
   library: { label: "Добавить в библиотеку / Удалить", icon: "library" },
   uncensored: { label: "Без цензуры (Найти оригинал)", icon: "uncensored" },
   similar: { label: "Похожие треки", icon: "similar" },
@@ -32,17 +34,11 @@ function resetDefaults() {
       <div class="track-settings-modal" @click.stop>
         <div class="track-settings-modal__header">
           <div class="track-settings-modal__title-group">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-            </svg>
+            <SvgIcon name="edit" width="20" height="20" />
             <h2>Кнопки действий треков</h2>
           </div>
           <button class="track-settings-modal__close-btn" @click="emit('close')" aria-label="Закрыть">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <SvgIcon name="cross" width="18" height="18" />
           </button>
         </div>
 
@@ -62,14 +58,11 @@ function resetDefaults() {
             <template #item="{ element }">
               <li class="track-settings-modal__item">
                 <button class="track-settings-modal__drag-handle" title="Перетащить кнопку">
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="9" cy="5" r="1" /><circle cx="9" cy="12" r="1" /><circle cx="9" cy="19" r="1" />
-                    <circle cx="15" cy="5" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="19" r="1" />
-                  </svg>
+                  <SvgIcon name="drag_handle" width="16" height="16" />
                 </button>
                 
                 <div class="track-settings-modal__item-content">
-                  <span class="track-settings-modal__icon" :data-icon="ALL_ITEMS_MAP[element.id]?.icon || 'library'" />
+                  <SvgIcon :name="ALL_ITEMS_MAP[element.id]?.icon || 'library'" class="track-settings-modal__icon" width="18" height="18" />
                   <span class="track-settings-modal__label">{{ ALL_ITEMS_MAP[element.id]?.label || element.id }}</span>
                 </div>
 
@@ -242,31 +235,10 @@ function resetDefaults() {
 .track-settings-modal__icon {
   width: 18px;
   height: 18px;
-  background: currentColor;
-  -webkit-mask-position: center;
-  mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-  mask-size: contain;
   color: var(--text-1);
-}
-
-.track-settings-modal__icon[data-icon="library"] {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
-}
-.track-settings-modal__icon[data-icon="uncensored"] {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'/%3E%3Ccircle cx='6' cy='18' r='3'/%3E%3Cline x1='20' y1='4' x2='8.12' y2='15.88'/%3E%3Cline x1='14.47' y1='14.48' x2='20' y2='20'/%3E%3Cline x1='8.12' y1='8.12' x2='12' y2='12'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6' cy='6' r='3'/%3E%3Ccircle cx='6' cy='18' r='3'/%3E%3Cline x1='20' y1='4' x2='8.12' y2='15.88'/%3E%3Cline x1='14.47' y1='14.48' x2='20' y2='20'/%3E%3Cline x1='8.12' y1='8.12' x2='12' y2='12'/%3E%3C/svg%3E");
-}
-.track-settings-modal__icon[data-icon="similar"] {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z'/%3E%3C/svg%3E");
-}
-.track-settings-modal__icon[data-icon="queue"] {
-  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='3' y1='6' x2='15' y2='6'/%3E%3Cline x1='3' y1='12' x2='15' y2='12'/%3E%3Cline x1='3' y1='18' x2='11' y2='18'/%3E%3Cline x1='19' y1='9' x2='19' y2='19'/%3E%3Cline x1='14' y1='14' x2='24' y2='14'/%3E%3C/svg%3E");
-  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='3' y1='6' x2='15' y2='6'/%3E%3Cline x1='3' y1='12' x2='15' y2='12'/%3E%3Cline x1='3' y1='18' x2='11' y2='18'/%3E%3Cline x1='19' y1='9' x2='19' y2='19'/%3E%3Cline x1='14' y1='14' x2='24' y2='14'/%3E%3C/svg%3E");
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .track-settings-modal__label {

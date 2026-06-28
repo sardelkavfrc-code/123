@@ -60,6 +60,7 @@ const {
   homeCardsBrightnessDimmed,
   homeCardsBrightnessTimeStart,
   homeCardsBrightnessTimeEnd,
+  iconSet,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -772,6 +773,39 @@ function onAfterLeave(el: Element) {
                 @click="dragHandleStyle = 'grip'"
               >
                 Хват
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article class="settings__card">
+          <h2>Значки и иконки</h2>
+          <div class="settings__row" style="align-items: flex-start;">
+            <div>
+              <div class="settings__row-title">Стиль значков</div>
+              <div class="settings__row-sub">Стиль оформления всех иконок в плеере и меню</div>
+            </div>
+            <div class="settings__segmented">
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': iconSet === 'line' }"
+                @click="iconSet = 'line'"
+              >
+                Контурные
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': iconSet === 'flat' }"
+                @click="iconSet = 'flat'"
+              >
+                Залитые
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': iconSet === 'rounded' }"
+                @click="iconSet = 'rounded'"
+              >
+                Скругленные
               </button>
             </div>
           </div>

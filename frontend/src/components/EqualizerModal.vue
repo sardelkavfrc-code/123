@@ -2,6 +2,7 @@
 import { useEqualizerStore } from "@/stores/equalizer";
 import { storeToRefs } from "pinia";
 import { computed, ref, nextTick } from "vue";
+import SvgIcon from "./SvgIcon.vue";
 
 defineProps<{ show: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -77,12 +78,7 @@ const activeGains = computed(() => {
       <div class="eq-modal" @click.stop>
         <div class="eq-modal__header">
         <div class="eq-modal__title-group">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 22v-8M4 10V2M12 22v-4M12 14V2M20 22v-12M20 6V2" />
-            <line x1="2" y1="14" x2="6" y2="14" />
-            <line x1="10" y1="18" x2="14" y2="18" />
-            <line x1="18" y1="10" x2="22" y2="10" />
-          </svg>
+          <SvgIcon name="equalizer" width="20" height="20" />
           <h2>Эквалайзер</h2>
         </div>
         

@@ -140,6 +140,7 @@ interface PersistedSettings {
   homeCardsBrightnessTimeEnd: string;
   sidebarItems: SidebarItemSetting[];
   trackItems: SidebarItemSetting[];
+  iconSet: "line" | "flat" | "rounded";
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -204,6 +205,7 @@ const defaults: PersistedSettings = {
     { id: "similar", visible: true },
     { id: "queue", visible: true },
   ],
+  iconSet: "rounded",
 };
 
 function load(): PersistedSettings {
@@ -309,6 +311,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const coverBgBlur = ref(initial.coverBgBlur ?? 90);
   const sidebarItems = ref<SidebarItemSetting[]>(initial.sidebarItems ?? defaults.sidebarItems);
   const trackItems = ref<SidebarItemSetting[]>(initial.trackItems ?? defaults.trackItems);
+  const iconSet = ref<"line" | "flat" | "rounded">(initial.iconSet ?? defaults.iconSet);
 
   const homeCardsBrightness = ref(initial.homeCardsBrightness ?? 100);
   const homeCardsBrightnessAuto = ref(initial.homeCardsBrightnessAuto ?? false);
@@ -530,6 +533,7 @@ export const useSettingsStore = defineStore("settings", () => {
       homeCardsBrightnessTimeEnd: homeCardsBrightnessTimeEnd.value,
       sidebarItems: sidebarItems.value,
       trackItems: trackItems.value,
+      iconSet: iconSet.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -586,6 +590,7 @@ export const useSettingsStore = defineStore("settings", () => {
       currentHomeCardsBrightness,
       sidebarItems,
       trackItems,
+      iconSet,
     ],
     () => {
       applyToDocument();
@@ -659,6 +664,7 @@ export const useSettingsStore = defineStore("settings", () => {
     homeCardsBrightnessTimeEnd.value = defaults.homeCardsBrightnessTimeEnd;
     sidebarItems.value = defaults.sidebarItems.map(item => ({ ...item }));
     trackItems.value = defaults.trackItems.map(item => ({ ...item }));
+    iconSet.value = defaults.iconSet;
   }
 
   return {
@@ -719,5 +725,6 @@ export const useSettingsStore = defineStore("settings", () => {
     reset,
     sidebarItems,
     trackItems,
+    iconSet,
   };
 });
