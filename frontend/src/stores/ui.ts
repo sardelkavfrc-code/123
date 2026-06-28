@@ -31,9 +31,11 @@ export const useUIStore = defineStore("ui", () => {
   const trackSettingsOpen = ref(false);
   const trackContextMenuOpen = ref(false);
   const trackContextMenuPos = ref({ x: 0, y: 0 });
-  const isMouseOverTrackRow = ref(false);
+  const hoveredTrackKey = ref<string | null>(null);
+  const activeContextMenuTrackKey = ref<string | null>(null);
 
-  function showTrackContextMenu(event: MouseEvent) {
+  function showTrackContextMenu(event: MouseEvent, key: string) {
+    activeContextMenuTrackKey.value = key;
     if (trackContextMenuOpen.value) {
       trackContextMenuOpen.value = false;
       window.setTimeout(() => {
@@ -72,7 +74,8 @@ export const useUIStore = defineStore("ui", () => {
     trackSettingsOpen,
     trackContextMenuOpen,
     trackContextMenuPos,
-    isMouseOverTrackRow,
+    hoveredTrackKey,
+    activeContextMenuTrackKey,
     showTrackContextMenu
   };
 });

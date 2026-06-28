@@ -90,7 +90,8 @@ let trackLeaveTimeout: number | null = null;
 function checkTrackMouseLeave() {
   if (trackLeaveTimeout) window.clearTimeout(trackLeaveTimeout);
   trackLeaveTimeout = window.setTimeout(() => {
-    if (!ui.isMouseOverTrackRow && !isMouseOverTrackContextMenu.value) {
+    const isOverActiveTrack = ui.hoveredTrackKey === ui.activeContextMenuTrackKey;
+    if (!isOverActiveTrack && !isMouseOverTrackContextMenu.value) {
       ui.trackContextMenuOpen = false;
     }
   }, 150);
@@ -101,8 +102,8 @@ function handleMouseLeaveTrackContextMenu() {
   checkTrackMouseLeave();
 }
 
-watch(() => ui.isMouseOverTrackRow, (val) => {
-  if (!val) {
+watch(() => ui.hoveredTrackKey, (newVal) => {
+  if (newVal !== ui.activeContextMenuTrackKey) {
     checkTrackMouseLeave();
   } else {
     if (trackLeaveTimeout) {
@@ -120,6 +121,8 @@ watch(() => ui.trackContextMenuOpen, (isOpen) => {
       window.clearTimeout(trackLeaveTimeout);
       trackLeaveTimeout = null;
     }
+  } else {
+    ui.activeContextMenuTrackKey = null;
   }
 });
 

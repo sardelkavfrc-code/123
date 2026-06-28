@@ -94,6 +94,7 @@ function addToQueue() {
 const trackItems = computed(() => {
   return settings.trackItems.filter((item) => item.visible);
 });
+const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 </script>
 
 <template>
@@ -103,9 +104,9 @@ const trackItems = computed(() => {
       'queue__row--current': current,
       'queue__row--playing': current && playing,
     }"
-    @contextmenu.prevent.stop="ui.showTrackContextMenu($event)"
-    @mouseenter="ui.isMouseOverTrackRow = true"
-    @mouseleave="ui.isMouseOverTrackRow = false"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, trackKey)"
+    @mouseenter="ui.hoveredTrackKey = trackKey"
+    @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >
     <span class="queue__handle" aria-hidden="true">
       <template v-if="settings.dragHandleStyle === 'lines'">

@@ -110,6 +110,7 @@ const settings = useSettingsStore();
 const trackItems = computed(() => {
   return settings.trackItems.filter((item) => item.visible);
 });
+const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 </script>
 
 <template>
@@ -117,9 +118,9 @@ const trackItems = computed(() => {
     class="row"
     :class="{ 'row--playing': isCurrent, 'row--compact': variant === 'compact', 'row--off': unavailable }"
     @dblclick="playOne"
-    @contextmenu.prevent.stop="ui.showTrackContextMenu($event)"
-    @mouseenter="ui.isMouseOverTrackRow = true"
-    @mouseleave="ui.isMouseOverTrackRow = false"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, trackKey)"
+    @mouseenter="ui.hoveredTrackKey = trackKey"
+    @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >
     <div class="row__lead">
       <span v-if="showIndex && !isCurrent" class="row__index">{{ (index ?? 0) + 1 }}</span>
