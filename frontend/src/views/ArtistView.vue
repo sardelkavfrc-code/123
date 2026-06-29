@@ -193,13 +193,14 @@ function playAll() {
 
 <template>
   <ScrollArea @reach-end="loadMoreTracks">
-    <div v-if="loading" class="artist__loading-full">
-      <Spinner :size="32" /> 
-      <div style="margin-top: 16px; color: var(--text-2);">Загружаем артиста…</div>
-    </div>
-    <div v-else-if="error" class="artist__error-full">{{ error }}</div>
-    
-    <template v-else>
+    <Transition name="content-reveal" mode="out-in">
+      <div v-if="loading" key="loading" class="artist__loading-full">
+        <Spinner :size="32" /> 
+        <div style="margin-top: 16px; color: var(--text-2);">Загружаем артиста…</div>
+      </div>
+      <div v-else-if="error" key="error" class="artist__error-full">{{ error }}</div>
+      
+      <div v-else :key="'content-' + props.id" class="artist__content-wrapper">
       <section
         class="artist__hero"
         :style="(artist?.banner || artist?.photo) 
@@ -300,7 +301,8 @@ function playAll() {
         </div>
       </Transition>
       </section>
-    </template>
+      </div>
+    </Transition>
   </ScrollArea>
 </template>
 
@@ -524,5 +526,24 @@ function playAll() {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-10px);
+}
+
+/* Smooth reveal animation */
+.content-reveal-enter-active {
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.content-reveal-leave-active {
+  transition: opacity 0.2s ease-in, transform 0.2s ease-in;
+}
+.content-reveal-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+  filter: blur(8px);
+}
+.content-reveal-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
 }
 </style>
