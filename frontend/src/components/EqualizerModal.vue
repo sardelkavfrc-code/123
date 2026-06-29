@@ -82,8 +82,7 @@ const activeGains = computed(() => {
     <Transition name="eq-fade">
       <div v-if="show" class="eq-overlay" @click.self="emit('close')">
         <div class="eq-modal" @click.stop>
-          
-          <Transition name="eq-fade">
+<Transition name="eq-fade">
             <div v-if="presetToDelete" class="eq-confirm-overlay">
               <div class="eq-confirm-box">
                 <h4>Удалить пресет?</h4>
