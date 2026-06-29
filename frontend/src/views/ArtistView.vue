@@ -32,6 +32,8 @@ const albumsLoaded = ref(false);
 const albumsError = ref<string | null>(null);
 const loadingAlbumId = ref<string | null>(null);
 
+const isTransitioning = ref(false);
+
 const tab = ref<ArtistTab>("all");
 
 const loading = ref(false);
@@ -48,17 +50,15 @@ const tracksHasMore = computed(
 );
 
 async function load() {
-  loading.value = true;
-  error.value = null;
-  tracksWarning.value = null;
-  
-  albumsLoaded.value = false;
-  albumsError.value = null;
-  loadingAlbumId.value = null;
-  tab.value = "all";
-
   const currentId = props.id;
   const name = hintedName.value ?? undefined;
+
+  if (!artist.value) {
+    loading.value = true;
+  }
+  
+  error.value = null;
+  tracksWarning.value = null;
 
   const [infoRes, listRes] = await Promise.allSettled([
     api.artist(props.id, name ? { name } : {}),
@@ -67,9 +67,9 @@ async function load() {
 
   if (currentId !== props.id) return; // prevent race condition
 
+  let bgUrl = null;
   if (infoRes.status === "fulfilled") {
-    artist.value = infoRes.value;
-    const bgUrl = artist.value.banner || artist.value.photo;
+    bgUrl = infoRes.value.banner || infoRes.value.photo;
     if (bgUrl) {
       await new Promise((resolve) => {
         const img = new Image();
@@ -78,6 +78,26 @@ async function load() {
         img.src = bgUrl;
       });
     }
+  }
+
+  if (currentId !== props.id) return; // prevent race condition
+
+  // Fade out old content
+  if (!loading.value) {
+    isTransitioning.value = true;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  if (currentId !== props.id) return;
+
+  // Swap data
+  tab.value = "all";
+  albumsBlocks.value = [];
+  albumsLoaded.value = false;
+  albumsError.value = null;
+  loadingAlbumId.value = null;
+
+  if (infoRes.status === "fulfilled") {
+    artist.value = infoRes.value;
   } else {
     artist.value = {
       id: props.id,
@@ -93,18 +113,21 @@ async function load() {
     tracks.value = listRes.value.items;
     tracksTotal.value = listRes.value.count;
   } else {
-    const reason = listRes.reason;
-    tracksWarning.value =
-      reason instanceof APIError
-        ? reason.detail.message || "Не удалось загрузить треки артиста"
-        : (reason as Error).message || "Не удалось загрузить треки артиста";
+    tracks.value = [];
+    tracksTotal.value = 0;
+    tracksWarning.value = "Не удалось загрузить треки";
   }
 
   if (!artist.value && !tracks.value.length) {
     error.value = "Артист не найден";
   }
 
-  loading.value = false;
+  // Fade in
+  if (!loading.value) {
+    isTransitioning.value = false;
+  } else {
+    loading.value = false;
+  }
 }
 
 async function loadMoreTracks() {
@@ -197,14 +220,13 @@ function playAll() {
 
 <template>
   <ScrollArea @reach-end="loadMoreTracks">
-    <Transition name="content-reveal" mode="out-in">
-      <div v-if="loading" key="loading" class="artist__loading-full">
-        <Spinner :size="32" /> 
-        <div style="margin-top: 16px; color: var(--text-2);">Загружаем артиста…</div>
-      </div>
-      <div v-else-if="error" key="error" class="artist__error-full">{{ error }}</div>
-      
-      <div v-else :key="'content-' + props.id" class="artist__content-wrapper">
+    <div v-if="loading" class="artist__loading-full">
+      <Spinner :size="32" /> 
+      <div style="margin-top: 16px; color: var(--text-2);">Загружаем артиста…</div>
+    </div>
+    <div v-else-if="error" class="artist__error-full">{{ error }}</div>
+    
+    <div v-else class="artist__content-wrapper" :class="{ 'is-transitioning': isTransitioning }">
       <section
         class="artist__hero"
         :style="(artist?.banner || artist?.photo) 
@@ -305,8 +327,7 @@ function playAll() {
         </div>
       </Transition>
       </section>
-      </div>
-    </Transition>
+    </div>
   </ScrollArea>
 </template>
 
@@ -532,22 +553,17 @@ function playAll() {
   transform: translateY(-10px);
 }
 
-/* Smooth reveal animation */
-.content-reveal-enter-active {
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1),
-              filter 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+.artist__content-wrapper {
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
 }
-.content-reveal-leave-active {
-  transition: opacity 0.2s ease-in, transform 0.2s ease-in;
-}
-.content-reveal-enter-from {
+.artist__content-wrapper.is-transitioning {
   opacity: 0;
-  transform: translateY(20px) scale(0.98);
+  transform: scale(0.97);
   filter: blur(8px);
-}
-.content-reveal-leave-to {
-  opacity: 0;
-  transform: translateY(-10px) scale(0.99);
 }
 </style>
