@@ -276,16 +276,29 @@ async def recommendations(
     offset: int = Query(0, ge=0),
     count: int = Query(50, ge=1, le=200),
     shuffle: bool = Query(False),
+    mood: str | None = Query(None),
+    familiarity: str | None = Query(None),
+    language: str | None = Query(None),
 ) -> TrackList:
+    kwargs = {
+        "target_audio": target_audio,
+        "user_id": user_id or session.user_id,
+        "offset": offset,
+        "count": count,
+        "shuffle": shuffle,
+    }
+    if mood:
+        kwargs["mood"] = mood
+    if familiarity:
+        kwargs["familiarity"] = familiarity
+    if language:
+        kwargs["language"] = language
+
     response = await _safe_call(
         vk,
         "audio.getRecommendations",
         session.access_token,
-        target_audio=target_audio,
-        user_id=user_id or session.user_id,
-        offset=offset,
-        count=count,
-        shuffle=shuffle,
+        **kwargs
     )
     return parse_track_list(response)
 

@@ -138,6 +138,9 @@ export const api = {
     offset?: number;
     count?: number;
     shuffle?: boolean;
+    mood?: string;
+    familiarity?: string;
+    language?: string;
   } = {}): Promise<TrackList> {
     const { data } = await http.get<TrackList>("/audio/recommendations", { params });
     return data;

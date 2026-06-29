@@ -142,6 +142,9 @@ interface PersistedSettings {
   sidebarItems: SidebarItemSetting[];
   trackItems: SidebarItemSetting[];
   iconSet: "line" | "flat" | "rounded";
+  mixMood: string;
+  mixFamiliarity: string;
+  mixLanguage: string;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -207,6 +210,9 @@ const defaults: PersistedSettings = {
     { id: "queue", visible: true },
   ],
   iconSet: "rounded",
+  mixMood: "any",
+  mixFamiliarity: "any",
+  mixLanguage: "any",
 };
 
 function load(): PersistedSettings {
@@ -313,6 +319,10 @@ export const useSettingsStore = defineStore("settings", () => {
   const sidebarItems = ref<SidebarItemSetting[]>(initial.sidebarItems ?? defaults.sidebarItems);
   const trackItems = ref<SidebarItemSetting[]>(initial.trackItems ?? defaults.trackItems);
   const iconSet = ref<"line" | "flat" | "rounded">(initial.iconSet ?? defaults.iconSet);
+
+  const mixMood = ref(initial.mixMood ?? defaults.mixMood);
+  const mixFamiliarity = ref(initial.mixFamiliarity ?? defaults.mixFamiliarity);
+  const mixLanguage = ref(initial.mixLanguage ?? defaults.mixLanguage);
 
   const homeCardsBrightness = ref(initial.homeCardsBrightness ?? 100);
   const homeCardsBrightnessAuto = ref(initial.homeCardsBrightnessAuto ?? false);
@@ -535,6 +545,9 @@ export const useSettingsStore = defineStore("settings", () => {
       sidebarItems: sidebarItems.value,
       trackItems: trackItems.value,
       iconSet: iconSet.value,
+      mixMood: mixMood.value,
+      mixFamiliarity: mixFamiliarity.value,
+      mixLanguage: mixLanguage.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -592,6 +605,9 @@ export const useSettingsStore = defineStore("settings", () => {
       sidebarItems,
       trackItems,
       iconSet,
+      mixMood,
+      mixFamiliarity,
+      mixLanguage,
     ],
     () => {
       applyToDocument();
@@ -666,6 +682,9 @@ export const useSettingsStore = defineStore("settings", () => {
     sidebarItems.value = defaults.sidebarItems.map(item => ({ ...item }));
     trackItems.value = defaults.trackItems.map(item => ({ ...item }));
     iconSet.value = defaults.iconSet;
+    mixMood.value = defaults.mixMood;
+    mixFamiliarity.value = defaults.mixFamiliarity;
+    mixLanguage.value = defaults.mixLanguage;
   }
 
   return {
@@ -727,5 +746,8 @@ export const useSettingsStore = defineStore("settings", () => {
     sidebarItems,
     trackItems,
     iconSet,
+    mixMood,
+    mixFamiliarity,
+    mixLanguage,
   };
 });

@@ -26,19 +26,34 @@ const {
   homeCardsBrightnessDimmed,
   homeCardsBrightnessTimeStart,
   homeCardsBrightnessTimeEnd,
+  mixMood,
+  mixFamiliarity,
+  mixLanguage,
 } = storeToRefs(settings);
 
-const dropdownRef = ref<HTMLElement | null>(null);
 const showDropdown = ref(false);
+const dropdownRef = ref<HTMLElement | null>(null);
+const showMixSettings = ref(false);
+const mixSettingsRef = ref<HTMLElement | null>(null);
 
 function toggleSettings(event: MouseEvent) {
   event.stopPropagation();
   showDropdown.value = !showDropdown.value;
+  showMixSettings.value = false;
+}
+
+function toggleMixSettings(event: MouseEvent) {
+  event.stopPropagation();
+  showMixSettings.value = !showMixSettings.value;
+  showDropdown.value = false;
 }
 
 function handleWindowClick(event: MouseEvent) {
   if (showDropdown.value && dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
     showDropdown.value = false;
+  }
+  if (showMixSettings.value && mixSettingsRef.value && !mixSettingsRef.value.contains(event.target as Node)) {
+    showMixSettings.value = false;
   }
 }
 
@@ -125,7 +140,12 @@ async function ensureCacheBuffer() {
     // Поддерживаем кэш на уровне 150 треков. Запросы делаем последовательно,
     // иначе ВК API отдаёт одинаковые массивы на параллельные запросы.
     while (mixTrackCache.length < 150 && attempts < 10) {
-      const res = await api.recommendations({ shuffle: true, count: 100 });
+      const params: any = { shuffle: true, count: 100 };
+      if (mixMood.value !== 'any') params.mood = mixMood.value;
+      if (mixFamiliarity.value !== 'any') params.familiarity = mixFamiliarity.value;
+      if (mixLanguage.value !== 'any') params.language = mixLanguage.value;
+      
+      const res = await api.recommendations(params);
       if (!res.items || res.items.length === 0) break;
       
       for (const t of res.items) {
@@ -196,7 +216,12 @@ async function fillMixBuffer(needTracks: number) {
 
   // 2. Если кэша не хватило, идем в ВК (последовательно)
   while (newTracks.length < needTracks && attempts < 15) {
-    const res = await api.recommendations({ shuffle: true, count: 100 });
+    const params: any = { shuffle: true, count: 100 };
+    if (mixMood.value !== 'any') params.mood = mixMood.value;
+    if (mixFamiliarity.value !== 'any') params.familiarity = mixFamiliarity.value;
+    if (mixLanguage.value !== 'any') params.language = mixLanguage.value;
+    
+    const res = await api.recommendations(params);
     if (!res.items || res.items.length === 0) break;
     
     for (const t of res.items) {
@@ -303,24 +328,86 @@ async function playAlbum(album: AlbumSummary) {
     </div>
 
     <section class="home__hero">
-      <button class="home__mix" :disabled="mixLoading" @click="playMix" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
-        <div class="home__mix-glow" />
-        <div class="home__mix-body">
-          <div class="home__mix-eyebrow">Персональная подборка</div>
-          <div class="home__mix-title">Слушать VK Микс</div>
-          <div class="home__mix-sub">
-            <template v-if="mixLoading">
-              <Spinner :size="14" /> Готовим микс…
-            </template>
-            <template v-else>
-              Бесконечный поток под твой вкус
-            </template>
+      <div class="home__mix-container">
+        <button class="home__mix" :disabled="mixLoading" @click="playMix" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
+          <div class="home__mix-glow" />
+          <div class="home__mix-body">
+            <div class="home__mix-eyebrow">Персональная подборка</div>
+            <div class="home__mix-title">Слушать VK Микс</div>
+            <div class="home__mix-sub">
+              <template v-if="mixLoading">
+                <Spinner :size="14" /> Готовим микс…
+              </template>
+              <template v-else>
+                Бесконечный поток под твой вкус
+              </template>
+            </div>
+            
+            <!-- Активные фильтры -->
+            <div class="home__mix-filters" v-if="mixMood !== 'any' || mixFamiliarity !== 'any' || mixLanguage !== 'any'">
+              <span class="home__mix-filter-badge" v-if="mixMood !== 'any'">
+                {{ mixMood === 'joy' ? 'Радостно' : mixMood === 'sad' ? 'Грусть' : mixMood === 'active' ? 'Активно' : mixMood === 'calm' ? 'Спокойно' : 'Любовь' }}
+              </span>
+              <span class="home__mix-filter-badge" v-if="mixFamiliarity !== 'any'">
+                {{ mixFamiliarity === 'familiar' ? 'Знакомое' : mixFamiliarity === 'unfamiliar' ? 'Незнакомое' : 'Новинки' }}
+              </span>
+              <span class="home__mix-filter-badge" v-if="mixLanguage !== 'any'">
+                {{ mixLanguage === 'russian' ? 'Русский' : mixLanguage === 'foreign' ? 'Иностранный' : 'Без слов' }}
+              </span>
+            </div>
           </div>
+          <div class="home__mix-play">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          </div>
+        </button>
+
+        <!-- Кнопка настроек микса -->
+        <div class="home__mix-settings-wrapper" ref="mixSettingsRef">
+          <button class="home__mix-settings-btn" :class="{ 'home__mix-settings-btn--active': showMixSettings }" @click="toggleMixSettings" aria-label="Настроить микс">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
+          </button>
+          
+          <Transition name="dropdown-fade">
+            <div v-if="showMixSettings" class="home__dropdown home__mix-dropdown">
+              <div class="home__dropdown-title">Настройки ВК Микса</div>
+              
+              <div class="home__dropdown-row home__dropdown-row--col">
+                <div class="home__dropdown-label-main">Настроение</div>
+                <select v-model="mixMood" class="home__dropdown-select">
+                  <option value="any">Любое</option>
+                  <option value="joy">Радостно</option>
+                  <option value="sad">Грусть</option>
+                  <option value="active">Активно</option>
+                  <option value="calm">Спокойно</option>
+                  <option value="love">Любовь</option>
+                </select>
+              </div>
+              
+              <div class="home__dropdown-row home__dropdown-row--col">
+                <div class="home__dropdown-label-main">Узнаваемость</div>
+                <select v-model="mixFamiliarity" class="home__dropdown-select">
+                  <option value="any">Любое</option>
+                  <option value="familiar">Знакомое</option>
+                  <option value="unfamiliar">Незнакомое</option>
+                  <option value="novelties">Новинки</option>
+                </select>
+              </div>
+
+              <div class="home__dropdown-row home__dropdown-row--col">
+                <div class="home__dropdown-label-main">Язык</div>
+                <select v-model="mixLanguage" class="home__dropdown-select">
+                  <option value="any">Любой</option>
+                  <option value="russian">Русский</option>
+                  <option value="foreign">Иностранный</option>
+                  <option value="instrumental">Без слов</option>
+                </select>
+              </div>
+            </div>
+          </Transition>
         </div>
-        <div class="home__mix-play">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-        </div>
-      </button>
+      </div>
     </section>
 
     <div v-if="library.albumsLoading || !library.algorithms" class="home__global-loading">
@@ -381,9 +468,14 @@ async function playAlbum(album: AlbumSummary) {
 .home__hero {
   padding: 0 32px 18px;
 }
+.home__mix-container {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
 .home__mix {
   position: relative;
-  width: 100%;
+  flex: 1;
   display: flex;
   align-items: center;
   gap: 18px;
@@ -435,6 +527,80 @@ async function playAlbum(album: AlbumSummary) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.home__mix-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.home__mix-filter-badge {
+  font-size: calc(10px * var(--font-scale, 1));
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.home__mix-settings-wrapper {
+  position: relative;
+  display: flex;
+}
+.home__mix-settings-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text-1);
+  border-radius: var(--radius-xl);
+  width: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--motion-duration-fast) var(--motion-ease-out);
+  box-shadow: var(--app-shadow, var(--shadow-sm));
+}
+.home__mix-settings-btn:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+  border-color: var(--border-strong);
+}
+.home__mix-settings-btn--active {
+  background: var(--accent-1);
+  color: #fff;
+  border-color: var(--accent-2);
+  transform: scale(0.95);
+}
+.home__mix-dropdown {
+  top: 100%;
+  margin-top: 10px;
+  right: 0;
+}
+.home__dropdown-row--col {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.home__dropdown-select {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-0);
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: calc(13px * var(--font-scale, 1));
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--motion-duration-fast);
+}
+.home__dropdown-select:hover {
+  border-color: var(--border-strong);
+}
+.home__dropdown-select:focus {
+  border-color: var(--accent-1);
 }
 .home__mix-play {
   position: relative;
