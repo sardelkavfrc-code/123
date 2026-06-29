@@ -13,7 +13,8 @@ export type ThemeName =
   | "mocha"
   | "spotify"
   | "spotify-cover"
-  | "custom";
+  | "custom"
+  | "night";
 export type AccentName =
   | "blue"
   | "magenta"
@@ -449,7 +450,7 @@ export const useSettingsStore = defineStore("settings", () => {
     html.dataset.accent = customAccent.value ? "custom" : accent.value;
     html.dataset.perf = performanceMode.value ? "on" : "off";
     html.dataset.reduceMotion = reduceMotion.value ? "on" : "off";
-    html.dataset.customBg = customBgEnabled.value ? "on" : "off";
+    html.dataset.customBg = (customBgEnabled.value && !!customBgUrl.value) ? "on" : "off";
     html.style.setProperty("--font-family", `"${fontFamily.value || 'Nunito'}", sans-serif`);
     html.style.setProperty("--font-scale", fontSizeScale.value.toString());
     html.style.setProperty("--letter-spacing", `${letterSpacing.value}px`);

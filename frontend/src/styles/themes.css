@@ -84,7 +84,8 @@
   --radius-xl: 28px;
 }
 
-[data-theme="amoled"] {
+[data-theme="amoled"],
+[data-theme="custom"] {
   color-scheme: dark;
 
   --bg-0: #000000;
@@ -210,7 +211,7 @@
 
 [data-theme="spotify"],
 [data-theme="spotify-cover"],
-[data-theme="custom"],
+[data-theme="night"],
 [data-custom-bg="on"] {
   color-scheme: dark;
 

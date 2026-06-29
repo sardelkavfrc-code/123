@@ -112,6 +112,7 @@ const themes: { value: ThemeName; label: string; preview: string }[] = [
   { value: "sunset", label: "Закат", preview: "linear-gradient(135deg, #3d251f, #1a0d0b)" },
   { value: "spotify", label: "Динамическая", preview: "radial-gradient(circle at top left, #1db954, #191414)" },
   { value: "spotify-cover", label: "Живая обложка", preview: "linear-gradient(135deg, #1a8cff, #ff5e7e)" },
+  { value: "night", label: "Ночь", preview: "linear-gradient(135deg, #111111, #000000)" },
   { value: "custom", label: "Кастомная", preview: "linear-gradient(135deg, #8a2387, #e94057, #f27121)" },
 ];
 
