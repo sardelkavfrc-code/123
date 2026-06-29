@@ -51,22 +51,21 @@ async function load() {
   loading.value = true;
   error.value = null;
   tracksWarning.value = null;
-  artist.value = null;
-  tracks.value = [];
-  tracksTotal.value = 0;
   
-  albumsBlocks.value = [];
   albumsLoaded.value = false;
   albumsError.value = null;
   loadingAlbumId.value = null;
   tab.value = "all";
 
+  const currentId = props.id;
   const name = hintedName.value ?? undefined;
 
   const [infoRes, listRes] = await Promise.allSettled([
     api.artist(props.id, name ? { name } : {}),
     api.byArtist(props.id, { count: PAGE_SIZE, offset: 0, ...(name ? { q: name } : {}) }),
   ]);
+
+  if (currentId !== props.id) return; // prevent race condition
 
   if (infoRes.status === "fulfilled") {
     artist.value = infoRes.value;
@@ -114,11 +113,14 @@ async function loadMoreTracks() {
   tracksLoadingMore.value = true;
   try {
     const name = hintedName.value ?? undefined;
+    const currentId = props.id;
     const list = await api.byArtist(props.id, {
       count: PAGE_SIZE,
       offset: tracks.value.length,
       ...(name ? { q: name } : {}),
     });
+    if (currentId !== props.id) return;
+    
     const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
     const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
     tracks.value = [...tracks.value, ...fresh];
@@ -135,7 +137,9 @@ async function ensureAlbums() {
   albumsLoading.value = true;
   albumsError.value = null;
   try {
+    const currentId = props.id;
     const res = await api.artistAlbums(props.id);
+    if (currentId !== props.id) return;
     albumsBlocks.value = res.blocks || [];
   } catch (err) {
     albumsError.value =
