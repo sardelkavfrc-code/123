@@ -87,14 +87,23 @@ function checkMoodsScroll() {
 }
 
 let resizeObserver: ResizeObserver | null = null;
+
+const closeMixSettings = () => {
+  if (showMixSettings.value) {
+    showMixSettings.value = false;
+  }
+};
+
 onMounted(() => {
   resizeObserver = new ResizeObserver(() => {
     checkAlgScroll();
     checkMoodsScroll();
   });
+  window.addEventListener('click', closeMixSettings);
 });
 onUnmounted(() => {
   if (resizeObserver) resizeObserver.disconnect();
+  window.removeEventListener('click', closeMixSettings);
 });
 
 watch(algorithmsScroll, (el, oldEl) => {
@@ -140,12 +149,7 @@ async function ensureCacheBuffer() {
     // Поддерживаем кэш на уровне 150 треков. Запросы делаем последовательно,
     // иначе ВК API отдаёт одинаковые массивы на параллельные запросы.
     while (mixTrackCache.length < 150 && attempts < 10) {
-      const params: any = { shuffle: true, count: 100 };
-      if (mixMood.value !== 'any') params.mood = mixMood.value;
-      if (mixFamiliarity.value !== 'any') params.familiarity = mixFamiliarity.value;
-      if (mixLanguage.value !== 'any') params.language = mixLanguage.value;
-      
-      const res = await api.recommendations(params);
+      const res = await api.mix({ vibes: mixMood.value, recognitions: mixFamiliarity.value, langs: mixLanguage.value });
       if (!res.items || res.items.length === 0) break;
       
       for (const t of res.items) {
@@ -180,9 +184,9 @@ async function playMix() {
   if (mixLoading.value) return;
   mixLoading.value = true;
   try {
-    // 1. Быстрый старт: забираем 50 треков прямиком из предзагруженного кэша в памяти
+    // 1. Быстрый старт: забираем первые 3 трека для моментального включения
     mixTracks.value = [];
-    await fillMixBuffer(50);
+    await fillMixBuffer(3);
     
     player.playQueue(
       mixTracks.value,
@@ -193,6 +197,9 @@ async function playMix() {
         await fillMixBuffer(50);
       }
     );
+
+    // 2. Запускаем фоновую докачку остальных треков
+    fillMixBuffer(47).catch(console.error);
 
   } finally {
     mixLoading.value = false; // UI кнопка отвисает моментально!
@@ -206,40 +213,45 @@ async function fillMixBuffer(needTracks: number) {
   const knownIds = new Set(mixTracks.value.map(t => t.id));
 
   // 1. Выгребаем треки из кэша, если они там есть
+  let chunkFromCache: Track[] = [];
   while (mixTrackCache.length > 0 && newTracks.length < needTracks) {
     const t = mixTrackCache.shift();
     if (t && !knownIds.has(t.id)) {
       knownIds.add(t.id);
       newTracks.push(t);
+      chunkFromCache.push(t);
     }
+  }
+  if (chunkFromCache.length > 0) {
+    mixTracks.value.push(...chunkFromCache);
+    player.appendTracksToQueue(chunkFromCache);
   }
 
   // 2. Если кэша не хватило, идем в ВК (последовательно)
   while (newTracks.length < needTracks && attempts < 15) {
-    const params: any = { shuffle: true, count: 100 };
-    if (mixMood.value !== 'any') params.mood = mixMood.value;
-    if (mixFamiliarity.value !== 'any') params.familiarity = mixFamiliarity.value;
-    if (mixLanguage.value !== 'any') params.language = mixLanguage.value;
-    
-    const res = await api.recommendations(params);
+    const res = await api.mix({ vibes: mixMood.value, recognitions: mixFamiliarity.value, langs: mixLanguage.value });
     if (!res.items || res.items.length === 0) break;
     
+    let chunk: Track[] = [];
     for (const t of res.items) {
       if (!knownIds.has(t.id)) {
         knownIds.add(t.id);
         if (newTracks.length < needTracks) {
           newTracks.push(t);
+          chunk.push(t);
         } else {
           mixTrackCache.push(t); // Сохраняем излишки на будущее
         }
       }
     }
+    
+    // Сразу показываем пользователю новую порцию треков
+    if (chunk.length > 0) {
+      mixTracks.value.push(...chunk);
+      player.appendTracksToQueue(chunk);
+    }
+    
     attempts++;
-  }
-
-  if (newTracks.length > 0) {
-    mixTracks.value.push(...newTracks);
-    player.appendTracksToQueue(newTracks);
   }
 
   // 3. Пингуем фоновую накачку, чтобы она восполнила потраченный кэш
@@ -328,7 +340,7 @@ async function playAlbum(album: AlbumSummary) {
     </div>
 
     <section class="home__hero">
-      <div class="home__mix-container">
+      <div class="home__mix-container" @mouseleave="showMixSettings = false">
         <button class="home__mix" :disabled="mixLoading" @click="playMix" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
           <div class="home__mix-glow" />
           <div class="home__mix-body">
@@ -346,63 +358,63 @@ async function playAlbum(album: AlbumSummary) {
             <!-- Активные фильтры -->
             <div class="home__mix-filters" v-if="mixMood !== 'any' || mixFamiliarity !== 'any' || mixLanguage !== 'any'">
               <span class="home__mix-filter-badge" v-if="mixMood !== 'any'">
-                {{ mixMood === 'joy' ? 'Радостно' : mixMood === 'sad' ? 'Грусть' : mixMood === 'active' ? 'Активно' : mixMood === 'calm' ? 'Спокойно' : 'Любовь' }}
+                {{ mixMood === 'happy' ? 'Радостно' : mixMood === 'sad' ? 'Грусть' : mixMood === 'active' ? 'Активно' : mixMood === 'calm' ? 'Спокойно' : 'Любовь' }}
               </span>
               <span class="home__mix-filter-badge" v-if="mixFamiliarity !== 'any'">
-                {{ mixFamiliarity === 'familiar' ? 'Знакомое' : mixFamiliarity === 'unfamiliar' ? 'Незнакомое' : 'Новинки' }}
+                {{ mixFamiliarity === 'known' ? 'Знакомое' : mixFamiliarity === 'unknown' ? 'Незнакомое' : 'Новинки' }}
               </span>
               <span class="home__mix-filter-badge" v-if="mixLanguage !== 'any'">
-                {{ mixLanguage === 'russian' ? 'Русский' : mixLanguage === 'foreign' ? 'Иностранный' : 'Без слов' }}
+                {{ mixLanguage === 'ru' ? 'Русский' : mixLanguage === 'international' ? 'Иностранный' : 'Без слов' }}
               </span>
             </div>
           </div>
-          <div class="home__mix-play">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          </div>
         </button>
-
-        <!-- Кнопка настроек микса -->
+        
         <div class="home__mix-settings-wrapper" ref="mixSettingsRef">
-          <button class="home__mix-settings-btn" :class="{ 'home__mix-settings-btn--active': showMixSettings }" @click="toggleMixSettings" aria-label="Настроить микс">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          <button class="home__mix-settings-inline-btn" :class="{ 'active': showMixSettings }" @click.stop="toggleMixSettings" aria-label="Настроить микс" title="Настройки микса">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="4" y1="8" x2="20" y2="8"></line>
+              <line x1="4" y1="16" x2="20" y2="16"></line>
+              <circle cx="10" cy="8" r="3" fill="currentColor"></circle>
+              <circle cx="14" cy="16" r="3" fill="currentColor"></circle>
             </svg>
+            Настроить
           </button>
-          
+
           <Transition name="dropdown-fade">
-            <div v-if="showMixSettings" class="home__dropdown home__mix-dropdown">
-              <div class="home__dropdown-title">Настройки ВК Микса</div>
+            <div v-if="showMixSettings" class="home__mix-dropdown-floating" @click.stop>
+              <div class="home__mix-dropdown-header">Настройки ВК Микса</div>
               
-              <div class="home__dropdown-row home__dropdown-row--col">
-                <div class="home__dropdown-label-main">Настроение</div>
-                <select v-model="mixMood" class="home__dropdown-select">
-                  <option value="any">Любое</option>
-                  <option value="joy">Радостно</option>
-                  <option value="sad">Грусть</option>
-                  <option value="active">Активно</option>
-                  <option value="calm">Спокойно</option>
-                  <option value="love">Любовь</option>
-                </select>
+              <div class="home__mix-settings-row">
+                <div class="home__mix-settings-label">Настроение</div>
+                <div class="home__segmented">
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixMood === 'any'}" @click="mixMood = 'any'">Любое</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixMood === 'happy'}" @click="mixMood = 'happy'">Радостно</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixMood === 'sad'}" @click="mixMood = 'sad'">Грусть</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixMood === 'active'}" @click="mixMood = 'active'">Активно</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixMood === 'calm'}" @click="mixMood = 'calm'">Спокойно</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixMood === 'love'}" @click="mixMood = 'love'">Любовь</button>
+                </div>
               </div>
               
-              <div class="home__dropdown-row home__dropdown-row--col">
-                <div class="home__dropdown-label-main">Узнаваемость</div>
-                <select v-model="mixFamiliarity" class="home__dropdown-select">
-                  <option value="any">Любое</option>
-                  <option value="familiar">Знакомое</option>
-                  <option value="unfamiliar">Незнакомое</option>
-                  <option value="novelties">Новинки</option>
-                </select>
+              <div class="home__mix-settings-row">
+                <div class="home__mix-settings-label">Узнаваемость</div>
+                <div class="home__segmented">
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixFamiliarity === 'any'}" @click="mixFamiliarity = 'any'">Любое</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixFamiliarity === 'known'}" @click="mixFamiliarity = 'known'">Знакомое</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixFamiliarity === 'unknown'}" @click="mixFamiliarity = 'unknown'">Незнакомое</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixFamiliarity === 'fresh'}" @click="mixFamiliarity = 'fresh'">Новинки</button>
+                </div>
               </div>
 
-              <div class="home__dropdown-row home__dropdown-row--col">
-                <div class="home__dropdown-label-main">Язык</div>
-                <select v-model="mixLanguage" class="home__dropdown-select">
-                  <option value="any">Любой</option>
-                  <option value="russian">Русский</option>
-                  <option value="foreign">Иностранный</option>
-                  <option value="instrumental">Без слов</option>
-                </select>
+              <div class="home__mix-settings-row">
+                <div class="home__mix-settings-label">Язык</div>
+                <div class="home__segmented">
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixLanguage === 'any'}" @click="mixLanguage = 'any'">Любой</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixLanguage === 'ru'}" @click="mixLanguage = 'ru'">Русский</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixLanguage === 'international'}" @click="mixLanguage = 'international'">Иностранный</button>
+                  <button class="home__segmented-btn" :class="{'home__segmented-btn--active': mixLanguage === 'instrumental'}" @click="mixLanguage = 'instrumental'">Без слов</button>
+                </div>
               </div>
             </div>
           </Transition>
@@ -472,6 +484,7 @@ async function playAlbum(album: AlbumSummary) {
   display: flex;
   gap: 12px;
   align-items: stretch;
+  position: relative;
 }
 .home__mix {
   position: relative;
@@ -547,37 +560,97 @@ async function playAlbum(album: AlbumSummary) {
   letter-spacing: 0.5px;
 }
 .home__mix-settings-wrapper {
-  position: relative;
-  display: flex;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 24px;
+  z-index: 20;
 }
-.home__mix-settings-btn {
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  color: var(--text-1);
-  border-radius: var(--radius-xl);
-  width: 64px;
+.home__mix-settings-inline-btn {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  border-radius: 12px;
+  padding: 8px 16px;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  font-size: calc(14px * var(--font-scale, 1));
+  font-weight: 600;
   cursor: pointer;
   transition: all var(--motion-duration-fast) var(--motion-ease-out);
-  box-shadow: var(--app-shadow, var(--shadow-sm));
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
-.home__mix-settings-btn:hover {
-  background: var(--bg-3);
-  color: var(--text-0);
-  border-color: var(--border-strong);
+.home__mix-settings-inline-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
-.home__mix-settings-btn--active {
-  background: var(--accent-1);
-  color: #fff;
-  border-color: var(--accent-2);
-  transform: scale(0.95);
+.home__mix-settings-inline-btn.active {
+  background: rgba(255, 255, 255, 0.3);
 }
-.home__mix-dropdown {
-  top: 100%;
-  margin-top: 10px;
+
+.home__mix-dropdown-floating {
+  position: absolute;
+  top: calc(100% + 8px);
   right: 0;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  min-width: 280px;
+  z-index: 100;
+  cursor: default;
+}
+.home__mix-dropdown-header {
+  font-size: calc(15px * var(--font-scale, 1));
+  font-weight: 700;
+  color: var(--text-0);
+  margin-bottom: -4px;
+}
+.home__mix-settings-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.home__mix-settings-label {
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text-0);
+  margin-left: 2px;
+}
+.home__segmented {
+  display: inline-flex;
+  background: var(--bg-3);
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.home__segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: all var(--motion-duration-fast);
+}
+.home__segmented-btn:hover {
+  color: var(--text-0);
+}
+.home__segmented-btn--active {
+  background: var(--bg-1);
+  color: var(--text-0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 .home__dropdown-row--col {
   flex-direction: column;

@@ -138,11 +138,16 @@ export const api = {
     offset?: number;
     count?: number;
     shuffle?: boolean;
-    mood?: string;
-    familiarity?: string;
-    language?: string;
   } = {}): Promise<TrackList> {
     const { data } = await http.get<TrackList>("/audio/recommendations", { params });
+    return data;
+  },
+  async mix(params: {
+    vibes?: string;
+    recognitions?: string;
+    langs?: string;
+  } = {}): Promise<TrackList> {
+    const { data } = await http.get<TrackList>("/audio/mix", { params });
     return data;
   },
   async algorithms(): Promise<AlbumList> {

@@ -276,9 +276,6 @@ async def recommendations(
     offset: int = Query(0, ge=0),
     count: int = Query(50, ge=1, le=200),
     shuffle: bool = Query(False),
-    mood: str | None = Query(None),
-    familiarity: str | None = Query(None),
-    language: str | None = Query(None),
 ) -> TrackList:
     kwargs = {
         "target_audio": target_audio,
@@ -287,12 +284,6 @@ async def recommendations(
         "count": count,
         "shuffle": shuffle,
     }
-    if mood:
-        kwargs["mood"] = mood
-    if familiarity:
-        kwargs["familiarity"] = familiarity
-    if language:
-        kwargs["language"] = language
 
     response = await _safe_call(
         vk,
@@ -301,6 +292,39 @@ async def recommendations(
         **kwargs
     )
     return parse_track_list(response)
+
+
+@router.get("/mix", response_model=TrackList)
+async def mix(
+    vk: VKDep,
+    session: SessionDep,
+    vibes: str | None = Query(None),
+    recognitions: str | None = Query(None),
+    langs: str | None = Query(None),
+) -> TrackList:
+    import json
+    options = {}
+    if vibes and vibes != 'any':
+        options["vibes"] = [vibes]
+    if recognitions and recognitions != 'any':
+        options["recognitions"] = [recognitions]
+    if langs and langs != 'any':
+        options["langs"] = [langs]
+        
+    response = await _safe_call(
+        vk,
+        "audio.getStreamMixAudios",
+        session.access_token,
+        mix_id="common",
+        options=json.dumps(options)
+    )
+    
+    # audio.getStreamMixAudios returns array directly
+    if isinstance(response, list):
+        await _fill_missing_urls(vk, session, response)
+        return parse_track_list({"count": len(response), "items": response})
+    
+    return parse_track_list({"count": 0, "items": []})
 
 
 @router.get("/algorithms", response_model=AlbumList)
