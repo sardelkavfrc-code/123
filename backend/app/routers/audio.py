@@ -412,9 +412,12 @@ async def moods(vk: VKDep, session: SessionDep) -> AlbumList:
         
         # 3. Find block with anchor "vibes"
         blocks = section_raw.get("section", {}).get("blocks", [])
+        
         vibes_block = None
         for b in blocks:
-            if b.get("data_type") == "music_playlists" and b.get("meta", {}).get("anchor") == "vibes":
+            # Fallback to title matching since anchor can change
+            title = b.get("title", "")
+            if b.get("data_type") == "music_playlists" and ("Настроени" in title or b.get("meta", {}).get("anchor") == "vibes"):
                 vibes_block = b
                 break
         
