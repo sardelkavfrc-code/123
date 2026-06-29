@@ -116,6 +116,35 @@ const { cover: externalCover } = useExternalArt(
 );
 const displayCover = computed(() => current.value?.album_cover || externalCover.value || null);
 
+const activeCover = ref<string | null>(null);
+const activeCoverKey = ref<string>("empty");
+
+watch([() => current.value, displayCover], async ([newTrack, newCover]) => {
+  const trackKey = newTrack ? `${newTrack.owner_id}_${newTrack.id}` : 'empty';
+  const targetKey = newCover ? `${trackKey}-${newCover}` : trackKey;
+
+  if (!newCover) {
+    activeCover.value = null;
+    activeCoverKey.value = targetKey;
+    return;
+  }
+
+  try {
+    const img = new Image();
+    img.src = newCover;
+    await img.decode();
+  } catch (e) {
+    // proceed even if decode fails
+  }
+
+  // Ensure nothing changed while waiting
+  const currentTrackKey = current.value ? `${current.value.owner_id}_${current.value.id}` : 'empty';
+  if (currentTrackKey === trackKey && displayCover.value === newCover) {
+    activeCover.value = newCover;
+    activeCoverKey.value = targetKey;
+  }
+}, { immediate: true });
+
 // Logarithmic taper: humans perceive loudness roughly on a log scale, so
 // linearly dragging the slider feels wrong (most usable range crammed into the
 // last 20%). x³ keeps the slider 1:1 visually with the position while giving
@@ -142,8 +171,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   <footer class="player">
     <div class="player__track">
       <TransitionGroup tag="div" name="track-anim" class="player__cover-wrap">
-        <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.owner_id + '_' + current.id : 'empty'">
-          <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
+        <div class="player__cover" :style="activeCover ? { backgroundImage: `url(${activeCover})` } : {}" :key="activeCoverKey">
+          <span v-if="!activeCover" class="player__cover-fallback accent-gradient" />
         </div>
       </TransitionGroup>
       
