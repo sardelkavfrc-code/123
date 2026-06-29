@@ -10,6 +10,7 @@ import { formatDuration } from "@/composables/useFormat";
 import { useExternalArt } from "@/composables/useExternalArt";
 import EqualizerModal from "./EqualizerModal.vue";
 import SvgIcon from "./SvgIcon.vue";
+import PlayerCover from "./PlayerCover.vue";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
@@ -142,9 +143,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   <footer class="player">
     <div class="player__track">
       <TransitionGroup tag="div" name="track-anim" class="player__cover-wrap">
-        <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.owner_id + '_' + current.id : 'empty'">
-          <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
-        </div>
+        <PlayerCover class="player__cover" :src="displayCover" :key="current ? current.owner_id + '_' + current.id : 'empty'" />
       </TransitionGroup>
       
       <TransitionGroup tag="div" name="track-anim" class="player__info-group">
