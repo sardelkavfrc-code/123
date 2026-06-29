@@ -16,6 +16,8 @@ const isSaving = ref(false);
 const saveName = ref("");
 const saveInputRef = ref<HTMLInputElement | null>(null);
 
+const presetToDelete = ref<string | null>(null);
+
 function onBandChange(index: number, event: Event) {
   const input = event.target as HTMLInputElement;
   eq.setBandGain(index, parseFloat(input.value));
@@ -28,8 +30,6 @@ function selectPreset(name: string) {
 function reset() {
   eq.resetBands();
 }
-
-
 
 async function startSave() {
   isSaving.value = true;
@@ -48,9 +48,14 @@ function commitSave() {
   saveName.value = "";
 }
 
-function deletePreset(name: string) {
-  if (confirm(`Удалить пользовательский пресет "${name}"?`)) {
-    eq.deleteUserPreset(name);
+function confirmDeletePreset(name: string) {
+  presetToDelete.value = name;
+}
+
+function executeDelete() {
+  if (presetToDelete.value) {
+    eq.deleteUserPreset(presetToDelete.value);
+    presetToDelete.value = null;
   }
 }
 
@@ -73,53 +78,69 @@ const activeGains = computed(() => {
 </script>
 
 <template>
-  <Transition name="eq-fade">
-    <div v-if="show" class="eq-overlay" @click.self="emit('close')">
-      <div class="eq-modal" @click.stop>
-        <div class="eq-modal__header">
-        <div class="eq-modal__title-group">
-          <SvgIcon name="equalizer" width="20" height="20" />
-          <h2>Эквалайзер</h2>
-        </div>
-        
-        <label class="eq-switch">
-          <input type="checkbox" v-model="enabled" />
-          <span class="eq-switch__slider"></span>
-        </label>
-      </div>
+  <Teleport to="body">
+    <Transition name="eq-fade">
+      <div v-if="show" class="eq-overlay" @click.self="emit('close')">
+        <div class="eq-modal" @click.stop>
+          
+          <Transition name="eq-fade">
+            <div v-if="presetToDelete" class="eq-confirm-overlay">
+              <div class="eq-confirm-box">
+                <h4>Удалить пресет?</h4>
+                <p>Вы уверены, что хотите удалить пресет «{{ presetToDelete }}»?</p>
+                <div class="eq-confirm-actions">
+                  <button class="eq-action-btn" @click="presetToDelete = null">Отмена</button>
+                  <button class="eq-action-btn eq-action-btn--primary eq-action-btn--danger" @click="executeDelete">Удалить</button>
+                </div>
+              </div>
+            </div>
+          </Transition>
 
-      <div class="eq-modal__body" :class="{ 'eq-modal__body--disabled': !enabled }">
-        <div class="eq-presets">
-          <button 
-            v-for="p in PRESETS" 
-            :key="p.name"
-            class="eq-preset-btn"
-            :class="{ 'eq-preset-btn--active': selectedPreset === p.name }"
-            @click="selectPreset(p.name)"
-          >
-            {{ p.name }}
-          </button>
-          <button 
-            class="eq-preset-btn"
-            :class="{ 'eq-preset-btn--active': isCustom }"
-            @click="selectPreset('Кастомный')"
-          >
-            Кастомный
-          </button>
-          <button 
-            v-for="p in userPresets" 
-            :key="p.name"
-            class="eq-preset-btn eq-preset-btn--user"
-            :class="{ 'eq-preset-btn--active': selectedPreset === p.name }"
-            @click="selectPreset(p.name)"
-            @contextmenu.prevent="deletePreset(p.name)"
-            title="Нажми правую кнопку мыши, чтобы удалить"
-          >
-            {{ p.name }}
-          </button>
-        </div>
+          <div class="eq-modal__header">
+            <div class="eq-modal__title-group">
+              <SvgIcon name="equalizer" width="20" height="20" />
+              <h2>Эквалайзер</h2>
+            </div>
+            
+            <label class="eq-switch">
+              <input type="checkbox" v-model="enabled" />
+              <span class="eq-switch__slider"></span>
+            </label>
+          </div>
 
-        <div class="eq-bands-wrap">
+          <div class="eq-modal__body" :class="{ 'eq-modal__body--disabled': !enabled }">
+            <TransitionGroup name="preset-list" tag="div" class="eq-presets">
+              <button 
+                v-for="p in PRESETS" 
+                :key="'p_' + p.name"
+                class="eq-preset-btn"
+                :class="{ 'eq-preset-btn--active': selectedPreset === p.name }"
+                @click="selectPreset(p.name)"
+              >
+                {{ p.name }}
+              </button>
+              <button 
+                key="custom"
+                class="eq-preset-btn"
+                :class="{ 'eq-preset-btn--active': isCustom }"
+                @click="selectPreset('Кастомный')"
+              >
+                Кастомный
+              </button>
+              <button 
+                v-for="p in userPresets" 
+                :key="'u_' + p.name"
+                class="eq-preset-btn eq-preset-btn--user"
+                :class="{ 'eq-preset-btn--active': selectedPreset === p.name }"
+                @click="selectPreset(p.name)"
+                @contextmenu.prevent="confirmDeletePreset(p.name)"
+                title="Нажми правую кнопку мыши, чтобы удалить"
+              >
+                {{ p.name }}
+              </button>
+            </TransitionGroup>
+
+            <div class="eq-bands-wrap">
           <div class="eq-db-axis">
             <span>+12</span>
             <span>0</span>
@@ -156,28 +177,39 @@ const activeGains = computed(() => {
         <div class="eq-footer-left">
           <button class="eq-action-btn" @click="reset">Сбросить</button>
           
-          <template v-if="!isSaving">
-            <button class="eq-action-btn" @click="startSave">Сохранить</button>
-          </template>
-          <template v-else>
-            <div class="eq-save-group">
-              <input 
-                ref="saveInputRef"
-                v-model="saveName" 
-                class="eq-save-input" 
-                placeholder="Имя пресета..." 
-                @keyup.enter="commitSave" 
-                @keyup.esc="isSaving = false"
-              />
-              <button class="eq-action-btn eq-action-btn--primary" @click="commitSave">Готово</button>
-            </div>
-          </template>
+          <Transition name="eq-fade" mode="out-in">
+            <template v-if="!isSaving">
+              <button class="eq-action-btn" @click="startSave">
+                <SvgIcon name="plus" width="16" height="16" />
+                Сохранить
+              </button>
+            </template>
+            <template v-else>
+              <div class="eq-save-group">
+                <input 
+                  ref="saveInputRef"
+                  v-model="saveName" 
+                  class="eq-save-input" 
+                  placeholder="Имя пресета..." 
+                  @keyup.enter="commitSave" 
+                  @keyup.esc="isSaving = false"
+                />
+                <button class="eq-action-btn eq-action-btn--primary" style="padding: 8px;" @click="commitSave" :disabled="!saveName.trim()">
+                  <SvgIcon name="check" width="16" height="16" />
+                </button>
+                <button class="eq-action-btn" style="padding: 8px;" @click="isSaving = false" title="Отмена">
+                  <SvgIcon name="cross" width="16" height="16" />
+                </button>
+              </div>
+            </template>
+          </Transition>
         </div>
         <button class="btn" @click="emit('close')">Закрыть</button>
       </div>
     </div>
   </div>
   </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -384,6 +416,9 @@ const activeGains = computed(() => {
   border-radius: 8px;
   cursor: pointer;
   transition: all var(--motion-duration-fast) var(--motion-ease-out);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .eq-action-btn:hover {
   background: var(--bg-4);
@@ -453,6 +488,70 @@ const activeGains = computed(() => {
 }
 .eq-switch input:checked + .eq-switch__slider::before {
   transform: translateX(20px);
+}
+
+.eq-confirm-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+}
+
+.eq-confirm-box {
+  background: var(--bg-1);
+  border: 1px solid var(--border-strong);
+  padding: 24px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  text-align: center;
+  max-width: 320px;
+}
+
+.eq-confirm-box h4 {
+  margin: 0 0 12px 0;
+  font-size: calc(16px * var(--font-scale, 1));
+  color: var(--text-0);
+}
+
+.eq-confirm-box p {
+  margin: 0 0 20px 0;
+  font-size: calc(13px * var(--font-scale, 1));
+  color: var(--text-2);
+}
+
+.eq-confirm-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.eq-action-btn--danger {
+  background: #ff4757;
+  color: white;
+}
+.eq-action-btn--danger:hover {
+  background: #ff6b81;
+  color: white;
+}
+
+.preset-list-move,
+.preset-list-enter-active,
+.preset-list-leave-active {
+  transition: all var(--motion-duration-default) var(--motion-ease-out);
+}
+.preset-list-enter-from,
+.preset-list-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.95);
+}
+.preset-list-leave-active {
+  position: absolute;
 }
 
 /* Modal Animations */
