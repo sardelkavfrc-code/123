@@ -37,52 +37,7 @@ watch(
 
 let detachMediaKey: (() => void) | null = null;
 
-onMounted(() => {
-  if (window.vkmp) {
-    detachMediaKey = window.vkmp.onMediaKey((key) => {
-      if (key === "play-pause") player.togglePlay();
-      else if (key === "next") player.next();
-      else if (key === "prev") player.prev();
-    });
 
-    if (settings.autoUpdateCheck) {
-      window.vkmp.updater?.checkForUpdates().catch(() => {});
-    }
-    
-    // Check every hour
-    setInterval(() => {
-      if (useSettingsStore().autoUpdateCheck) {
-        window.vkmp?.updater?.checkForUpdates().catch(() => {});
-      }
-    }, 1000 * 60 * 60);
-  }
-
-  // Restore state after update
-  const unwatch = watch(() => useAuthStore().checked, (isChecked) => {
-    if (isChecked) {
-      unwatch();
-      try {
-        const rawState = localStorage.getItem("vkmp:update_restore_state");
-        if (rawState) {
-          localStorage.removeItem("vkmp:update_restore_state");
-          const state = JSON.parse(rawState);
-          if (state.queue && state.track) {
-            const idx = state.queue.findIndex((t: any) => t.id === state.track.id);
-            player.playQueue(state.queue, idx >= 0 ? idx : 0, {
-              autoPlay: state.playing,
-              startTime: state.time || 0,
-            });
-          }
-          if (state.path) {
-            router.push(state.path);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to restore update state", err);
-      }
-    }
-  }, { immediate: true });
-});
 
 const isMouseOverTrackContextMenu = ref(false);
 let trackLeaveTimeout: number | null = null;

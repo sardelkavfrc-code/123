@@ -654,6 +654,7 @@ export const usePlayerStore = defineStore("player", () => {
 
   function play() {
     void eq.resumeContext();
+    isPlaying.value = true;
     if (backend) {
       const settings = useSettingsStore();
       if (settings.fadeEnabled) {
