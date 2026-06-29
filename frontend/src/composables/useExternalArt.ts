@@ -134,3 +134,32 @@ export function useExternalArt(
 
   return { cover: fetched };
 }
+
+export async function preloadExternalArt(artist: string, title: string) {
+  const settings = useSettingsStore();
+  if (!settings.externalCovers) return;
+  artist = artist.trim();
+  title = title.trim();
+  if (!artist || !title) return;
+  const cached = readCache(artist, title);
+  if (cached !== undefined) {
+    if (cached) {
+      const img = new Image();
+      img.src = cached;
+    }
+    return;
+  }
+  try {
+    let res = await api.coverLookup(artist, title);
+    if (!res.cover) {
+      res = await api.coverSearch(artist, title);
+    }
+    writeCache(artist, title, res.cover);
+    if (res.cover) {
+      const img = new Image();
+      img.src = res.cover;
+    }
+  } catch {
+    writeCache(artist, title, null);
+  }
+}

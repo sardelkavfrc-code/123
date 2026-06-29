@@ -5,6 +5,7 @@ import type { Track } from "@/api/types";
 import { api } from "@/api/client";
 import { useSettingsStore } from "./settings";
 import { useEqualizerStore } from "./equalizer";
+import { preloadExternalArt } from "@/composables/useExternalArt";
 
 export type RepeatMode = "off" | "all" | "one";
 
@@ -389,6 +390,16 @@ export const usePlayerStore = defineStore("player", () => {
 
     const nextTrack = queue.value[nextIdx];
     if (!nextTrack || !nextTrack.url) return;
+
+    if (nextTrack.album_cover) {
+      const img = new Image();
+      img.src = nextTrack.album_cover;
+    } else {
+      const artist = nextTrack.main_artists?.[0]?.name || nextTrack.artist;
+      if (artist && nextTrack.title) {
+        preloadExternalArt(artist, nextTrack.title).catch(() => {});
+      }
+    }
 
     console.log(`[Player] Prefetching next track: ${nextTrack.title}`);
     if (isHlsUrl(nextTrack.url)) {

@@ -142,7 +142,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   <footer class="player">
     <div class="player__track">
       <TransitionGroup tag="div" name="track-anim" class="player__cover-wrap">
-        <div class="player__cover" v-lazy-bg="displayCover" :key="current ? current.owner_id + '_' + current.id : 'empty'">
+        <div class="player__cover" :style="displayCover ? { backgroundImage: `url(${displayCover})` } : {}" :key="current ? current.owner_id + '_' + current.id : 'empty'">
           <span v-if="!displayCover" class="player__cover-fallback accent-gradient" />
         </div>
       </TransitionGroup>
