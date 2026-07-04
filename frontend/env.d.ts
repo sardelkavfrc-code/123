@@ -34,7 +34,7 @@ declare global {
       getAutoStart: () => Promise<boolean>;
       onMediaKey: (cb: (key: "play-pause" | "next" | "prev") => void) => () => void;
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
-      openVKAuth: () => Promise<VKAuthResult>;
+      openVKAuth: (silent?: boolean) => Promise<VKAuthResult>;
       openVKCaptcha: (redirectUrl: string, remixstlid: string, vkCookies?: string) => Promise<{ success: boolean; remixstlid?: string; vkCookies?: string }>;
       closeVKCaptcha: () => Promise<{ remixstlid?: string; vkCookies?: string } | undefined>;
       fetchVKCaptcha: (url: string) => Promise<string | null>;

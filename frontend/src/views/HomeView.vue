@@ -166,13 +166,18 @@ async function ensureCacheBuffer() {
       const res = await api.mix({ vibes: mood, recognitions: fam, langs: lang });
       if (!res.items || res.items.length === 0) break;
 
+      let newTracks = 0;
       for (const t of res.items) {
         if (bucket.buffer.length >= 150) break;
         if (!bucket.seenIds.has(t.id)) {
           bucket.seenIds.add(t.id);
+          if (!dislikes.isDisliked(t)) newTracks++;
           if (!dislikes.isDisliked(t)) bucket.buffer.push(t);
         }
       }
+      
+      // Если все треки дубликаты, прерываем цикл кэширования
+      if (newTracks === 0) break;
       attempts++;
     }
   } finally {
@@ -260,6 +265,11 @@ async function fillMixBuffer(needTracks: number) {
       } else {
         bucket.buffer.push(t); // Сохраняем излишки на будущее
       }
+    }
+    
+    // Если ВК отдал полностью дубликаты, нет смысла продолжать цикл, он отдаст их снова
+    if (chunk.length === 0 && bucket.buffer.length === 0) {
+      break;
     }
 
     // Сразу показываем пользователю новую порцию треков

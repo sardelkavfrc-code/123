@@ -27,8 +27,18 @@ async def _probe_audio(vk: VKDep, token: str) -> bool:
     """
     try:
         await vk.call("audio.get", token, count=1)
-    except VKError:
-        return False
+    except VKError as exc:
+        if exc.code == 3:
+            return False
+        if exc.code in (5, 1117, 28, 3610):
+            raise HTTPException(
+                status.HTTP_401_UNAUTHORIZED,
+                detail={"kind": "vk_error", "message": exc.message},
+            ) from exc
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail={"kind": "vk_error", "message": exc.message},
+        ) from exc
     return True
 
 
@@ -63,19 +73,26 @@ async def _resolve_user(vk: VKDep, token: str, *, has_audio: bool) -> AuthStatus
     )
 
 
+import asyncio
+
 @router.get("/status", response_model=AuthStatus)
 async def status_endpoint(vk: VKDep) -> AuthStatus:
     session = storage.load()
     if session is None:
         return AuthStatus(authenticated=False)
-    try:
-        has_audio = await _probe_audio(vk, session.access_token)
-        return await _resolve_user(vk, session.access_token, has_audio=has_audio)
-    except HTTPException as exc:
-        if exc.status_code == status.HTTP_401_UNAUTHORIZED:
-            storage.clear()
-            return AuthStatus(authenticated=False)
-        raise exc
+    
+    for attempt in range(3):
+        try:
+            has_audio = await _probe_audio(vk, session.access_token)
+            return await _resolve_user(vk, session.access_token, has_audio=has_audio)
+        except HTTPException as exc:
+            if exc.status_code == status.HTTP_502_BAD_GATEWAY and attempt < 2:
+                await asyncio.sleep(1.0)
+                continue
+            if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+                storage.clear()
+                return AuthStatus(authenticated=False)
+            raise exc
 
 
 @router.post("/token", response_model=AuthStatus)

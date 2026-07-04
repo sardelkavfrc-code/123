@@ -152,7 +152,6 @@ function estimateCache(): number {
   return Math.round((bytes / (1024 * 1024)) * 100) / 100;
 }
 
-
 async function logout() {
   player.clear();
   library.reset();

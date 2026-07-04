@@ -41,6 +41,24 @@ export const useAuthStore = defineStore("auth", () => {
       }
     } catch (err) {
       if (err instanceof APIError && err.status === 401) {
+        if (window.vkmp?.openVKAuth && localStorage.getItem("wasAuthenticated") === "true") {
+          try {
+            const result = await window.vkmp.openVKAuth(true);
+            if (result.ok) {
+              const loginOk = await loginWithToken({
+                access_token: result.access_token,
+                user_id: result.user_id,
+                remember: true,
+              });
+              if (loginOk) {
+                checked.value = true;
+                return;
+              }
+            }
+          } catch (e) {
+            console.error("Silent auth retry failed", e);
+          }
+        }
         status.value = emptyStatus();
         localStorage.removeItem("wasAuthenticated");
       } else {

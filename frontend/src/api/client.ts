@@ -55,9 +55,85 @@ export class APIError extends Error {
   }
 }
 
+let isRefreshing = false;
+let failedQueue: Array<{ resolve: (value?: unknown) => void; reject: (reason?: any) => void }> = [];
+
+const processQueue = (error: Error | null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve();
+    }
+  });
+  failedQueue = [];
+};
+
 http.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
+    const originalRequest = error.config as any;
+
+    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(() => {
+          return http(originalRequest);
+        }).catch((err) => {
+          return Promise.reject(err);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        if (window.vkmp?.openVKAuth && localStorage.getItem("wasAuthenticated") === "true") {
+          const result = await window.vkmp.openVKAuth(true);
+          
+          if (result.ok) {
+            const { useAuthStore } = await import("@/stores/auth");
+            const auth = useAuthStore();
+            const loginOk = await auth.loginWithToken({
+              access_token: result.access_token,
+              user_id: result.user_id,
+              remember: true,
+            });
+            if (loginOk) {
+              processQueue(null);
+              isRefreshing = false;
+              return http(originalRequest);
+            }
+          } else {
+            const { useUIStore } = await import("@/stores/ui");
+            useUIStore().notify(`Silent auth fail: ${result.error}`, "error");
+          }
+        }
+        
+        // If we reach here, auth failed
+        processQueue(error);
+        isRefreshing = false;
+        
+        const { useAuthStore } = await import("@/stores/auth");
+        const auth = useAuthStore();
+        auth.status.authenticated = false;
+        localStorage.removeItem("wasAuthenticated");
+        const { router } = await import("@/router");
+        router.replace({ name: "auth" });
+        
+      } catch (e) {
+        processQueue(error);
+        isRefreshing = false;
+        
+        const { useAuthStore } = await import("@/stores/auth");
+        const auth = useAuthStore();
+        auth.status.authenticated = false;
+        localStorage.removeItem("wasAuthenticated");
+        const { router } = await import("@/router");
+        router.replace({ name: "auth" });
+      }
+    }
     if (error.response) {
       const raw = error.response.data as { detail?: unknown } | undefined;
       let detail: APIErrorDetail;

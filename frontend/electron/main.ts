@@ -32,6 +32,7 @@ app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 app.commandLine.appendSwitch("disable-blink-features", "AutomationControlled");
 
 let mainWindow: BrowserWindow | null = null;
+let silentAuthWin: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -588,8 +589,52 @@ app.on("will-quit", () => {
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
 
+function initSilentAuthWin() {
+  if (silentAuthWin) return;
+  silentAuthWin = new BrowserWindow({
+    width: 560,
+    height: 760,
+    show: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      partition: `persist:vk-oauth-${VK_OAUTH_CLIENT_ID}`,
+    },
+  });
+  silentAuthWin.webContents.setUserAgent(DESKTOP_UA);
+  
+  const ses = session.fromPartition(`persist:vk-oauth-${VK_OAUTH_CLIENT_ID}`);
+  ses.webRequest.onBeforeRequest({ urls: ["*://*/*"] }, (details, callback) => {
+    if (
+      details.resourceType === "image" ||
+      details.resourceType === "font" ||
+      details.url.includes("google-analytics") ||
+      details.url.includes("yandex.ru") ||
+      details.url.includes("mail.ru")
+    ) {
+      callback({ cancel: true });
+    } else {
+      callback({ cancel: false });
+    }
+  });
+  
+  const url =
+    "https://oauth.vk.com/authorize?" +
+    new URLSearchParams({
+      client_id: String(VK_OAUTH_CLIENT_ID),
+      scope: VK_OAUTH_SCOPE,
+      redirect_uri: OAUTH_REDIRECT_PREFIX,
+      display: "page",
+      v: "5.131",
+      response_type: "token",
+      revoke: "0",
+    }).toString();
+    
+  void silentAuthWin.loadURL(url);
+}
+
 app.whenReady().then(() => {
-  // autoUpdater.checkForUpdates() is triggered by the renderer now
+  initSilentAuthWin();
 });
 
 autoUpdater.on("update-available", (info) => {
@@ -688,22 +733,38 @@ function parseOAuthFragment(rawUrl: string): OAuthResult | null {
   };
 }
 
-ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
-  const oauthWin = new BrowserWindow({
-    width: 560,
-    height: 760,
-    parent: mainWindow ?? undefined,
-    modal: false,
-    autoHideMenuBar: true,
-    title: "Вход в ВК",
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      partition: `persist:vk-oauth-${VK_OAUTH_CLIENT_ID}`,
-    },
-  });
-  oauthWin.webContents.setUserAgent(DESKTOP_UA);
-  oauthWin.removeMenu();
+ipcMain.handle("auth:open-vk-oauth", async (_event, silent?: boolean): Promise<OAuthResult> => {
+  let oauthWin: BrowserWindow;
+  if (silent && silentAuthWin && !silentAuthWin.isDestroyed()) {
+    oauthWin = silentAuthWin;
+    // Clear all previous listeners from pre-warmed window
+    oauthWin.webContents.removeAllListeners("will-redirect");
+    oauthWin.webContents.removeAllListeners("did-redirect-navigation");
+    oauthWin.webContents.removeAllListeners("did-navigate");
+    oauthWin.webContents.removeAllListeners("did-navigate-in-page");
+    oauthWin.webContents.removeAllListeners("did-start-navigation");
+    oauthWin.webContents.removeAllListeners("did-frame-navigate");
+    oauthWin.webContents.removeAllListeners("dom-ready");
+    oauthWin.webContents.removeAllListeners("did-fail-load");
+    oauthWin.webContents.session.cookies.removeAllListeners("changed");
+  } else {
+    oauthWin = new BrowserWindow({
+      width: 560,
+      height: 760,
+      parent: mainWindow ?? undefined,
+      modal: false,
+      show: !silent,
+      autoHideMenuBar: true,
+      title: "Вход в ВК",
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        partition: `persist:vk-oauth-${VK_OAUTH_CLIENT_ID}`,
+      },
+    });
+    oauthWin.webContents.setUserAgent(DESKTOP_UA);
+    oauthWin.removeMenu();
+  }
 
   const url =
     "https://oauth.vk.com/authorize?" +
@@ -714,7 +775,7 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
       display: "page",
       v: "5.131",
       response_type: "token",
-      revoke: "1",
+      revoke: silent ? "0" : "1",
     }).toString();
 
   return new Promise<OAuthResult>((resolve) => {
@@ -738,19 +799,40 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
       if (settled) return;
       settled = true;
       clearInterval(checkInterval);
+      if (silentTimeout) clearTimeout(silentTimeout);
       try {
-        oauthWin.close();
+        if (!silent) oauthWin.close();
       } catch {
         // ignore
       }
       resolve(result);
     };
 
+    let silentTimeout: NodeJS.Timeout | null = null;
+    if (silent) {
+      silentTimeout = setTimeout(() => {
+        if (!settled) finalize({ ok: false, error: "Silent auth timeout" });
+      }, 5000);
+    }
+
+    let tokenExpiredRetries = 0;
+
     const onUrl = (rawUrl: string) => {
       if (!rawUrl) return;
       if (!rawUrl.startsWith(OAUTH_REDIRECT_PREFIX)) return;
       const parsed = parseOAuthFragment(rawUrl);
-      if (parsed) finalize(parsed);
+      if (parsed) {
+        if (!parsed.ok && parsed.error === "token_expired" && tokenExpiredRetries < 2) {
+          tokenExpiredRetries++;
+          setTimeout(() => {
+            if (!oauthWin.isDestroyed()) {
+              void oauthWin.loadURL(url);
+            }
+          }, 500);
+          return;
+        }
+        finalize(parsed);
+      }
     };
 
     // Monitor session cookies to force authorization completion if 2FA login page hangs/fails to redirect
@@ -780,16 +862,45 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
     oauthWin.webContents.on("did-start-navigation", (_e, navUrl) => onUrl(navUrl));
     oauthWin.webContents.on("did-frame-navigate", (_e, navUrl) => onUrl(navUrl));
     
-    // Check URL state when loading completes
-    oauthWin.webContents.on("did-stop-loading", () => {
+    const injectClicker = async () => {
       try {
-        if (!oauthWin.isDestroyed()) {
-          onUrl(oauthWin.webContents.getURL());
+        if (oauthWin.isDestroyed()) return;
+        const currentUrl = oauthWin.webContents.getURL();
+        onUrl(currentUrl);
+        
+        if (silent && currentUrl.includes("vk.com")) {
+          await oauthWin.webContents.executeJavaScript(`
+            (function() {
+              const tryClick = () => {
+                const btn = document.querySelector('.oauth_button_allow, button.flat_button, button[type="submit"], .vkuiButton, .vkc__Button__primary');
+                if (btn && btn.offsetHeight > 0) {
+                  btn.click();
+                  return true;
+                }
+                return false;
+              };
+              if (!tryClick()) {
+                const obs = new MutationObserver(() => {
+                  if (tryClick()) obs.disconnect();
+                });
+                if (document.body) {
+                  obs.observe(document.body, { childList: true, subtree: true });
+                } else {
+                  document.addEventListener('DOMContentLoaded', () => {
+                    obs.observe(document.body, { childList: true, subtree: true });
+                  });
+                }
+              }
+            })();
+          `).catch(() => {});
         }
       } catch {
         // ignore
       }
-    });
+    };
+
+    // Check URL state when DOM is ready (faster than did-stop-loading)
+    oauthWin.webContents.on("dom-ready", injectClicker);
 
     // Close window and report error if loading main page fails (e.g. DNS or connection issue)
     oauthWin.webContents.on("did-fail-load", (_e, errorCode, errorDescription, _validatedURL, isMainFrame) => {
@@ -801,8 +912,13 @@ ipcMain.handle("auth:open-vk-oauth", async (): Promise<OAuthResult> => {
       }
     });
 
-    oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
+    if (silent && oauthWin === silentAuthWin && oauthWin.webContents.getURL().includes("vk.com")) {
+      // It's already loaded, just inject the clicker!
+      void injectClicker();
+    } else {
+      void oauthWin.loadURL(url);
+    }
 
-    void oauthWin.loadURL(url);
+    oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
   });
 });
