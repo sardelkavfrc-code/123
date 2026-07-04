@@ -208,6 +208,7 @@ const defaults: PersistedSettings = {
     { id: "uncensored", visible: true },
     { id: "similar", visible: true },
     { id: "queue", visible: true },
+    { id: "dislike", visible: true },
   ],
   iconSet: "rounded",
   mixMood: "any",

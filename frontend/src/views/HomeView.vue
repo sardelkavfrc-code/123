@@ -14,12 +14,14 @@ import ScrollArea from "@/components/ScrollArea.vue";
 import Spinner from "@/components/Spinner.vue";
 
 import { useUIStore } from "@/stores/ui";
+import { useDislikesStore } from "@/stores/dislikes";
 import { getMixBucket } from "@/composables/useMixCache";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
 const ui = useUIStore();
 const settings = useSettingsStore();
+const dislikes = useDislikesStore();
 
 const {
   homeCardsBrightness,
@@ -168,7 +170,7 @@ async function ensureCacheBuffer() {
         if (bucket.buffer.length >= 150) break;
         if (!bucket.seenIds.has(t.id)) {
           bucket.seenIds.add(t.id);
-          bucket.buffer.push(t);
+          if (!dislikes.isDisliked(t)) bucket.buffer.push(t);
         }
       }
       attempts++;
@@ -230,7 +232,11 @@ async function fillMixBuffer(needTracks: number) {
 
   // 1. Мгновенно отдаём из буфера этой комбинации, если он не пуст (без запросов)
   if (bucket.buffer.length > 0) {
-    const chunk = bucket.buffer.splice(0, needTracks);
+    const chunk: Track[] = [];
+    while (bucket.buffer.length > 0 && chunk.length < needTracks) {
+      const t = bucket.buffer.shift()!;
+      if (!dislikes.isDisliked(t)) chunk.push(t); // дизлайкнутые в буфере пропускаем
+    }
     if (chunk.length > 0) {
       mixTracks.value.push(...chunk);
       player.appendTracksToQueue(chunk);
@@ -248,6 +254,7 @@ async function fillMixBuffer(needTracks: number) {
     for (const t of res.items) {
       if (bucket.seenIds.has(t.id)) continue;
       bucket.seenIds.add(t.id);
+      if (dislikes.isDisliked(t)) continue; // не подмешиваем «не нравится»
       if (taken + chunk.length < needTracks) {
         chunk.push(t);
       } else {

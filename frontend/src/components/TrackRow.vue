@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
+import { useDislikesStore } from "@/stores/dislikes";
 import { useUIStore } from "@/stores/ui";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
@@ -23,6 +24,7 @@ const emit = defineEmits<{
 
 const player = usePlayerStore();
 const library = useLibraryStore();
+const dislikes = useDislikesStore();
 const ui = useUIStore();
 const router = useRouter();
 
@@ -32,6 +34,18 @@ const isCurrent = computed(
   () => current.value?.id === props.track.id && current.value?.owner_id === props.track.owner_id
 );
 const inLibrary = computed(() => library.isInLibrary(props.track));
+const isDisliked = computed(() => dislikes.isDisliked(props.track));
+
+function toggleDislike() {
+  const disliked = dislikes.toggle(props.track);
+  if (disliked) {
+    // Как в офиц. ВК: «не нравится» убирает трек из очереди и из будущих миксов.
+    player.removeTrack(props.track);
+    ui.notify("Добавлено в «Не нравится»", "success");
+  } else {
+    ui.notify("Убрано из «Не нравится»", "success");
+  }
+}
 const unavailable = computed(() => !props.track.url);
 
 function playOne() {
@@ -181,6 +195,16 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
         </button>
         <button v-else-if="item.id === 'queue'" class="row__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
           <SvgIcon name="queue_add" width="18" height="18" />
+        </button>
+        <button
+          v-else-if="item.id === 'dislike'"
+          class="row__action row__action--dislike"
+          :class="{ 'row__action--disliked': isDisliked }"
+          :title="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
+          :aria-label="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
+          @click.stop="toggleDislike"
+        >
+          <SvgIcon name="dislike" width="18" height="18" />
         </button>
       </template>
     </div>
@@ -354,6 +378,13 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 }
 .row__action--in-lib {
   color: var(--accent-1);
+}
+.row__action--disliked {
+  color: var(--danger);
+}
+.row__action--disliked:hover {
+  background: rgba(255, 94, 126, 0.12);
+  color: var(--danger);
 }
 .row__action--in-lib .row__lib-x {
   display: none;

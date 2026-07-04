@@ -16,6 +16,7 @@ const ALL_ITEMS_MAP: Record<string, { label: string; icon: IconName }> = {
   uncensored: { label: "Без цензуры (Найти оригинал)", icon: "uncensored" },
   similar: { label: "Похожие треки", icon: "similar" },
   queue: { label: "Слушать далее (Добавить в очередь)", icon: "queue" },
+  dislike: { label: "Не нравится", icon: "dislike" },
 };
 
 function resetDefaults() {
@@ -24,6 +25,7 @@ function resetDefaults() {
     { id: "uncensored", visible: true },
     { id: "similar", visible: true },
     { id: "queue", visible: true },
+    { id: "dislike", visible: true },
   ];
 }
 </script>

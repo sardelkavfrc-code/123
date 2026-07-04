@@ -28,6 +28,7 @@ export type IconName =
   | "similar"
   | "queue_add"
   | "queue_list"
+  | "dislike"
   | "plus"
   | "check"
   | "cross"
@@ -185,6 +186,15 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       strokeLinejoin: "round",
       content: `<line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />`,
     },
+    dislike: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />`,
+    },
     plus: {
       viewBox: "0 0 24 24",
       fill: "none",
@@ -336,6 +346,11 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       viewBox: "0 0 24 24",
       fill: "currentColor",
       content: `<path d="M4 6h2v2H4V6zm0 5h2v2H4v-2zm0 5h2v2H4v-2zm4-10h12v2H8V6zm0 5h12v2H8v-2zm0 5h12v2H8v-2z" />`,
+    },
+    dislike: {
+      viewBox: "0 0 24 24",
+      fill: "currentColor",
+      content: `<path d="M15 3H6c-.83 0-1.54.5-1.84 1.22l-3.02 7.05c-.09.23-.14.47-.14.73v2c0 1.1.9 2 2 2h6.31l-.95 4.57-.03.32c0 .41.17.79.44 1.06L9.83 23l6.59-6.59c.36-.36.58-.86.58-1.41V5c0-1.1-.9-2-2-2zm4 0v12h4V3h-4z" />`,
     },
     plus: {
       viewBox: "0 0 24 24",
@@ -513,6 +528,15 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       strokeWidth: 2.2,
       strokeLinecap: "round",
       content: `<path d="M8 6h12.5M8 12h12.5M8 18h12.5" /><circle cx="3.5" cy="6" r="1.2" fill="currentColor" /><circle cx="3.5" cy="12" r="1.2" fill="currentColor" /><circle cx="3.5" cy="18" r="1.2" fill="currentColor" />`,
+    },
+    dislike: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2.2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M17 14V2" /><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88Z" />`,
     },
     plus: {
       viewBox: "0 0 24 24",

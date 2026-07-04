@@ -775,6 +775,16 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
+  /** Remove every occurrence of a track from the queue (used by "Не нравится"). */
+  function removeTrack(target: Pick<Track, "owner_id" | "id">) {
+    for (let i = queue.value.length - 1; i >= 0; i -= 1) {
+      const t = queue.value[i];
+      if (t.id === target.id && t.owner_id === target.owner_id) {
+        removeFromQueue(i);
+      }
+    }
+  }
+
   function moveInQueue(from: number, to: number) {
     if (from === to) return;
     if (from < 0 || from >= queue.value.length) return;
@@ -881,6 +891,7 @@ export const usePlayerStore = defineStore("player", () => {
     setVolume,
     clear,
     removeFromQueue,
+    removeTrack,
     moveInQueue,
     setQueue,
   };

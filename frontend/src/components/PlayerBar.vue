@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
+import { useDislikesStore } from "@/stores/dislikes";
 import { useUIStore } from "@/stores/ui";
 import { useEqualizerStore } from "@/stores/equalizer";
 import { formatDuration } from "@/composables/useFormat";
@@ -13,6 +14,7 @@ import SvgIcon from "./SvgIcon.vue";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
+const dislikes = useDislikesStore();
 const ui = useUIStore();
 const eq = useEqualizerStore();
 const router = useRouter();
@@ -92,8 +94,23 @@ function addToQueue() {
   ui.notify("Трек будет играть следующим", "success");
 }
 
-function openQueue() {
-  router.push({ name: "queue" });
+const isDisliked = computed(() => (current.value ? dislikes.isDisliked(current.value) : false));
+
+function toggleDislike() {
+  if (!current.value) return;
+  const track = current.value;
+  const disliked = dislikes.toggle(track);
+  if (disliked) {
+    // Как в офиц. ВК: «не нравится» переключает на следующий трек и убирает
+    // текущий из очереди (и из будущих миксов).
+    if (player.hasNext) {
+      player.next();
+    }
+    player.removeTrack(track);
+    ui.notify("Добавлено в «Не нравится»", "success");
+  } else {
+    ui.notify("Убрано из «Не нравится»", "success");
+  }
 }
 
 const showEqModal = ref(false);
@@ -242,8 +259,15 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <button class="player__icon-btn" :disabled="!current" title="Слушать далее" aria-label="Слушать далее" @click="addToQueue">
             <SvgIcon name="queue_add" width="22" height="22" />
           </button>
-          <button class="player__icon-btn" :disabled="!current" title="Открыть очередь" aria-label="Очередь" @click="openQueue">
-            <SvgIcon name="queue_list" width="22" height="22" />
+          <button
+            class="player__icon-btn"
+            :class="{ 'player__icon-btn--disliked': isDisliked }"
+            :disabled="!current"
+            :title="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
+            :aria-label="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
+            @click="toggleDislike"
+          >
+            <SvgIcon name="dislike" width="22" height="22" />
           </button>
         </div>
       </div>
@@ -548,6 +572,9 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
 }
 .player__icon-btn--active {
   color: var(--accent-1);
+}
+.player__icon-btn--disliked {
+  color: var(--danger);
 }
 .player__repeat-badge {
   position: absolute;
