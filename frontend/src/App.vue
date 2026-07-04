@@ -104,12 +104,16 @@ onMounted(() => {
     });
 
     if (settings.autoUpdateCheck) {
-      window.vkmp.updater?.checkForUpdates().catch(() => {});
+      setTimeout(() => {
+        window.vkmp?.updater?.checkForUpdates().catch((err) => {
+          console.error("Auto update check failed:", err);
+        });
+      }, 3000);
     }
     
     // Check every hour
     setInterval(() => {
-      if (useSettingsStore().autoUpdateCheck) {
+      if (settings.autoUpdateCheck) {
         window.vkmp?.updater?.checkForUpdates().catch(() => {});
       }
     }, 1000 * 60 * 60);
