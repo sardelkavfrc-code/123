@@ -495,6 +495,24 @@ async def delete(
     return {"ok": bool(result)}
 
 
+@router.post("/dislike")
+async def dislike(
+    audio_id: int,
+    owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+) -> dict[str, bool]:
+    """VK's "не нравится": tells the algorithm to hide this track (and similar
+    ones) from recommendations / the mix. One-way — VK has no un-dislike."""
+    result = await _safe_call(
+        vk,
+        "audio.addDislike",
+        session.access_token,
+        audio_ids=f"{owner_id}_{audio_id}",
+    )
+    return {"ok": bool(result)}
+
+
 def _slug_to_name(slug: str) -> str:
     """Best-effort fallback: turn VK artist slug ('linkin-park') into a name."""
     return slug.replace("-", " ").replace("_", " ").strip().title() or slug

@@ -1,11 +1,13 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
+import { api } from "@/api/client";
 import type { Track } from "@/api/types";
 
 /**
- * "Не нравится" — like the official VK player. Disliked tracks are remembered
- * across restarts (localStorage), skipped/removed from the play queue, and
- * excluded from VK Mix so they don't come back.
+ * "Не нравится" — like the official VK player. Disliking is a one-way action:
+ * a disliked track is gone for good — removed from the play queue and excluded
+ * from VK Mix, and there is no way to un-dislike it. The set is remembered
+ * across restarts (localStorage).
  */
 const STORAGE_KEY = "vkmp:dislikes";
 
@@ -41,31 +43,17 @@ export const useDislikesStore = defineStore("dislikes", () => {
     return keys.value.has(trackKey(track));
   }
 
+  /** One-way: mark a track as disliked forever. No-op if already disliked. */
   function dislike(track: Pick<Track, "owner_id" | "id">) {
     const key = trackKey(track);
     if (keys.value.has(key)) return;
     keys.value = new Set(keys.value).add(key);
     persist();
+    // Tell VK (audio.addDislike) so its algorithm hides this track and similar
+    // ones from recommendations / the mix. Best-effort: local filtering already
+    // applies even if the request fails (offline, rate limit, etc.).
+    void api.dislikeTrack(track.id, track.owner_id).catch(() => {});
   }
 
-  function undislike(track: Pick<Track, "owner_id" | "id">) {
-    const key = trackKey(track);
-    if (!keys.value.has(key)) return;
-    const next = new Set(keys.value);
-    next.delete(key);
-    keys.value = next;
-    persist();
-  }
-
-  /** Toggle and return the resulting disliked state. */
-  function toggle(track: Pick<Track, "owner_id" | "id">): boolean {
-    if (isDisliked(track)) {
-      undislike(track);
-      return false;
-    }
-    dislike(track);
-    return true;
-  }
-
-  return { keys, isDisliked, dislike, undislike, toggle };
+  return { keys, isDisliked, dislike };
 });

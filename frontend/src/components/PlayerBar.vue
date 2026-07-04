@@ -96,21 +96,17 @@ function addToQueue() {
 
 const isDisliked = computed(() => (current.value ? dislikes.isDisliked(current.value) : false));
 
-function toggleDislike() {
-  if (!current.value) return;
+function dislikeTrack() {
+  if (!current.value || isDisliked.value) return; // одностороннее действие
   const track = current.value;
-  const disliked = dislikes.toggle(track);
-  if (disliked) {
-    // Как в офиц. ВК: «не нравится» переключает на следующий трек и убирает
-    // текущий из очереди (и из будущих миксов).
-    if (player.hasNext) {
-      player.next();
-    }
-    player.removeTrack(track);
-    ui.notify("Добавлено в «Не нравится»", "success");
-  } else {
-    ui.notify("Убрано из «Не нравится»", "success");
+  // Как в офиц. ВК: «не нравится» переключает на следующий трек и убирает
+  // текущий из очереди (и из будущих миксов) навсегда.
+  dislikes.dislike(track);
+  if (player.hasNext) {
+    player.next();
   }
+  player.removeTrack(track);
+  ui.notify("Больше не будет попадаться", "success");
 }
 
 const showEqModal = ref(false);
@@ -262,12 +258,12 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <button
             class="player__icon-btn"
             :class="{ 'player__icon-btn--disliked': isDisliked }"
-            :disabled="!current"
-            :title="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
-            :aria-label="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
-            @click="toggleDislike"
+            :disabled="!current || isDisliked"
+            :title="isDisliked ? 'Не нравится' : 'Не нравится (больше не показывать)'"
+            aria-label="Не нравится"
+            @click="dislikeTrack"
           >
-            <SvgIcon name="dislike" width="22" height="22" />
+            <SvgIcon name="dislike" width="20" height="20" />
           </button>
         </div>
       </div>

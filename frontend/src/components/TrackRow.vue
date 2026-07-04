@@ -36,15 +36,12 @@ const isCurrent = computed(
 const inLibrary = computed(() => library.isInLibrary(props.track));
 const isDisliked = computed(() => dislikes.isDisliked(props.track));
 
-function toggleDislike() {
-  const disliked = dislikes.toggle(props.track);
-  if (disliked) {
-    // Как в офиц. ВК: «не нравится» убирает трек из очереди и из будущих миксов.
-    player.removeTrack(props.track);
-    ui.notify("Добавлено в «Не нравится»", "success");
-  } else {
-    ui.notify("Убрано из «Не нравится»", "success");
-  }
+function dislikeTrack() {
+  if (isDisliked.value) return; // одностороннее действие — отменить нельзя
+  // Как в офиц. ВК: «не нравится» убирает трек из очереди и из будущих миксов навсегда.
+  dislikes.dislike(props.track);
+  player.removeTrack(props.track);
+  ui.notify("Больше не будет попадаться", "success");
 }
 const unavailable = computed(() => !props.track.url);
 
@@ -200,11 +197,12 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
           v-else-if="item.id === 'dislike'"
           class="row__action row__action--dislike"
           :class="{ 'row__action--disliked': isDisliked }"
-          :title="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
-          :aria-label="isDisliked ? 'Убрать из «Не нравится»' : 'Не нравится'"
-          @click.stop="toggleDislike"
+          :disabled="isDisliked"
+          :title="isDisliked ? 'Не нравится' : 'Не нравится (больше не показывать)'"
+          aria-label="Не нравится"
+          @click.stop="dislikeTrack"
         >
-          <SvgIcon name="dislike" width="18" height="18" />
+          <SvgIcon name="dislike" width="16" height="16" />
         </button>
       </template>
     </div>
