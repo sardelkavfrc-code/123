@@ -4,10 +4,15 @@ def main():
     base_dirs = ['.']
     exts = {'.py', '.ts', '.vue', '.css', '.md', '.json', '.html'}
     ignore_dirs = {
-        'node_modules', 'venv', '.git', 'dist', 'build', 
-        '__pycache__', '.idea', '.vscode', '.github'
+        'node_modules', 'venv', '.git', 'dist', 'build',
+        'dist-electron', 'release', 'win-unpacked',
+        '__pycache__', '.idea', '.vscode', '.github',
+        '.pytest_cache', '.ruff_cache', '.mypy_cache',
     }
-    
+    # Generated / lockfiles / vendored dumps — huge and useless in a code dump.
+    ignore_files = {'all_code.txt', 'package-lock.json', 'poetry.lock', 'catalog.json'}
+    ignore_suffixes = ('.min.js', '.min.css', '.lock')
+
     files_data = []
     total_lines = 0
     total_files = 0
@@ -18,6 +23,8 @@ def main():
             dirs[:] = [d for d in dirs if d not in ignore_dirs]
             
             for f in files:
+                if f in ignore_files or f.endswith(ignore_suffixes):
+                    continue
                 if any(f.endswith(e) for e in exts):
                     path = os.path.join(root, f)
                     rel_path = os.path.relpath(path, start='.')

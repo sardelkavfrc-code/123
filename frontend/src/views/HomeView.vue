@@ -14,6 +14,7 @@ import ScrollArea from "@/components/ScrollArea.vue";
 import Spinner from "@/components/Spinner.vue";
 
 import { useUIStore } from "@/stores/ui";
+import { getMixBucket } from "@/composables/useMixCache";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
@@ -122,8 +123,9 @@ watch(moodsScroll, (el, oldEl) => {
 });
 const loadingAlbumId = ref<string | null>(null);
 
-// VK Mix state
-let mixTrackCache: Track[] = [];
+// VK Mix state. Buffers live per parameter-combo in useMixCache (module-scoped),
+// so switching parameters never leaks tracks from another combo and re-selecting
+// the same parameters serves instantly from memory.
 const mixTracks = ref<Track[]>([]);
 const mixLoading = ref(false);
 
@@ -135,28 +137,38 @@ onMounted(async () => {
   ensureCacheBuffer().catch(console.error);
 });
 
+// Пре-нагрев буфера при смене параметров: буферы других комбинаций остаются
+// в памяти, а для только что выбранной начинаем подкачку заранее.
+watch([mixMood, mixFamiliarity, mixLanguage], () => {
+  ensureCacheBuffer().catch(console.error);
+});
+
 let isCaching = false;
 async function ensureCacheBuffer() {
   if (isCaching) return;
   isCaching = true;
   try {
-    const knownIds = new Set([
-      ...mixTracks.value.map(t => t.id),
-      ...mixTrackCache.map(t => t.id)
-    ]);
-    
+    // Снимок параметров: наполняем буфер именно той комбинации, что выбрана сейчас.
+    const mood = mixMood.value;
+    const fam = mixFamiliarity.value;
+    const lang = mixLanguage.value;
+    const bucket = getMixBucket(mood, fam, lang);
+
     let attempts = 0;
     // Поддерживаем кэш на уровне 150 треков. Запросы делаем последовательно,
     // иначе ВК API отдаёт одинаковые массивы на параллельные запросы.
-    while (mixTrackCache.length < 150 && attempts < 10) {
-      const res = await api.mix({ vibes: mixMood.value, recognitions: mixFamiliarity.value, langs: mixLanguage.value });
+    while (bucket.buffer.length < 150 && attempts < 10) {
+      // Пользователь переключил параметры на лету — прекращаем, чужой буфер не трогаем.
+      if (mixMood.value !== mood || mixFamiliarity.value !== fam || mixLanguage.value !== lang) break;
+
+      const res = await api.mix({ vibes: mood, recognitions: fam, langs: lang });
       if (!res.items || res.items.length === 0) break;
-      
+
       for (const t of res.items) {
-        if (mixTrackCache.length >= 150) break;
-        if (!knownIds.has(t.id)) {
-          knownIds.add(t.id);
-          mixTrackCache.push(t);
+        if (bucket.buffer.length >= 150) break;
+        if (!bucket.seenIds.has(t.id)) {
+          bucket.seenIds.add(t.id);
+          bucket.buffer.push(t);
         }
       }
       attempts++;
@@ -206,55 +218,54 @@ async function playMix() {
   }
 }
 
-// Функция фоновой подгрузки N уникальных треков
+// Функция подгрузки N уникальных треков для текущей комбинации параметров
 async function fillMixBuffer(needTracks: number) {
-  let newTracks: Track[] = [];
-  let attempts = 0;
-  const knownIds = new Set(mixTracks.value.map(t => t.id));
+  // Снимок параметров — работаем строго с буфером выбранной комбинации.
+  const mood = mixMood.value;
+  const fam = mixFamiliarity.value;
+  const lang = mixLanguage.value;
+  const bucket = getMixBucket(mood, fam, lang);
 
-  // 1. Выгребаем треки из кэша, если они там есть
-  let chunkFromCache: Track[] = [];
-  while (mixTrackCache.length > 0 && newTracks.length < needTracks) {
-    const t = mixTrackCache.shift();
-    if (t && !knownIds.has(t.id)) {
-      knownIds.add(t.id);
-      newTracks.push(t);
-      chunkFromCache.push(t);
+  let taken = 0;
+
+  // 1. Мгновенно отдаём из буфера этой комбинации, если он не пуст (без запросов)
+  if (bucket.buffer.length > 0) {
+    const chunk = bucket.buffer.splice(0, needTracks);
+    if (chunk.length > 0) {
+      mixTracks.value.push(...chunk);
+      player.appendTracksToQueue(chunk);
+      taken += chunk.length;
     }
   }
-  if (chunkFromCache.length > 0) {
-    mixTracks.value.push(...chunkFromCache);
-    player.appendTracksToQueue(chunkFromCache);
-  }
 
-  // 2. Если кэша не хватило, идем в ВК (последовательно)
-  while (newTracks.length < needTracks && attempts < 15) {
-    const res = await api.mix({ vibes: mixMood.value, recognitions: mixFamiliarity.value, langs: mixLanguage.value });
+  // 2. Если буфера не хватило, идём в ВК (последовательно)
+  let attempts = 0;
+  while (taken < needTracks && attempts < 15) {
+    const res = await api.mix({ vibes: mood, recognitions: fam, langs: lang });
     if (!res.items || res.items.length === 0) break;
-    
-    let chunk: Track[] = [];
+
+    const chunk: Track[] = [];
     for (const t of res.items) {
-      if (!knownIds.has(t.id)) {
-        knownIds.add(t.id);
-        if (newTracks.length < needTracks) {
-          newTracks.push(t);
-          chunk.push(t);
-        } else {
-          mixTrackCache.push(t); // Сохраняем излишки на будущее
-        }
+      if (bucket.seenIds.has(t.id)) continue;
+      bucket.seenIds.add(t.id);
+      if (taken + chunk.length < needTracks) {
+        chunk.push(t);
+      } else {
+        bucket.buffer.push(t); // Сохраняем излишки на будущее
       }
     }
-    
+
     // Сразу показываем пользователю новую порцию треков
     if (chunk.length > 0) {
       mixTracks.value.push(...chunk);
       player.appendTracksToQueue(chunk);
+      taken += chunk.length;
     }
-    
+
     attempts++;
   }
 
-  // 3. Пингуем фоновую накачку, чтобы она восполнила потраченный кэш
+  // 3. Пингуем фоновую накачку, чтобы она восполнила потраченный буфер
   ensureCacheBuffer().catch(console.error);
 }
 
