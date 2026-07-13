@@ -756,3 +756,37 @@ async def artist_info(
         banner=None,
         is_followed=False,
     )
+
+
+@router.post("/track-play")
+async def track_play(
+    vk: VKDep,
+    session: SessionDep,
+    audio_id: int = Query(..., description="ID аудиозаписи"),
+    owner_id: int = Query(..., description="ID владельца аудиозаписи"),
+    duration: int = Query(..., description="Длительность в секундах"),
+) -> dict[str, bool]:
+    """Регистрирует проигрывание трека в статистике ВК для недавних и рекомендаций."""
+    import json
+    import time
+    import random
+
+    uuid_val = random.randint(0, 2**63 - 1)
+    event = {
+        "e": "audio_play",
+        "audio_id": f"{owner_id}_{audio_id}",
+        "source": "my",
+        "uuid": uuid_val,
+        "duration": duration,
+        "start_time": int(time.time()),
+    }
+    events_json = json.dumps([event])
+
+    await _safe_call(
+        vk,
+        "stats.trackEvents",
+        session.access_token,
+        events=events_json
+    )
+    return {"ok": True}
+

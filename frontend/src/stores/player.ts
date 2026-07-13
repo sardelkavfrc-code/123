@@ -362,6 +362,7 @@ export const usePlayerStore = defineStore("player", () => {
   let prefetchAudio: HTMLAudioElement | null = null;
   let prefetchHls: Hls | null = null;
   let prefetchTimeout: number | null = null;
+  let trackPlayTimeout: number | null = null;
 
   function destroyPrefetch() {
     if (prefetchTimeout) {
@@ -748,6 +749,10 @@ export const usePlayerStore = defineStore("player", () => {
   function clear() {
     destroyBackend();
     destroyPrefetch();
+    if (trackPlayTimeout !== null) {
+      window.clearTimeout(trackPlayTimeout);
+      trackPlayTimeout = null;
+    }
     queue.value = [];
     originalQueue.value = [];
     index.value = -1;
@@ -853,6 +858,32 @@ export const usePlayerStore = defineStore("player", () => {
       }
 
       api.updateRpc(payload).catch(err => console.error("RPC Update failed", err));
+    }
+  );
+
+  // Send track playback statistic (stats.trackEvents) to VK after 2 seconds of playback
+  watch(
+    [current, isPlaying],
+    ([track, playing]) => {
+      if (trackPlayTimeout !== null) {
+        window.clearTimeout(trackPlayTimeout);
+        trackPlayTimeout = null;
+      }
+
+      if (!playing || !track) {
+        return;
+      }
+
+      // Ignore local files (which do not have owner_id or valid VK ID)
+      if (track.owner_id === undefined || track.id === undefined || track.id === -1) {
+        return;
+      }
+
+      trackPlayTimeout = window.setTimeout(() => {
+        api.trackPlay(track.id, track.owner_id, track.duration).catch((err) => {
+          console.error("Failed to report track playback to VK:", err);
+        });
+      }, 2000);
     }
   );
 
