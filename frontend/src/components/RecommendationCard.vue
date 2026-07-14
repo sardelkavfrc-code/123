@@ -112,8 +112,8 @@ function generateReededCover(baseColor: string, id: string): string {
   const lVal = 30 + Math.floor(random() * 10);
   const baseRGB = hslToRgb(randomHue, sVal, lVal);
 
-  // Select a stable random letter or digit using seeded random
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789";
+  // Select a stable random English letter using seeded random (excluding X, R, K, F, P)
+  const chars = "ABCDEGHIJLMNOQSTUVWYZ";
   const char = chars.charAt(Math.floor(random() * chars.length));
   
   const isDarker = random() > 0.5;
@@ -126,12 +126,12 @@ function generateReededCover(baseColor: string, id: string): string {
   blurCanvas.height = height;
   const bCtx = blurCanvas.getContext("2d");
   if (bCtx) {
-    bCtx.filter = "blur(48px)";
-    bCtx.font = "bold 1200px Inter, system-ui, sans-serif";
+    bCtx.filter = "blur(62px)";
+    bCtx.font = "bold 1560px Inter, system-ui, sans-serif";
     bCtx.textAlign = "center";
     bCtx.textBaseline = "middle";
     bCtx.fillStyle = "white";
-    bCtx.fillText(char, width / 2, height / 2 + 80);
+    bCtx.fillText(char, width / 2, height / 2 + 105);
   }
 
   // Create canvas to draw the sharp/solid letter mask
@@ -140,12 +140,12 @@ function generateReededCover(baseColor: string, id: string): string {
   solidCanvas.height = height;
   const sCtx = solidCanvas.getContext("2d");
   if (sCtx) {
-    sCtx.filter = "blur(20px)";
-    sCtx.font = "bold 1200px Inter, system-ui, sans-serif";
+    sCtx.filter = "blur(26px)";
+    sCtx.font = "bold 1560px Inter, system-ui, sans-serif";
     sCtx.textAlign = "center";
     sCtx.textBaseline = "middle";
     sCtx.fillStyle = "white";
-    sCtx.fillText(char, width / 2, height / 2 + 80);
+    sCtx.fillText(char, width / 2, height / 2 + 105);
   }
 
   // Pack both masks into a single canvas (Red = Blurred alpha, Green = Solid alpha)
@@ -208,11 +208,11 @@ function generateReededCover(baseColor: string, id: string): string {
           float coord = uv.x * 48.0 - t + float(i) * 0.05;
           // Sawtooth wave: f goes from 0.0 (peak) to 1.0 (end of period), spanning 100% of the space
           float f = fract(coord / 6.2831853);
-          float val = f * 1.35; 
+          float val = f * 0.95; 
           intensity += lineWidth * float(i*i) / (val + 0.018);
         }
         // Layer the white highlight (#fefefe = vec3(0.996)) using mix instead of addition
-        float highlightBlend = clamp(intensity * 0.48 * edge, 0.0, 1.0);
+        float highlightBlend = clamp(intensity * 0.68 * edge, 0.0, 1.0);
         vec3 finalColor = mix(mix(baseColor, letterColor, a_blur), vec3(0.996), highlightBlend);
         
         gl_FragColor = vec4(finalColor, 1.0);
