@@ -205,16 +205,11 @@ function generateReededCover(baseColor: string, id: string): string {
         vec3 shaderColor = vec3(0.0);
         for(int j = 0; j < 3; j++){
           for(int i=0; i < 5; i++){
-            // Completely vertical lines and higher density (frequency multiplier 28.0)
-            float coord = uv.x * 28.0 - t - 0.05 * float(j) + float(i) * 0.05;
-            float s = sin(coord);
-            float c = cos(coord);
-            float val = 1.0 - s;
-            if (c > 0.0) {
-              val = val * 5.0; // sharp edge
-            } else {
-              val = val * 0.6; // soft directional smear
-            }
+            // Completely vertical lines and higher density (frequency multiplier 36.0)
+            float coord = uv.x * 36.0 - t - 0.05 * float(j) + float(i) * 0.05;
+            // Sawtooth wave: f goes from 0.0 (peak) to 1.0 (end of period), spanning 100% of the space
+            float f = fract(coord / 6.2831853);
+            float val = f * 1.35; 
             shaderColor[j] += lineWidth * float(i*i) / (val + 0.018);
           }
         }
