@@ -120,18 +120,35 @@ function generateReededCover(baseColor: string, id: string): string {
   const letterL = isDarker ? Math.max(15, lVal - 8) : Math.min(85, lVal + 8);
   const letterRGB = hslToRgb(randomHue, sVal, letterL);
 
+  // 2. Measure letter width to scale font size dynamically (preventing wide letters from covering the whole card)
+  const dummyCanvas = document.createElement("canvas");
+  const dummyCtx = dummyCanvas.getContext("2d");
+  let letterWidth = 800; // default fallback
+  if (dummyCtx) {
+    dummyCtx.font = "bold 1000px Inter, system-ui, sans-serif";
+    letterWidth = dummyCtx.measureText(char).width;
+  }
+
+  // Calculate dynamic font size based on measured width, clamped between 850px and 1450px
+  let fontSize = Math.round(1000 * (650 / letterWidth));
+  fontSize = Math.max(850, Math.min(1450, fontSize));
+
+  const blurRadius = Math.round(fontSize * 0.04);
+  const solidRadius = Math.round(fontSize * 0.0166);
+  const yOffset = Math.round(fontSize * 0.065);
+
   // Create canvas to draw the blurred letter mask (transparent background, white letter)
   const blurCanvas = document.createElement("canvas");
   blurCanvas.width = width;
   blurCanvas.height = height;
   const bCtx = blurCanvas.getContext("2d");
   if (bCtx) {
-    bCtx.filter = "blur(62px)";
-    bCtx.font = "bold 1560px Inter, system-ui, sans-serif";
+    bCtx.filter = `blur(${blurRadius}px)`;
+    bCtx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
     bCtx.textAlign = "center";
     bCtx.textBaseline = "middle";
     bCtx.fillStyle = "white";
-    bCtx.fillText(char, width / 2, height / 2 + 105);
+    bCtx.fillText(char, width / 2, height / 2 + yOffset);
   }
 
   // Create canvas to draw the sharp/solid letter mask
@@ -140,12 +157,12 @@ function generateReededCover(baseColor: string, id: string): string {
   solidCanvas.height = height;
   const sCtx = solidCanvas.getContext("2d");
   if (sCtx) {
-    sCtx.filter = "blur(26px)";
-    sCtx.font = "bold 1560px Inter, system-ui, sans-serif";
+    sCtx.filter = `blur(${solidRadius}px)`;
+    sCtx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
     sCtx.textAlign = "center";
     sCtx.textBaseline = "middle";
     sCtx.fillStyle = "white";
-    sCtx.fillText(char, width / 2, height / 2 + 105);
+    sCtx.fillText(char, width / 2, height / 2 + yOffset);
   }
 
   // Pack both masks into a single canvas (Red = Blurred alpha, Green = Solid alpha)
