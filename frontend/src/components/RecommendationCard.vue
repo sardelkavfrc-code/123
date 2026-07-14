@@ -26,7 +26,7 @@ const variants = computed(() =>
 
 const background = computed(() => {
   if (props.block.cover) {
-    return `linear-gradient(180deg, rgba(8, 9, 14, 0.4), rgba(8, 9, 14, 0.0) 50%), url(${props.block.cover}) center/cover`;
+    return `linear-gradient(180deg, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.25) 40%, rgba(0, 0, 0, 0.0) 100%), url(${props.block.cover}) center/cover`;
   }
   return "linear-gradient(135deg, var(--accent-1), var(--accent-3))";
 });
@@ -100,13 +100,13 @@ const background = computed(() => {
 .rec-card__overlay {
   position: absolute;
   inset: 0;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.15);
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
   z-index: 2;
   pointer-events: none;
 }
 .rec-card:hover .rec-card__overlay {
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.45);
 }
 .rec-card__play {
   position: absolute;

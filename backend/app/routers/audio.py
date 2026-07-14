@@ -366,16 +366,12 @@ async def algorithms(vk: VKDep, session: SessionDep) -> AlbumList:
     for pl in playlists_data:
         pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
         if pl_id in playlist_ids:
-            cover = None
-            if pl.get("photo"):
-                cover = pl["photo"].get("photo_600") or pl["photo"].get("photo_300")
-            
             items.append(AlbumSummary(
                 id=str(pl.get("id")),
                 owner_id=pl.get("owner_id"),
                 title=pl.get("title", ""),
                 subtitle=pl.get("description") or pl.get("subtitle") or "",
-                cover=cover,
+                cover=_get_playlist_cover(pl),
                 year=pl.get("year"),
                 track_count=pl.get("count", 0),
             ))
