@@ -72,15 +72,6 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function shiftColor(r: number, g: number, b: number, dh: number, ds: number, dl: number): string {
-  const [h, s, l] = rgbToHsl(r, g, b);
-  const nh = (h + dh + 360) % 360;
-  const ns = Math.min(100, Math.max(0, s + ds));
-  const nl = Math.min(100, Math.max(0, l + dl));
-  const [nr, ng, nb] = hslToRgb(nh, ns, nl);
-  return `rgb(${nr}, ${ng}, ${nb})`;
-}
-
 function generateReededCover(baseColor: string, id: string): string {
   const cacheKey = `${id}_${baseColor}`;
   if (coverCache.has(cacheKey)) {
@@ -103,8 +94,6 @@ function generateReededCover(baseColor: string, id: string): string {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return "";
 
   // 1. Parse base color
   let r = 120, g = 120, b = 120;
@@ -115,222 +104,132 @@ function generateReededCover(baseColor: string, id: string): string {
     b = parseInt(hex.substring(4, 6), 16);
   }
 
-  // 2. Base gradient background values (high-saturation dual-tone)
-  const [h, s, l] = rgbToHsl(r, g, b);
-  const shiftedHue = (h + 18 + random() * 12) % 360;
-  const [sr, sg, sb] = hslToRgb(shiftedHue, Math.min(100, s * 1.05), Math.min(95, l * 1.1));
-  const [er, eg, eb] = hslToRgb((h - 22 + 360) % 360, Math.min(100, s * 1.05), Math.max(22, l * 0.72));
+  const [h] = rgbToHsl(r, g, b);
 
-  const color1 = `rgb(${sr}, ${sg}, ${sb})`;
-  const color2 = `rgb(${er}, ${eg}, ${eb})`;
+  // Generate exactly 1 single solid random color per card (matte/soft tone)
+  const randomHue = (h + Math.floor(random() * 80) - 40 + 360) % 360;
+  const sVal = 55 + Math.floor(random() * 15);
+  const lVal = 30 + Math.floor(random() * 10);
+  const baseRGB = hslToRgb(randomHue, sVal, lVal);
 
-  // 3. Create a slightly larger canvas for the base background to prevent edge bleeding halos
-  const bgW = width + 40;
-  const bgH = height + 40;
-  const bgCanvas = document.createElement("canvas");
-  bgCanvas.width = bgW;
-  bgCanvas.height = bgH;
-  const bgCtx = bgCanvas.getContext("2d");
-  if (bgCtx) {
-    // A. Draw base gradient
-    const baseGrad = bgCtx.createLinearGradient(0, 0, bgW, bgH);
-    baseGrad.addColorStop(0, color1);
-    baseGrad.addColorStop(1, color2);
-    bgCtx.fillStyle = baseGrad;
-    bgCtx.fillRect(0, 0, bgW, bgH);
+  const seedTime = random(); // Freeze shader at a unique static state per card
 
-    // B. Draw a soft diagonal light reflection on background to enrich mirror effect
-    const backShine = bgCtx.createLinearGradient(0, 0, bgW, bgH);
-    backShine.addColorStop(0, "rgba(255, 255, 255, 0.08)");
-    backShine.addColorStop(0.35, "rgba(255, 255, 255, 0.0)");
-    backShine.addColorStop(0.6, "rgba(0, 0, 0, 0.0)");
-    backShine.addColorStop(1, "rgba(0, 0, 0, 0.12)");
-    bgCtx.fillStyle = backShine;
-    bgCtx.fillRect(0, 0, bgW, bgH);
-  }
-
-  // 4. Create an opaque slightly blurred canvas (blur(4px) for semi-sharp mirror reflection!)
-  const blurCanvas = document.createElement("canvas");
-  blurCanvas.width = bgW;
-  blurCanvas.height = bgH;
-  const bCtx = blurCanvas.getContext("2d");
-  if (bCtx) {
-    bCtx.filter = "blur(4px)";
-    bCtx.drawImage(bgCanvas, 0, 0);
-  }
-
-  // Draw clean un-distorted background on main canvas
-  ctx.drawImage(bgCanvas, 20, 20, width, height, 0, 0, width, height);
-
-  // Get fast pixel access on blurred background
-  const imgData = bCtx!.getImageData(0, 0, bgW, bgH);
-  const d = imgData.data;
-
-  function getBgColor(x: number, y: number): [number, number, number] {
-    // Translate coords to the larger blur canvas space
-    const cx = Math.max(0, Math.min(bgW - 1, Math.floor(x + 20)));
-    const cy = Math.max(0, Math.min(bgH - 1, Math.floor(y + 20)));
-    const idx = (cy * bgW + cx) * 4;
-    return [d[idx], d[idx + 1], d[idx + 2]];
-  }
-
-  // Compute a highly saturated deep shadow color based on the base hue (no muddy grey shadows!)
-  const [dr, dg, db] = hslToRgb(h, Math.min(100, s * 1.1), Math.max(8, l * 0.25));
-  const shadowColorStr = `rgba(${dr}, ${dg}, ${db}`;
-
-  const ribWidth = 26 + Math.floor(random() * 8); // 26 to 34px (perfect mirror strip size)
-  const hasWaviness = random() > 0.25;
-  const amp1 = 3 + random() * 3; // subtle wave distortion
-  const amp2 = 1.5 + random() * 1.5;
-  const freq1 = 0.005 + random() * 0.005;
-  const freq2 = 0.012 + random() * 0.008;
-  const phase1 = random() * Math.PI * 2;
-  const phase2 = random() * Math.PI * 2;
-
-  // 5. Create glass ribbed refraction canvas
-  const ribCanvas = document.createElement("canvas");
-  ribCanvas.width = width;
-  ribCanvas.height = height;
-  const rCtx = ribCanvas.getContext("2d");
-  if (rCtx) {
-    for (let y = 0; y < height; y += 2) {
-      const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
-      for (let x = -40; x < width + 40; x += ribWidth) {
-        const curX = x + xOffset;
-        
-        // Mirror-flip sample coordinates with offset to simulate convex cylindrical mirror strips
-        const leftRGB = getBgColor(curX - 45, y);
-        const centerRGB = getBgColor(curX, y);
-        const rightRGB = getBgColor(curX + 45, y);
-        
-        // Shift colors slightly to match mirror cylinder reflection lighting curve
-        const edgeLeft = shiftColor(leftRGB[0], leftRGB[1], leftRGB[2], 0, 4, 6);
-        const specRGB = getBgColor(curX - 15, y);
-        const specC = shiftColor(specRGB[0], specRGB[1], specRGB[2], 6, 12, 16);
-        const midC = `rgb(${centerRGB[0]}, ${centerRGB[1]}, ${centerRGB[2]})`;
-        const shadowRGB = getBgColor(curX + 25, y);
-        const shadowC = shiftColor(shadowRGB[0], shadowRGB[1], shadowRGB[2], -4, -8, -12);
-        const ambientC = shiftColor(rightRGB[0], rightRGB[1], rightRGB[2], 2, 4, 4);
-        const edgeRight = shiftColor(rightRGB[0], rightRGB[1], rightRGB[2], 0, 4, 6);
-
-        const g = rCtx.createLinearGradient(curX, 0, curX + ribWidth, 0);
-        g.addColorStop(0, edgeLeft);
-        g.addColorStop(0.22, specC);
-        g.addColorStop(0.5, midC);
-        g.addColorStop(0.78, shadowC);
-        g.addColorStop(0.9, ambientC);
-        g.addColorStop(1, edgeRight);
-        
-        rCtx.fillStyle = g;
-        rCtx.fillRect(curX, y, ribWidth, 2);
+  const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
+  if (gl) {
+    // Vertex shader
+    const vsSource = `
+      attribute vec2 position;
+      void main() {
+        gl_Position = vec4(position, 0.0, 1.0);
       }
-    }
-  }
+    `;
 
-  // 6. Create effect mask (defines where the glass cylinders are visible)
-  const effectMaskCanvas = document.createElement("canvas");
-  effectMaskCanvas.width = width;
-  effectMaskCanvas.height = height;
-  const emCtx = effectMaskCanvas.getContext("2d");
-  if (emCtx) {
-    const maskType = random();
-    if (maskType < 0.35) {
-      const maskGrad = emCtx.createLinearGradient(width, 0, 0, height);
-      maskGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
-      maskGrad.addColorStop(0.4, "rgba(255, 255, 255, 0.7)");
-      maskGrad.addColorStop(0.8, "rgba(255, 255, 255, 0.15)");
-      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
-      emCtx.fillStyle = maskGrad;
-    } else if (maskType < 0.7) {
-      const centerX = width * (0.2 + random() * 0.6);
-      const centerY = height * (0.2 + random() * 0.5);
-      const radius = 180 + random() * 150;
-      const maskGrad = emCtx.createRadialGradient(centerX, centerY, 20, centerX, centerY, radius);
-      maskGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
-      maskGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.45)");
-      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
-      emCtx.fillStyle = maskGrad;
-    } else {
-      const maskGrad = emCtx.createLinearGradient(0, 0, width, 0);
-      maskGrad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
-      maskGrad.addColorStop(0.35, "rgba(255, 255, 255, 0.15)");
-      maskGrad.addColorStop(0.65, "rgba(255, 255, 255, 0.15)");
-      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.9)");
-      emCtx.fillStyle = maskGrad;
-    }
-    emCtx.fillRect(0, 0, width, height);
-  }
+    // Fragment shader
+    const fsSource = `
+      precision highp float;
+      uniform vec2 resolution;
+      uniform float time;
+      uniform vec3 baseColor;
 
-  // 7. Draw the masked ribs onto the main canvas
-  const finalRibsCanvas = document.createElement("canvas");
-  finalRibsCanvas.width = width;
-  finalRibsCanvas.height = height;
-  const frCtx = finalRibsCanvas.getContext("2d");
-  if (frCtx) {
-    frCtx.drawImage(ribCanvas, 0, 0);
-    frCtx.globalCompositeOperation = "destination-in";
-    frCtx.drawImage(effectMaskCanvas, 0, 0);
-  }
-  ctx.drawImage(finalRibsCanvas, 0, 0);
+      void main(void) {
+        vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
+        float t = time * 0.05;
+        float lineWidth = 0.0035;
 
-  // 8. Draw 3D highlights and shadows on top of the columns (applying the effect mask)
-  const overlaysCanvas = document.createElement("canvas");
-  overlaysCanvas.width = width;
-  overlaysCanvas.height = height;
-  const oCtx = overlaysCanvas.getContext("2d");
-  if (oCtx) {
-    for (let y = 0; y < height; y += 2) {
-      const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
-      for (let x = -40; x < width + 40; x += ribWidth) {
-        const curX = x + xOffset;
+        vec3 shaderColor = vec3(0.0);
+        for(int j = 0; j < 3; j++){
+          for(int i=0; i < 5; i++){
+            // Steep vertical tilt (uv.y coefficient 0.28) and high frequency (multiplied by 18.0)
+            float diagonal = sin((uv.x + uv.y * 0.28) * 18.0 - t - 0.05 * float(j) + float(i) * 0.05);
+            float val = abs(diagonal);
+            shaderColor[j] += lineWidth * float(i*i) / (val + 0.016);
+          }
+        }
         
-        const borderAlpha = 0.08 + 0.10 * Math.sin(y / height * Math.PI);
-        const shadowAlpha = 0.18 + 0.14 * Math.sin(y / height * Math.PI);
-        
-        // Left Fresnel border (bright specular edge)
-        oCtx.fillStyle = `rgba(255, 255, 255, ${borderAlpha})`;
-        oCtx.fillRect(curX, y, 1.2, 2);
-        
-        // Right shadow boundary gap (creates the 3D mirror separation between tubes)
-        oCtx.fillStyle = `${shadowColorStr}, ${shadowAlpha})`;
-        oCtx.fillRect(curX + ribWidth - 1.5, y, 1.5, 2);
-        
-        // Mirror peak specular line (representing light source reflection)
-        const peakAlpha = 0.12 + 0.14 * Math.sin(y / height * Math.PI);
-        oCtx.fillStyle = `rgba(255, 255, 255, ${peakAlpha})`;
-        oCtx.fillRect(curX + Math.floor(ribWidth * 0.22), y, 1.2, 2);
-        
-        // Soft cylinder shading to make the flat blurred background look round
-        const cylinderGrad = oCtx.createLinearGradient(curX, 0, curX + ribWidth, 0);
-        cylinderGrad.addColorStop(0, "rgba(255, 255, 255, 0.04)");
-        cylinderGrad.addColorStop(0.2, "rgba(255, 255, 255, 0.10)");
-        cylinderGrad.addColorStop(0.4, "rgba(0, 0, 0, 0.0)");
-        cylinderGrad.addColorStop(0.78, `${shadowColorStr}, 0.12)`);
-        cylinderGrad.addColorStop(1, "rgba(255, 255, 255, 0.03)");
-        oCtx.fillStyle = cylinderGrad;
-        oCtx.fillRect(curX, y, ribWidth, 2);
+        // Blend shader lines with our single solid base color
+        vec3 finalColor = baseColor + shaderColor * 0.45;
+        gl_FragColor = vec4(finalColor, 1.0);
       }
-    }
-    
-    oCtx.globalCompositeOperation = "destination-in";
-    oCtx.drawImage(effectMaskCanvas, 0, 0);
+    `;
+
+    const vs = gl.createShader(gl.VERTEX_SHADER)!;
+    gl.shaderSource(vs, vsSource);
+    gl.compileShader(vs);
+
+    const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
+    gl.shaderSource(fs, fsSource);
+    gl.compileShader(fs);
+
+    const program = gl.createProgram()!;
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    // Full screen quad geometry
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1, -1,
+       1, -1,
+      -1,  1,
+      -1,  1,
+       1, -1,
+       1,  1,
+    ]), gl.STATIC_DRAW);
+
+    const positionLocation = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+    // Set uniforms
+    const resLocation = gl.getUniformLocation(program, "resolution");
+    gl.uniform2f(resLocation, canvas.width, canvas.height);
+
+    const timeLocation = gl.getUniformLocation(program, "time");
+    // Frozen animation: set time based on static seeded random
+    gl.uniform1f(timeLocation, seedTime * 500.0);
+
+    const baseColorLocation = gl.getUniformLocation(program, "baseColor");
+    gl.uniform3f(baseColorLocation, baseRGB[0] / 255, baseRGB[1] / 255, baseRGB[2] / 255);
+
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Clean up WebGL resources
+    gl.deleteBuffer(buffer);
+    gl.deleteProgram(program);
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
   }
-  ctx.drawImage(overlaysCanvas, 0, 0);
 
-  // 10. Add premium glassy specular highlight overlay
-  const flare = ctx.createLinearGradient(0, 0, width, height * 0.8);
-  flare.addColorStop(0, "rgba(255, 255, 255, 0.06)");
-  flare.addColorStop(0.25, "rgba(255, 255, 255, 0.02)");
-  flare.addColorStop(0.45, "rgba(255, 255, 255, 0.0)");
-  ctx.fillStyle = flare;
-  ctx.fillRect(0, 0, width, height);
+  // Draw matte texture / border using 2D canvas context overlay
+  const finalCanvas = document.createElement("canvas");
+  finalCanvas.width = width;
+  finalCanvas.height = height;
+  const ctx = finalCanvas.getContext("2d");
+  if (ctx) {
+    // Draw the WebGL render
+    ctx.drawImage(canvas, 0, 0);
 
-  // 11. Glass inner border
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(0, 0, width, height);
+    // Subtle paper-like matte noise
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const noise = (random() - 0.5) * 8;
+      d[i] = Math.min(255, Math.max(0, d[i] + noise));
+      d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + noise));
+      d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + noise));
+    }
+    ctx.putImageData(imgData, 0, 0);
 
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.94);
+    // Subtle inner border
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(0, 0, width, height);
+  }
+
+  const dataUrl = finalCanvas.toDataURL("image/jpeg", 0.94);
   coverCache.set(cacheKey, dataUrl);
   return dataUrl;
 }
