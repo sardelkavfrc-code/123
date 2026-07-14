@@ -72,6 +72,15 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
+function shiftColor(r: number, g: number, b: number, dh: number, ds: number, dl: number): string {
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const nh = (h + dh + 360) % 360;
+  const ns = Math.min(100, Math.max(0, s + ds));
+  const nl = Math.min(100, Math.max(0, l + dl));
+  const [nr, ng, nb] = hslToRgb(nh, ns, nl);
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
 function generateReededCover(baseColor: string, id: string): string {
   const cacheKey = `${id}_${baseColor}`;
   if (coverCache.has(cacheKey)) {
@@ -106,86 +115,139 @@ function generateReededCover(baseColor: string, id: string): string {
     b = parseInt(hex.substring(4, 6), 16);
   }
 
-  // 2. Base gradient background
+  // 2. Base gradient background values
   const [h, s, l] = rgbToHsl(r, g, b);
   const shiftedHue = (h + 18 + random() * 12) % 360;
   const [sr, sg, sb] = hslToRgb(shiftedHue, Math.min(100, s * 1.05), Math.min(95, l * 1.1));
-  
-  // Shift hue in opposite direction for bottom-right color to create a beautiful dual-tone gradient
   const [er, eg, eb] = hslToRgb((h - 22 + 360) % 360, Math.min(100, s * 1.05), Math.max(22, l * 0.72));
+
+  const color1 = `rgb(${sr}, ${sg}, ${sb})`;
+  const color2 = `rgb(${er}, ${eg}, ${eb})`;
+
+  // 3. Create a slightly larger canvas for the base background to prevent edge bleeding halos
+  const bgW = width + 40;
+  const bgH = height + 40;
+  const bgCanvas = document.createElement("canvas");
+  bgCanvas.width = bgW;
+  bgCanvas.height = bgH;
+  const bgCtx = bgCanvas.getContext("2d");
+  if (bgCtx) {
+    // A. Draw base gradient
+    const baseGrad = bgCtx.createLinearGradient(0, 0, bgW, bgH);
+    baseGrad.addColorStop(0, color1);
+    baseGrad.addColorStop(1, color2);
+    bgCtx.fillStyle = baseGrad;
+    bgCtx.fillRect(0, 0, bgW, bgH);
+
+    // B. Draw organic colorful blobs to enrich visual depth and distortion details
+    const blob1X = bgW * 0.25;
+    const blob1Y = bgH * 0.3;
+    const blob1Rad = 140;
+    const blob1Grad = bgCtx.createRadialGradient(blob1X, blob1Y, 10, blob1X, blob1Y, blob1Rad);
+    const [b1r, b1g, b1b] = hslToRgb((h + 40) % 360, Math.min(100, s * 1.15), Math.min(95, l * 1.05));
+    blob1Grad.addColorStop(0, `rgba(${b1r}, ${b1g}, ${b1b}, 0.8)`);
+    blob1Grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+    bgCtx.fillStyle = blob1Grad;
+    bgCtx.beginPath();
+    bgCtx.arc(blob1X, blob1Y, blob1Rad, 0, Math.PI * 2);
+    bgCtx.fill();
+
+    const blob2X = bgW * 0.75;
+    const blob2Y = bgH * 0.7;
+    const blob2Rad = 170;
+    const blob2Grad = bgCtx.createRadialGradient(blob2X, blob2Y, 10, blob2X, blob2Y, blob2Rad);
+    const [b2r, b2g, b2b] = hslToRgb((h - 30 + 360) % 360, Math.min(100, s * 1.2), Math.max(10, l * 0.8));
+    blob2Grad.addColorStop(0, `rgba(${b2r}, ${b2g}, ${b2b}, 0.75)`);
+    blob2Grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+    bgCtx.fillStyle = blob2Grad;
+    bgCtx.beginPath();
+    bgCtx.arc(blob2X, blob2Y, blob2Rad, 0, Math.PI * 2);
+    bgCtx.fill();
+  }
+
+  // 4. Create an opaque blurred canvas (no transparent borders!)
+  const blurCanvas = document.createElement("canvas");
+  blurCanvas.width = bgW;
+  blurCanvas.height = bgH;
+  const bCtx = blurCanvas.getContext("2d");
+  if (bCtx) {
+    bCtx.filter = "blur(14px)";
+    bCtx.drawImage(bgCanvas, 0, 0);
+  }
+
+  // Draw clean un-distorted background on main canvas
+  ctx.drawImage(bgCanvas, 20, 20, width, height, 0, 0, width, height);
+
+  // Get fast pixel access on blurred background
+  const imgData = bCtx!.getImageData(0, 0, bgW, bgH);
+  const d = imgData.data;
+
+  function getBgColor(x: number, y: number): [number, number, number] {
+    // Translate coords to the larger blur canvas space
+    const cx = Math.max(0, Math.min(bgW - 1, Math.floor(x + 20)));
+    const cy = Math.max(0, Math.min(bgH - 1, Math.floor(y + 20)));
+    const idx = (cy * bgW + cx) * 4;
+    return [d[idx], d[idx + 1], d[idx + 2]];
+  }
 
   // Compute a highly saturated deep shadow color based on the base hue (no muddy grey shadows!)
   const [dr, dg, db] = hslToRgb(h, Math.min(100, s * 1.1), Math.max(8, l * 0.25));
   const shadowColorStr = `rgba(${dr}, ${dg}, ${db}`;
 
-  const baseGrad = ctx.createLinearGradient(0, 0, width, height);
-  const color1 = `rgb(${sr}, ${sg}, ${sb})`;
-  const color2 = `rgb(${er}, ${eg}, ${eb})`;
-  baseGrad.addColorStop(0, color1);
-  baseGrad.addColorStop(1, color2);
-  
-  ctx.fillStyle = baseGrad;
-  ctx.fillRect(0, 0, width, height);
-
   const ribWidth = 22 + Math.floor(random() * 8); // 22 to 30px (broad cylinders)
   const hasWaviness = random() > 0.25;
-  const amp1 = 8 + random() * 14; // Stronger waviness for visible refraction distortion
+  const amp1 = 8 + random() * 14;
   const amp2 = 4 + random() * 8;
   const freq1 = 0.005 + random() * 0.005;
   const freq2 = 0.012 + random() * 0.008;
   const phase1 = random() * Math.PI * 2;
   const phase2 = random() * Math.PI * 2;
 
-  // 3. Create matte (blurred) background canvas (solid, no transparency!)
-  const matteCanvas = document.createElement("canvas");
-  matteCanvas.width = width;
-  matteCanvas.height = height;
-  const mCtx = matteCanvas.getContext("2d");
-  if (mCtx) {
-    mCtx.fillStyle = baseGrad;
-    mCtx.fillRect(0, 0, width, height);
-    
-    // We blur the solid background gradient (no transparency = no grey borders!)
-    const blurCanvas = document.createElement("canvas");
-    blurCanvas.width = width;
-    blurCanvas.height = height;
-    const bCtx = blurCanvas.getContext("2d");
-    if (bCtx) {
-      bCtx.filter = "blur(10px)";
-      bCtx.drawImage(matteCanvas, 0, 0);
-      mCtx.clearRect(0, 0, width, height);
-      mCtx.drawImage(blurCanvas, 0, 0);
-    }
-  }
-
-  // 4. Create a mask canvas for the solid rib columns
-  const ribMaskCanvas = document.createElement("canvas");
-  ribMaskCanvas.width = width;
-  ribMaskCanvas.height = height;
-  const rmCtx = ribMaskCanvas.getContext("2d");
-  if (rmCtx) {
-    rmCtx.fillStyle = "white";
+  // 5. Create glass ribbed refraction canvas
+  const ribCanvas = document.createElement("canvas");
+  ribCanvas.width = width;
+  ribCanvas.height = height;
+  const rCtx = ribCanvas.getContext("2d");
+  if (rCtx) {
     for (let y = 0; y < height; y += 2) {
       const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
       for (let x = -40; x < width + 40; x += ribWidth) {
         const curX = x + xOffset;
-        rmCtx.fillRect(curX, y, ribWidth, 2);
+        
+        // Mirror-flip sample coordinates to simulate optical glass refraction distortion
+        const leftRGB = getBgColor(curX + ribWidth * 0.85, y);
+        const centerRGB = getBgColor(curX + ribWidth * 0.5, y);
+        const rightRGB = getBgColor(curX + ribWidth * 0.15, y);
+        
+        // Lightness shifts based on cylinder curve lighting
+        const edgeLeft = shiftColor(leftRGB[0], leftRGB[1], leftRGB[2], 0, 8, 14);
+        
+        const specRGB = getBgColor(curX + ribWidth * 0.3, y);
+        const specC = shiftColor(specRGB[0], specRGB[1], specRGB[2], 12, 22, 28);
+        
+        const midC = `rgb(${centerRGB[0]}, ${centerRGB[1]}, ${centerRGB[2]})`;
+        
+        const shadowRGB = getBgColor(curX + ribWidth * 0.7, y);
+        const shadowC = shiftColor(shadowRGB[0], shadowRGB[1], shadowRGB[2], -8, -12, -22);
+        
+        const ambientC = shiftColor(rightRGB[0], rightRGB[1], rightRGB[2], 4, 6, 8);
+        const edgeRight = shiftColor(rightRGB[0], rightRGB[1], rightRGB[2], 0, 8, 12);
+
+        const g = rCtx.createLinearGradient(curX, 0, curX + ribWidth, 0);
+        g.addColorStop(0, edgeLeft);
+        g.addColorStop(0.2, specC);
+        g.addColorStop(0.38, midC);
+        g.addColorStop(0.72, shadowC);
+        g.addColorStop(0.9, ambientC);
+        g.addColorStop(1, edgeRight);
+        
+        rCtx.fillStyle = g;
+        rCtx.fillRect(curX, y, ribWidth, 2);
       }
     }
   }
 
-  // 5. Create the masked matte ribs layer
-  const matteRibsCanvas = document.createElement("canvas");
-  matteRibsCanvas.width = width;
-  matteRibsCanvas.height = height;
-  const mrCtx = matteRibsCanvas.getContext("2d");
-  if (mrCtx) {
-    mrCtx.drawImage(matteCanvas, 0, 0);
-    mrCtx.globalCompositeOperation = "destination-in";
-    mrCtx.drawImage(ribMaskCanvas, 0, 0);
-  }
-
-  // 6. Create a mask for where the entire reeded glass effect is visible
+  // 6. Create effect mask (defines where the glass cylinders are visible)
   const effectMaskCanvas = document.createElement("canvas");
   effectMaskCanvas.width = width;
   effectMaskCanvas.height = height;
@@ -219,13 +281,13 @@ function generateReededCover(baseColor: string, id: string): string {
     emCtx.fillRect(0, 0, width, height);
   }
 
-  // 7. Draw the masked matte ribs onto the main canvas (applying the effect mask)
+  // 7. Draw the masked ribs onto the main canvas
   const finalRibsCanvas = document.createElement("canvas");
   finalRibsCanvas.width = width;
   finalRibsCanvas.height = height;
   const frCtx = finalRibsCanvas.getContext("2d");
   if (frCtx) {
-    frCtx.drawImage(matteRibsCanvas, 0, 0);
+    frCtx.drawImage(ribCanvas, 0, 0);
     frCtx.globalCompositeOperation = "destination-in";
     frCtx.drawImage(effectMaskCanvas, 0, 0);
   }
