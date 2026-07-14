@@ -202,22 +202,18 @@ function generateReededCover(baseColor: string, id: string): string {
         // Edge mask: active only along the boundaries of the letter shape, completely clearing shader from the letter body
         float edge = a_blur * (1.0 - a_solid * a_solid * a_solid * a_solid * a_solid * a_solid);
 
-        vec3 shaderColor = vec3(0.0);
-        for(int j = 0; j < 3; j++){
-          for(int i=0; i < 5; i++){
-            // Completely vertical lines and higher density (frequency multiplier 36.0)
-            float coord = uv.x * 36.0 - t - 0.05 * float(j) + float(i) * 0.05;
-            // Sawtooth wave: f goes from 0.0 (peak) to 1.0 (end of period), spanning 100% of the space
-            float f = fract(coord / 6.2831853);
-            float val = f * 1.35; 
-            shaderColor[j] += lineWidth * float(i*i) / (val + 0.018);
-          }
+        float intensity = 0.0;
+        for(int i=0; i < 5; i++){
+          // Completely vertical lines and higher density (frequency multiplier 48.0)
+          float coord = uv.x * 48.0 - t + float(i) * 0.05;
+          // Sawtooth wave: f goes from 0.0 (peak) to 1.0 (end of period), spanning 100% of the space
+          float f = fract(coord / 6.2831853);
+          float val = f * 1.35; 
+          intensity += lineWidth * float(i*i) / (val + 0.018);
         }
-        
-        // Blend background and letter colors smoothly based on blurred mask alpha
-        vec3 finalColor = mix(baseColor, letterColor, a_blur);
-        // Add the glowing mirror lines ONLY along the edge of the letter
-        finalColor += shaderColor * 0.40 * edge;
+        // Layer the white highlight (#fefefe = vec3(0.996)) using mix instead of addition
+        float highlightBlend = clamp(intensity * 0.48 * edge, 0.0, 1.0);
+        vec3 finalColor = mix(mix(baseColor, letterColor, a_blur), vec3(0.996), highlightBlend);
         
         gl_FragColor = vec4(finalColor, 1.0);
       }
