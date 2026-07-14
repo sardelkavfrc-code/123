@@ -112,6 +112,61 @@ function generateReededCover(baseColor: string, id: string): string {
   const lVal = 30 + Math.floor(random() * 10);
   const baseRGB = hslToRgb(randomHue, sVal, lVal);
 
+  // Select a stable random letter or digit using seeded random
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789";
+  const char = chars.charAt(Math.floor(random() * chars.length));
+  
+  const isDarker = random() > 0.5;
+  const letterL = isDarker ? Math.max(15, lVal - 8) : Math.min(85, lVal + 8);
+  const letterRGB = hslToRgb(randomHue, sVal, letterL);
+
+  // Create canvas to draw the blurred letter mask (transparent background, white letter)
+  const blurCanvas = document.createElement("canvas");
+  blurCanvas.width = width;
+  blurCanvas.height = height;
+  const bCtx = blurCanvas.getContext("2d");
+  if (bCtx) {
+    bCtx.filter = "blur(48px)";
+    bCtx.font = "bold 1200px Inter, system-ui, sans-serif";
+    bCtx.textAlign = "center";
+    bCtx.textBaseline = "middle";
+    bCtx.fillStyle = "white";
+    bCtx.fillText(char, width / 2, height / 2 + 80);
+  }
+
+  // Create canvas to draw the sharp/solid letter mask
+  const solidCanvas = document.createElement("canvas");
+  solidCanvas.width = width;
+  solidCanvas.height = height;
+  const sCtx = solidCanvas.getContext("2d");
+  if (sCtx) {
+    sCtx.filter = "blur(20px)";
+    sCtx.font = "bold 1200px Inter, system-ui, sans-serif";
+    sCtx.textAlign = "center";
+    sCtx.textBaseline = "middle";
+    sCtx.fillStyle = "white";
+    sCtx.fillText(char, width / 2, height / 2 + 80);
+  }
+
+  // Pack both masks into a single canvas (Red = Blurred alpha, Green = Solid alpha)
+  const letterCanvas = document.createElement("canvas");
+  letterCanvas.width = width;
+  letterCanvas.height = height;
+  const lCtx = letterCanvas.getContext("2d");
+  if (lCtx && bCtx && sCtx) {
+    const imgDataB = bCtx.getImageData(0, 0, width, height);
+    const imgDataS = sCtx.getImageData(0, 0, width, height);
+    const dB = imgDataB.data;
+    const dS = imgDataS.data;
+    for (let i = 0; i < dB.length; i += 4) {
+      dB[i] = dB[i + 3];     // Red = Blurred alpha
+      dB[i + 1] = dS[i + 3]; // Green = Solid alpha
+      dB[i + 2] = 0;
+      dB[i + 3] = 255;       // Fully opaque
+    }
+    lCtx.putImageData(imgDataB, 0, 0);
+  }
+
   const seedTime = random(); // Freeze shader at a unique static state per card
 
   const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
@@ -130,24 +185,38 @@ function generateReededCover(baseColor: string, id: string): string {
       uniform vec2 resolution;
       uniform float time;
       uniform vec3 baseColor;
+      uniform vec3 letterColor;
+      uniform sampler2D letterTexture;
 
       void main(void) {
         vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
+        vec2 texCoord = gl_FragCoord.xy / resolution;
+        texCoord.y = 1.0 - texCoord.y; // Flip y for WebGL texture orientation
+
         float t = time * 0.05;
         float lineWidth = 0.0035;
+
+        // Sample letter texture channels
+        float a_blur = texture2D(letterTexture, texCoord).r;
+        float a_solid = texture2D(letterTexture, texCoord).g;
+        // Edge mask: active only along the boundaries of the letter shape, completely clearing shader from the letter body
+        float edge = a_blur * (1.0 - a_solid * a_solid * a_solid * a_solid * a_solid * a_solid);
 
         vec3 shaderColor = vec3(0.0);
         for(int j = 0; j < 3; j++){
           for(int i=0; i < 5; i++){
-            // Steep vertical tilt (uv.y coefficient 0.28) and high frequency (multiplied by 18.0)
+            // Steep vertical tilt and high frequency
             float diagonal = sin((uv.x + uv.y * 0.28) * 18.0 - t - 0.05 * float(j) + float(i) * 0.05);
             float val = abs(diagonal);
-            shaderColor[j] += lineWidth * float(i*i) / (val + 0.016);
+            shaderColor[j] += lineWidth * float(i*i) / (val + 0.018);
           }
         }
         
-        // Blend shader lines with our single solid base color
-        vec3 finalColor = baseColor + shaderColor * 0.45;
+        // Blend background and letter colors smoothly based on blurred mask alpha
+        vec3 finalColor = mix(baseColor, letterColor, a_blur);
+        // Add the glowing mirror lines ONLY along the edge of the letter
+        finalColor += shaderColor * 0.40 * edge;
+        
         gl_FragColor = vec4(finalColor, 1.0);
       }
     `;
@@ -187,16 +256,32 @@ function generateReededCover(baseColor: string, id: string): string {
     gl.uniform2f(resLocation, canvas.width, canvas.height);
 
     const timeLocation = gl.getUniformLocation(program, "time");
-    // Frozen animation: set time based on static seeded random
     gl.uniform1f(timeLocation, seedTime * 500.0);
 
     const baseColorLocation = gl.getUniformLocation(program, "baseColor");
     gl.uniform3f(baseColorLocation, baseRGB[0] / 255, baseRGB[1] / 255, baseRGB[2] / 255);
 
+    const letterColorLocation = gl.getUniformLocation(program, "letterColor");
+    gl.uniform3f(letterColorLocation, letterRGB[0] / 255, letterRGB[1] / 255, letterRGB[2] / 255);
+
+    // Upload and bind texture
+    const texture = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, letterCanvas);
+
+    const textureLocation = gl.getUniformLocation(program, "letterTexture");
+    gl.uniform1i(textureLocation, 0);
+
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     // Clean up WebGL resources
+    gl.deleteTexture(texture);
     gl.deleteBuffer(buffer);
     gl.deleteProgram(program);
     gl.deleteShader(vs);
@@ -209,7 +294,6 @@ function generateReededCover(baseColor: string, id: string): string {
   finalCanvas.height = height;
   const ctx = finalCanvas.getContext("2d");
   if (ctx) {
-    // Draw the WebGL render
     ctx.drawImage(canvas, 0, 0);
 
     // Subtle paper-like matte noise
