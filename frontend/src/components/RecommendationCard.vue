@@ -205,9 +205,16 @@ function generateReededCover(baseColor: string, id: string): string {
         vec3 shaderColor = vec3(0.0);
         for(int j = 0; j < 3; j++){
           for(int i=0; i < 5; i++){
-            // Steep vertical tilt and high frequency
-            float diagonal = sin((uv.x + uv.y * 0.28) * 18.0 - t - 0.05 * float(j) + float(i) * 0.05);
-            float val = abs(diagonal);
+            // Completely vertical lines and higher density (frequency multiplier 28.0)
+            float coord = uv.x * 28.0 - t - 0.05 * float(j) + float(i) * 0.05;
+            float s = sin(coord);
+            float c = cos(coord);
+            float val = 1.0 - s;
+            if (c > 0.0) {
+              val = val * 5.0; // sharp edge
+            } else {
+              val = val * 0.6; // soft directional smear
+            }
             shaderColor[j] += lineWidth * float(i*i) / (val + 0.018);
           }
         }
