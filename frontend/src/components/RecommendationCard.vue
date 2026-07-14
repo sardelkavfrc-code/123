@@ -24,9 +24,282 @@ const variants = computed(() =>
   )
 );
 
+const coverCache = new Map<string, string>();
+
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0, s = 0;
+  const l = (max + min) / 2;
+
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  h /= 360;
+  s /= 100;
+  l /= 100;
+  let r = l, g = l, b = l;
+
+  if (s !== 0) {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue2rgb = (t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    r = hue2rgb(h + 1/3);
+    g = hue2rgb(h);
+    b = hue2rgb(h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function generateReededCover(baseColor: string, id: string): string {
+  const cacheKey = `${id}_${baseColor}`;
+  if (coverCache.has(cacheKey)) {
+    return coverCache.get(cacheKey)!;
+  }
+
+  // Seeded random helper
+  let seed = 0;
+  for (let i = 0; i < cacheKey.length; i++) {
+    seed = (seed << 5) - seed + cacheKey.charCodeAt(i);
+    seed |= 0;
+  }
+  function random() {
+    const x = Math.sin(seed++) * 10000;
+    return x - Math.floor(x);
+  }
+
+  const width = 300;
+  const height = 400;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+
+  // 1. Parse base color
+  let r = 120, g = 120, b = 120;
+  const hex = baseColor.replace("#", "");
+  if (hex.length === 6) {
+    r = parseInt(hex.substring(0, 2), 16);
+    g = parseInt(hex.substring(2, 4), 16);
+    b = parseInt(hex.substring(4, 6), 16);
+  }
+
+  // 2. Base gradient background
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const shiftedHue = (h + 18 + random() * 12) % 360;
+  const [sr, sg, sb] = hslToRgb(shiftedHue, Math.min(100, s * 1.05), Math.min(95, l * 1.1));
+  
+  // Shift hue in opposite direction for bottom-right color to create a beautiful dual-tone gradient
+  const [er, eg, eb] = hslToRgb((h - 22 + 360) % 360, Math.min(100, s * 1.05), Math.max(22, l * 0.72));
+
+  // Compute a highly saturated deep shadow color based on the base hue (no muddy grey shadows!)
+  const [dr, dg, db] = hslToRgb(h, Math.min(100, s * 1.1), Math.max(8, l * 0.25));
+  const shadowColorStr = `rgba(${dr}, ${dg}, ${db}`;
+
+  const baseGrad = ctx.createLinearGradient(0, 0, width, height);
+  const color1 = `rgb(${sr}, ${sg}, ${sb})`;
+  const color2 = `rgb(${er}, ${eg}, ${eb})`;
+  baseGrad.addColorStop(0, color1);
+  baseGrad.addColorStop(1, color2);
+  
+  ctx.fillStyle = baseGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  const ribWidth = 22 + Math.floor(random() * 8); // 22 to 30px (broad cylinders)
+  const hasWaviness = random() > 0.25;
+  const amp1 = 8 + random() * 14; // Stronger waviness for visible refraction distortion
+  const amp2 = 4 + random() * 8;
+  const freq1 = 0.005 + random() * 0.005;
+  const freq2 = 0.012 + random() * 0.008;
+  const phase1 = random() * Math.PI * 2;
+  const phase2 = random() * Math.PI * 2;
+
+  // 3. Create matte (blurred) background canvas (solid, no transparency!)
+  const matteCanvas = document.createElement("canvas");
+  matteCanvas.width = width;
+  matteCanvas.height = height;
+  const mCtx = matteCanvas.getContext("2d");
+  if (mCtx) {
+    mCtx.fillStyle = baseGrad;
+    mCtx.fillRect(0, 0, width, height);
+    
+    // We blur the solid background gradient (no transparency = no grey borders!)
+    const blurCanvas = document.createElement("canvas");
+    blurCanvas.width = width;
+    blurCanvas.height = height;
+    const bCtx = blurCanvas.getContext("2d");
+    if (bCtx) {
+      bCtx.filter = "blur(10px)";
+      bCtx.drawImage(matteCanvas, 0, 0);
+      mCtx.clearRect(0, 0, width, height);
+      mCtx.drawImage(blurCanvas, 0, 0);
+    }
+  }
+
+  // 4. Create a mask canvas for the solid rib columns
+  const ribMaskCanvas = document.createElement("canvas");
+  ribMaskCanvas.width = width;
+  ribMaskCanvas.height = height;
+  const rmCtx = ribMaskCanvas.getContext("2d");
+  if (rmCtx) {
+    rmCtx.fillStyle = "white";
+    for (let y = 0; y < height; y += 2) {
+      const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
+      for (let x = -40; x < width + 40; x += ribWidth) {
+        const curX = x + xOffset;
+        rmCtx.fillRect(curX, y, ribWidth, 2);
+      }
+    }
+  }
+
+  // 5. Create the masked matte ribs layer
+  const matteRibsCanvas = document.createElement("canvas");
+  matteRibsCanvas.width = width;
+  matteRibsCanvas.height = height;
+  const mrCtx = matteRibsCanvas.getContext("2d");
+  if (mrCtx) {
+    mrCtx.drawImage(matteCanvas, 0, 0);
+    mrCtx.globalCompositeOperation = "destination-in";
+    mrCtx.drawImage(ribMaskCanvas, 0, 0);
+  }
+
+  // 6. Create a mask for where the entire reeded glass effect is visible
+  const effectMaskCanvas = document.createElement("canvas");
+  effectMaskCanvas.width = width;
+  effectMaskCanvas.height = height;
+  const emCtx = effectMaskCanvas.getContext("2d");
+  if (emCtx) {
+    const maskType = random();
+    if (maskType < 0.35) {
+      const maskGrad = emCtx.createLinearGradient(width, 0, 0, height);
+      maskGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+      maskGrad.addColorStop(0.4, "rgba(255, 255, 255, 0.7)");
+      maskGrad.addColorStop(0.8, "rgba(255, 255, 255, 0.15)");
+      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+      emCtx.fillStyle = maskGrad;
+    } else if (maskType < 0.7) {
+      const centerX = width * (0.2 + random() * 0.6);
+      const centerY = height * (0.2 + random() * 0.5);
+      const radius = 180 + random() * 150;
+      const maskGrad = emCtx.createRadialGradient(centerX, centerY, 20, centerX, centerY, radius);
+      maskGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+      maskGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.45)");
+      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+      emCtx.fillStyle = maskGrad;
+    } else {
+      const maskGrad = emCtx.createLinearGradient(0, 0, width, 0);
+      maskGrad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+      maskGrad.addColorStop(0.35, "rgba(255, 255, 255, 0.15)");
+      maskGrad.addColorStop(0.65, "rgba(255, 255, 255, 0.15)");
+      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.9)");
+      emCtx.fillStyle = maskGrad;
+    }
+    emCtx.fillRect(0, 0, width, height);
+  }
+
+  // 7. Draw the masked matte ribs onto the main canvas (applying the effect mask)
+  const finalRibsCanvas = document.createElement("canvas");
+  finalRibsCanvas.width = width;
+  finalRibsCanvas.height = height;
+  const frCtx = finalRibsCanvas.getContext("2d");
+  if (frCtx) {
+    frCtx.drawImage(matteRibsCanvas, 0, 0);
+    frCtx.globalCompositeOperation = "destination-in";
+    frCtx.drawImage(effectMaskCanvas, 0, 0);
+  }
+  ctx.drawImage(finalRibsCanvas, 0, 0);
+
+  // 8. Draw 3D highlights and shadows on top of the columns (applying the effect mask)
+  const overlaysCanvas = document.createElement("canvas");
+  overlaysCanvas.width = width;
+  overlaysCanvas.height = height;
+  const oCtx = overlaysCanvas.getContext("2d");
+  if (oCtx) {
+    for (let y = 0; y < height; y += 2) {
+      const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
+      for (let x = -40; x < width + 40; x += ribWidth) {
+        const curX = x + xOffset;
+        
+        const borderAlpha = 0.14 + 0.18 * Math.sin(y / height * Math.PI);
+        const shadowAlpha = 0.28 + 0.22 * Math.sin(y / height * Math.PI);
+        
+        // Left Fresnel border (bright specular edge)
+        oCtx.fillStyle = `rgba(255, 255, 255, ${borderAlpha})`;
+        oCtx.fillRect(curX, y, 1.2, 2);
+        
+        // Right shadow boundary gap (creates the 3D mirror separation between tubes)
+        oCtx.fillStyle = `${shadowColorStr}, ${shadowAlpha})`;
+        oCtx.fillRect(curX + ribWidth - 1.8, y, 1.8, 2);
+        
+        // Mirror peak specular line (representing light source reflection)
+        const peakAlpha = 0.25 + 0.3 * Math.sin(y / height * Math.PI);
+        oCtx.fillStyle = `rgba(255, 255, 255, ${peakAlpha})`;
+        oCtx.fillRect(curX + Math.floor(ribWidth * 0.22), y, 1.4, 2);
+        
+        // Soft cylinder shading to make the flat blurred background look round
+        const cylinderGrad = oCtx.createLinearGradient(curX, 0, curX + ribWidth, 0);
+        cylinderGrad.addColorStop(0, "rgba(255, 255, 255, 0.08)");
+        cylinderGrad.addColorStop(0.2, "rgba(255, 255, 255, 0.18)");
+        cylinderGrad.addColorStop(0.4, "rgba(0, 0, 0, 0.0)");
+        cylinderGrad.addColorStop(0.75, `${shadowColorStr}, 0.2)`);
+        cylinderGrad.addColorStop(1, "rgba(255, 255, 255, 0.05)");
+        oCtx.fillStyle = cylinderGrad;
+        oCtx.fillRect(curX, y, ribWidth, 2);
+      }
+    }
+    
+    oCtx.globalCompositeOperation = "destination-in";
+    oCtx.drawImage(effectMaskCanvas, 0, 0);
+  }
+  ctx.drawImage(overlaysCanvas, 0, 0);
+
+  // 10. Add premium glassy specular highlight overlay
+  const flare = ctx.createLinearGradient(0, 0, width, height * 0.8);
+  flare.addColorStop(0, "rgba(255, 255, 255, 0.08)");
+  flare.addColorStop(0.25, "rgba(255, 255, 255, 0.02)");
+  flare.addColorStop(0.45, "rgba(255, 255, 255, 0.0)");
+  ctx.fillStyle = flare;
+  ctx.fillRect(0, 0, width, height);
+
+  // 11. Glass inner border
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(0, 0, width, height);
+
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.94);
+  coverCache.set(cacheKey, dataUrl);
+  return dataUrl;
+}
+
 const background = computed(() => {
+  if (props.block.type === "generated" && props.block.main_color) {
+    const dataUrl = generateReededCover(props.block.main_color, props.block.id);
+    return `url(${dataUrl}) center/cover`;
+  }
   if (props.block.cover) {
-    return `linear-gradient(180deg, rgba(0, 0, 0, 0.65) 0%, rgba(0, 0, 0, 0.25) 40%, rgba(0, 0, 0, 0.0) 100%), url(${props.block.cover}) center/cover`;
+    return `linear-gradient(180deg, rgba(8, 9, 14, 0.4), rgba(8, 9, 14, 0.0) 50%), url(${props.block.cover}) center/cover`;
   }
   return "linear-gradient(135deg, var(--accent-1), var(--accent-3))";
 });
@@ -100,13 +373,13 @@ const background = computed(() => {
 .rec-card__overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.15);
+  background: transparent;
   transition: background var(--motion-duration-fast) var(--motion-ease-out);
   z-index: 2;
   pointer-events: none;
 }
 .rec-card:hover .rec-card__overlay {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.4);
 }
 .rec-card__play {
   position: absolute;
@@ -153,6 +426,7 @@ const background = computed(() => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 .rec-card__subtitle {
   font-size: calc(13px * var(--font-scale, 1));
@@ -163,6 +437,7 @@ const background = computed(() => {
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-word;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15);
 }
 .rec-card__bottom {
   display: flex;
