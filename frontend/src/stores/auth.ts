@@ -134,6 +134,127 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function validateAccount(payload: {
+    login: string;
+    captcha_sid?: string;
+    captcha_key?: string;
+    success_token?: string;
+  }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.validateAccount(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+        throw err;
+      } else {
+        lastError.value = (err as Error).message;
+        throw err;
+      }
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function sendOtpSms(payload: { sid: string }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.sendOtpSms(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function sendCallreset(payload: { sid: string }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.sendCallreset(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function sendEmail(payload: { sid: string }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.sendEmail(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function checkOtp(payload: {
+    sid: string;
+    code: string;
+    verification_method: string;
+  }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.checkOtp(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function confirmAuth(payload: {
+    grant_type: string;
+    username: string;
+    code?: string;
+    password?: string;
+    remember?: boolean;
+    sid?: string;
+  }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      status.value = await api.confirmAuth(payload);
+      localStorage.setItem("wasAuthenticated", "true");
+      return true;
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   return {
     status,
     checked,
@@ -145,6 +266,12 @@ export const useAuthStore = defineStore("auth", () => {
     refresh,
     loginWithToken,
     loginViaOAuth,
+    validateAccount,
+    sendOtpSms,
+    sendCallreset,
+    sendEmail,
+    checkOtp,
+    confirmAuth,
     logout,
   };
 });

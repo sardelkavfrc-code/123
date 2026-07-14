@@ -110,3 +110,18 @@ export interface AuthStatus {
   photo: string | null;
   has_audio: boolean;
 }
+
+export interface VKNextStep {
+  verification_method: "callreset" | "sms" | "password" | "email";
+  has_another_verification_methods: boolean;
+}
+
+export interface VKValidateAccountResponse {
+  sid: string;
+  next_step: VKNextStep;
+}
+
+export interface VKCheckOtpResponse {
+  access_token?: string;
+  auth_code?: string;
+}

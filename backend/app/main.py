@@ -16,6 +16,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.session_dir.mkdir(parents=True, exist_ok=True)
     app.state.vk_client = VKClient(settings)
+    
+    # Proactively refresh token if session is older than 2 weeks (14 days = 1209600 seconds)
+    import asyncio
+    from . import storage
+    session = storage.load()
+    if session and session.access_token:
+        if storage.get_session_age_seconds() > 14 * 24 * 3600:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("Session token is older than 2 weeks. Starting proactive background refresh...")
+            asyncio.create_task(app.state.vk_client.refresh_session())
+
     try:
         yield
     finally:

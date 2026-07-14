@@ -922,3 +922,72 @@ ipcMain.handle("auth:open-vk-oauth", async (_event, silent?: boolean): Promise<O
     oauthWin.on("closed", () => finalize({ ok: false, error: "Окно входа закрыто" }));
   });
 });
+
+ipcMain.handle("auth:open-vk-validation", async (_event, url: string): Promise<string | null> => {
+  const win = new BrowserWindow({
+    width: 560,
+    height: 700,
+    parent: mainWindow ?? undefined,
+    modal: true,
+    show: true,
+    autoHideMenuBar: true,
+    title: "Подтверждение входа VK",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  win.removeMenu();
+
+  let successToken: string | null = null;
+  let resolved = false;
+
+  return new Promise<string | null>((resolve) => {
+    win.webContents.on("console-message", (event, level, message) => {
+      if (message.startsWith("SUCCESS_TOKEN_INTERCEPTED:")) {
+        successToken = message.substring("SUCCESS_TOKEN_INTERCEPTED:".length);
+      }
+      if (message.startsWith("VALIDATION_FINISHED")) {
+        resolved = true;
+        win.close();
+        resolve(successToken);
+      }
+    });
+
+    win.webContents.on("dom-ready", () => {
+      const script = `
+        (function() {
+          if (window.__fetchIntercepted) return;
+          window.__fetchIntercepted = true;
+          const originalFetch = window.fetch;
+          window.fetch = function(...args) {
+            const url = args[0] ? String(args[0]) : "";
+            return originalFetch.apply(this, args).then(response => {
+              response.clone().json().then(data => {
+                const token = data?.response?.success_token || data?.success_token;
+                if (token) {
+                  console.log("SUCCESS_TOKEN_INTERCEPTED:" + token);
+                }
+                if (url.includes("leaveCaptcha") || url.includes("endSession")) {
+                  console.log("VALIDATION_FINISHED");
+                }
+              }).catch(() => {});
+              return response;
+            });
+          };
+        })();
+      `;
+      win.webContents.executeJavaScript(script).catch(() => {});
+    });
+
+    win.on("closed", () => {
+      if (!resolved) {
+        resolve(null);
+      }
+    });
+
+    win.loadURL(url);
+  });
+});
+

@@ -20,6 +20,8 @@ class Session:
     access_token: str
     user_id: int
     expires_at: int = 0  # unix seconds; 0 = no expiry known
+    refresh_token: str | None = None
+
 
 
 def _path() -> Path:
@@ -43,7 +45,9 @@ def load() -> Session | None:
                 access_token=str(data["access_token"]),
                 user_id=int(data["user_id"]),
                 expires_at=int(data.get("expires_at") or 0),
+                refresh_token=data.get("refresh_token"),
             )
+
     except OSError:
         return None
     except (json.JSONDecodeError, TypeError, ValueError):
@@ -68,3 +72,63 @@ def clear() -> None:
     path = _path()
     if path.exists():
         path.unlink(missing_ok=True)
+
+
+def get_device_id() -> str:
+    """Get or generate a persistent device_id saved in a local file."""
+    path = _path().parent / "device_id.txt"
+    if path.exists():
+        try:
+            dev_id = path.read_text(encoding="utf-8").strip()
+            if dev_id and ":" in dev_id:
+                return dev_id
+        except OSError:
+            pass
+            
+    # Generate in the format used by VK / Relax Player: <16_hex_chars>:<32_hex_chars>
+    import random
+    hex_chars = "0123456789abcdef"
+    part1 = "".join(random.choice(hex_chars) for _ in range(16))
+    part2 = "".join(random.choice(hex_chars) for _ in range(32))
+    dev_id = f"{part1}:{part2}"
+    
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(dev_id, encoding="utf-8")
+    except OSError:
+        pass
+    return dev_id
+
+
+def get_session_age_seconds() -> float:
+    """Return the time in seconds since the session file was last modified."""
+    import time
+    path = _path()
+    if not path.exists():
+        return 0.0
+    try:
+        return time.time() - path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def save_anonym_token(token: str) -> None:
+    """Save the anonymous token to a file."""
+    path = _path().parent / "anonym_token.txt"
+    try:
+        path.write_text(token, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def load_anonym_token() -> str | None:
+    """Load the anonymous token from the file."""
+    path = _path().parent / "anonym_token.txt"
+    if path.exists():
+        try:
+            return path.read_text(encoding="utf-8").strip()
+        except OSError:
+            pass
+    return None
+
+

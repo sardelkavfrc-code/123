@@ -9,7 +9,10 @@ import type {
   TrackList,
   User,
   ArtistAlbumsResponse,
+  VKValidateAccountResponse,
+  VKCheckOtpResponse,
 } from "./types";
+
 
 const defaultBaseURL = import.meta.env.VITE_BACKEND_URL || "http://127.0.0.1:8765";
 
@@ -177,6 +180,47 @@ export const api = {
   async logout(): Promise<void> {
     await http.post("/auth/logout");
   },
+  async validateAccount(payload: {
+    login: string;
+    captcha_sid?: string;
+    captcha_key?: string;
+    success_token?: string;
+  }): Promise<VKValidateAccountResponse> {
+    const { data } = await http.post<VKValidateAccountResponse>("/auth/validate", payload);
+    return data;
+  },
+  async sendOtpSms(payload: { sid: string }): Promise<any> {
+    const { data } = await http.post("/auth/send-sms", payload);
+    return data;
+  },
+  async sendCallreset(payload: { sid: string }): Promise<any> {
+    const { data } = await http.post("/auth/send-callreset", payload);
+    return data;
+  },
+  async sendEmail(payload: { sid: string }): Promise<any> {
+    const { data } = await http.post("/auth/send-email", payload);
+    return data;
+  },
+  async checkOtp(payload: {
+    sid: string;
+    code: string;
+    verification_method: string;
+  }): Promise<VKCheckOtpResponse> {
+    const { data } = await http.post<VKCheckOtpResponse>("/auth/check-otp", payload);
+    return data;
+  },
+  async confirmAuth(payload: {
+    grant_type: string;
+    username: string;
+    code?: string;
+    password?: string;
+    remember?: boolean;
+    sid?: string;
+  }): Promise<AuthStatus> {
+    const { data } = await http.post<AuthStatus>("/auth/confirm", payload);
+    return data;
+  },
+
 
   async myMusic(params: { offset?: number; count?: number } = {}): Promise<TrackList> {
     const { data } = await http.get<TrackList>("/audio/my", { params });

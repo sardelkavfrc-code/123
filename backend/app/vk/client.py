@@ -5,9 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+import logging
 
 from ..config import Settings, get_settings
 from .exceptions import VKError
+
+logger = logging.getLogger(__name__)
+
 
 
 class VKClient:
@@ -28,6 +32,20 @@ class VKClient:
     async def aclose(self) -> None:
         await self._client.aclose()
     async def call(self, method: str, token: str, **params: Any) -> Any:
+        try:
+            return await self._call_internal(method, token, **params)
+        except VKError as exc:
+            if exc.code in (5, 1117):
+                logger.info("Token expired/invalid (code %d). Attempting background refresh...", exc.code)
+                if await self.refresh_session():
+                    from .. import storage
+                    new_session = storage.load()
+                    if new_session and new_session.access_token:
+                        logger.info("Retrying VK request with refreshed token")
+                        return await self._call_internal(method, new_session.access_token, **params)
+            raise exc
+
+    async def _call_internal(self, method: str, token: str, **params: Any) -> Any:
         remixstlid = params.pop("remixstlid", None)
         payload: dict[str, Any] = {
             "v": self._settings.vk_api_version,
@@ -79,6 +97,124 @@ class VKClient:
                 raw=err,
             )
         return data.get("response")
+
+    def calculate_sig(self, method: str, params: dict[str, Any], client_secret: str) -> str:
+        clean_params = {}
+        for k, v in params.items():
+            if v is None:
+                continue
+            if isinstance(v, bool):
+                clean_params[k] = str(int(v))
+            elif isinstance(v, list | tuple | set):
+                clean_params[k] = ",".join(str(item) for item in v)
+            else:
+                clean_params[k] = str(v)
+        sorted_query = "&".join(f"{k}={clean_params[k]}" for k in sorted(clean_params.keys()))
+        to_hash = f"/method/{method}?{sorted_query}{client_secret}"
+        import hashlib
+        return hashlib.md5(to_hash.encode("utf-8")).hexdigest()
+
+    async def call_anonymous(self, method: str, params: dict[str, Any], sign: bool = True) -> Any:
+        payload = {}
+        for key, value in params.items():
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                payload[key] = int(value)
+            elif isinstance(value, list | tuple | set):
+                payload[key] = ",".join(str(v) for v in value)
+            else:
+                payload[key] = value
+
+        if sign:
+            payload["sig"] = self.calculate_sig(method, payload, self._settings.vk_client_secret)
+
+        print(f"VK ANONYMOUS CALL: method={method}, params={payload}", flush=True)
+
+        try:
+            resp = await self._client.post(f"/method/{method}", data=payload)
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            print(f"VK ANONYMOUS HTTP ERROR: {exc.response.status_code} - {exc.response.text}", flush=True)
+            raise VKError(code=-2, message=f"HTTP status error {exc.response.status_code}: {str(exc)}") from exc
+        except httpx.RequestError as exc:
+            print(f"VK ANONYMOUS REQUEST ERROR: {str(exc)}", flush=True)
+            raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
+
+        data = resp.json()
+        print(f"VK ANONYMOUS RESPONSE: {data}", flush=True)
+        if "error" in data:
+            err = data["error"]
+            raise VKError(
+                code=int(err.get("error_code", -1)),
+                message=str(err.get("error_msg", "Unknown VK error")),
+                raw=err,
+            )
+        return data.get("response")
+
+    async def refresh_session(self) -> bool:
+        from .. import storage
+        session = storage.load()
+        if not session or not session.access_token:
+            return False
+            
+        device_id = storage.get_device_id()
+        params = {
+            "api_id": self._settings.vk_client_id,
+            "client_id": self._settings.vk_client_id,
+            "client_secret": self._settings.vk_client_secret,
+            "exchange_tokens": session.access_token,
+            "scope": "all",
+            "device_id": device_id,
+            "v": self._settings.vk_api_version,
+            "lang": "ru",
+        }
+        
+        try:
+            response = await self.call_anonymous("auth.refreshTokens", params, sign=True)
+            if response and "access_token" in response:
+                new_access_token = response["access_token"]
+                new_refresh_token = response.get("refresh_token")
+                session.access_token = new_access_token
+                if new_refresh_token:
+                    session.refresh_token = new_refresh_token
+                storage.save(session)
+                logger.info("Successfully refreshed session token in background")
+                return True
+        except Exception as exc:
+            logger.error("Failed to refresh session token: %s", exc)
+            
+        return False
+
+    async def get_anonymous_token(self) -> str:
+        from .. import storage
+        token = storage.load_anonym_token()
+        if token:
+            return token
+            
+        device_id = storage.get_device_id()
+        params = {
+            "api_id": self._settings.vk_client_id,
+            "client_id": self._settings.vk_client_id,
+            "client_secret": self._settings.vk_client_secret,
+            "v": self._settings.vk_api_version,
+            "https": 1,
+            "lang": "ru",
+            "device_id": device_id,
+        }
+        
+        response = await self.call_anonymous("auth.getAnonymToken", params, sign=True)
+        token = response.get("token")
+        if not token:
+            raise VKError(code=-1, message="auth.getAnonymToken response did not contain token")
+            
+        storage.save_anonym_token(token)
+        return token
+
+    def clear_anonymous_token(self) -> None:
+        from .. import storage
+        path = storage._path().parent / "anonym_token.txt"
+        path.unlink(missing_ok=True)
 
     async def raw_get(self, url: str, params: dict[str, Any] | None = None) -> httpx.Response:
         """Used by the auth flow which hits oauth.vk.com directly."""
