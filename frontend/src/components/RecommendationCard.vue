@@ -48,6 +48,39 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  h /= 360;
+  s /= 100;
+  l /= 100;
+  let r = l, g = l, b = l;
+
+  if (s !== 0) {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const hue2rgb = (t: number) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    r = hue2rgb(h + 1/3);
+    g = hue2rgb(h);
+    b = hue2rgb(h - 1/3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+function shiftColor(r: number, g: number, b: number, dh: number, ds: number, dl: number): string {
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const nh = (h + dh + 360) % 360;
+  const ns = Math.min(100, Math.max(0, s + ds));
+  const nl = Math.min(100, Math.max(0, l + dl));
+  const [nr, ng, nb] = hslToRgb(nh, ns, nl);
+  return `rgb(${nr}, ${ng}, ${nb})`;
+}
+
 function generateReededCover(baseColor: string, id: string): string {
   const cacheKey = `${id}_${baseColor}`;
   if (coverCache.has(cacheKey)) {
@@ -82,29 +115,218 @@ function generateReededCover(baseColor: string, id: string): string {
     b = parseInt(hex.substring(4, 6), 16);
   }
 
-  const [h] = rgbToHsl(r, g, b);
+  // 2. Base gradient background values (high-saturation dual-tone)
+  const [h, s, l] = rgbToHsl(r, g, b);
+  const shiftedHue = (h + 18 + random() * 12) % 360;
+  const [sr, sg, sb] = hslToRgb(shiftedHue, Math.min(100, s * 1.05), Math.min(95, l * 1.1));
+  const [er, eg, eb] = hslToRgb((h - 22 + 360) % 360, Math.min(100, s * 1.05), Math.max(22, l * 0.72));
 
-  // Generate exactly 1 single solid color per card (soft matte tone)
-  const randomHue = (h + Math.floor(random() * 80) - 40 + 360) % 360;
-  const sVal = 50 + Math.floor(random() * 20);
-  const lVal = 35 + Math.floor(random() * 15);
+  const color1 = `rgb(${sr}, ${sg}, ${sb})`;
+  const color2 = `rgb(${er}, ${eg}, ${eb})`;
 
-  ctx.fillStyle = `hsl(${randomHue}, ${sVal}%, ${lVal}%)`;
+  // 3. Create a slightly larger canvas for the base background to prevent edge bleeding halos
+  const bgW = width + 40;
+  const bgH = height + 40;
+  const bgCanvas = document.createElement("canvas");
+  bgCanvas.width = bgW;
+  bgCanvas.height = bgH;
+  const bgCtx = bgCanvas.getContext("2d");
+  if (bgCtx) {
+    // A. Draw base gradient
+    const baseGrad = bgCtx.createLinearGradient(0, 0, bgW, bgH);
+    baseGrad.addColorStop(0, color1);
+    baseGrad.addColorStop(1, color2);
+    bgCtx.fillStyle = baseGrad;
+    bgCtx.fillRect(0, 0, bgW, bgH);
+
+    // B. Draw a soft diagonal light reflection on background to enrich mirror effect
+    const backShine = bgCtx.createLinearGradient(0, 0, bgW, bgH);
+    backShine.addColorStop(0, "rgba(255, 255, 255, 0.08)");
+    backShine.addColorStop(0.35, "rgba(255, 255, 255, 0.0)");
+    backShine.addColorStop(0.6, "rgba(0, 0, 0, 0.0)");
+    backShine.addColorStop(1, "rgba(0, 0, 0, 0.12)");
+    bgCtx.fillStyle = backShine;
+    bgCtx.fillRect(0, 0, bgW, bgH);
+  }
+
+  // 4. Create an opaque slightly blurred canvas (blur(4px) for semi-sharp mirror reflection!)
+  const blurCanvas = document.createElement("canvas");
+  blurCanvas.width = bgW;
+  blurCanvas.height = bgH;
+  const bCtx = blurCanvas.getContext("2d");
+  if (bCtx) {
+    bCtx.filter = "blur(4px)";
+    bCtx.drawImage(bgCanvas, 0, 0);
+  }
+
+  // Draw clean un-distorted background on main canvas
+  ctx.drawImage(bgCanvas, 20, 20, width, height, 0, 0, width, height);
+
+  // Get fast pixel access on blurred background
+  const imgData = bCtx!.getImageData(0, 0, bgW, bgH);
+  const d = imgData.data;
+
+  function getBgColor(x: number, y: number): [number, number, number] {
+    // Translate coords to the larger blur canvas space
+    const cx = Math.max(0, Math.min(bgW - 1, Math.floor(x + 20)));
+    const cy = Math.max(0, Math.min(bgH - 1, Math.floor(y + 20)));
+    const idx = (cy * bgW + cx) * 4;
+    return [d[idx], d[idx + 1], d[idx + 2]];
+  }
+
+  // Compute a highly saturated deep shadow color based on the base hue (no muddy grey shadows!)
+  const [dr, dg, db] = hslToRgb(h, Math.min(100, s * 1.1), Math.max(8, l * 0.25));
+  const shadowColorStr = `rgba(${dr}, ${dg}, ${db}`;
+
+  const ribWidth = 26 + Math.floor(random() * 8); // 26 to 34px (perfect mirror strip size)
+  const hasWaviness = random() > 0.25;
+  const amp1 = 3 + random() * 3; // subtle wave distortion
+  const amp2 = 1.5 + random() * 1.5;
+  const freq1 = 0.005 + random() * 0.005;
+  const freq2 = 0.012 + random() * 0.008;
+  const phase1 = random() * Math.PI * 2;
+  const phase2 = random() * Math.PI * 2;
+
+  // 5. Create glass ribbed refraction canvas
+  const ribCanvas = document.createElement("canvas");
+  ribCanvas.width = width;
+  ribCanvas.height = height;
+  const rCtx = ribCanvas.getContext("2d");
+  if (rCtx) {
+    for (let y = 0; y < height; y += 2) {
+      const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
+      for (let x = -40; x < width + 40; x += ribWidth) {
+        const curX = x + xOffset;
+        
+        // Mirror-flip sample coordinates with offset to simulate convex cylindrical mirror strips
+        const leftRGB = getBgColor(curX - 45, y);
+        const centerRGB = getBgColor(curX, y);
+        const rightRGB = getBgColor(curX + 45, y);
+        
+        // Shift colors slightly to match mirror cylinder reflection lighting curve
+        const edgeLeft = shiftColor(leftRGB[0], leftRGB[1], leftRGB[2], 0, 4, 6);
+        const specRGB = getBgColor(curX - 15, y);
+        const specC = shiftColor(specRGB[0], specRGB[1], specRGB[2], 6, 12, 16);
+        const midC = `rgb(${centerRGB[0]}, ${centerRGB[1]}, ${centerRGB[2]})`;
+        const shadowRGB = getBgColor(curX + 25, y);
+        const shadowC = shiftColor(shadowRGB[0], shadowRGB[1], shadowRGB[2], -4, -8, -12);
+        const ambientC = shiftColor(rightRGB[0], rightRGB[1], rightRGB[2], 2, 4, 4);
+        const edgeRight = shiftColor(rightRGB[0], rightRGB[1], rightRGB[2], 0, 4, 6);
+
+        const g = rCtx.createLinearGradient(curX, 0, curX + ribWidth, 0);
+        g.addColorStop(0, edgeLeft);
+        g.addColorStop(0.22, specC);
+        g.addColorStop(0.5, midC);
+        g.addColorStop(0.78, shadowC);
+        g.addColorStop(0.9, ambientC);
+        g.addColorStop(1, edgeRight);
+        
+        rCtx.fillStyle = g;
+        rCtx.fillRect(curX, y, ribWidth, 2);
+      }
+    }
+  }
+
+  // 6. Create effect mask (defines where the glass cylinders are visible)
+  const effectMaskCanvas = document.createElement("canvas");
+  effectMaskCanvas.width = width;
+  effectMaskCanvas.height = height;
+  const emCtx = effectMaskCanvas.getContext("2d");
+  if (emCtx) {
+    const maskType = random();
+    if (maskType < 0.35) {
+      const maskGrad = emCtx.createLinearGradient(width, 0, 0, height);
+      maskGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+      maskGrad.addColorStop(0.4, "rgba(255, 255, 255, 0.7)");
+      maskGrad.addColorStop(0.8, "rgba(255, 255, 255, 0.15)");
+      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+      emCtx.fillStyle = maskGrad;
+    } else if (maskType < 0.7) {
+      const centerX = width * (0.2 + random() * 0.6);
+      const centerY = height * (0.2 + random() * 0.5);
+      const radius = 180 + random() * 150;
+      const maskGrad = emCtx.createRadialGradient(centerX, centerY, 20, centerX, centerY, radius);
+      maskGrad.addColorStop(0, "rgba(255, 255, 255, 1.0)");
+      maskGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.45)");
+      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.0)");
+      emCtx.fillStyle = maskGrad;
+    } else {
+      const maskGrad = emCtx.createLinearGradient(0, 0, width, 0);
+      maskGrad.addColorStop(0, "rgba(255, 255, 255, 0.9)");
+      maskGrad.addColorStop(0.35, "rgba(255, 255, 255, 0.15)");
+      maskGrad.addColorStop(0.65, "rgba(255, 255, 255, 0.15)");
+      maskGrad.addColorStop(1, "rgba(255, 255, 255, 0.9)");
+      emCtx.fillStyle = maskGrad;
+    }
+    emCtx.fillRect(0, 0, width, height);
+  }
+
+  // 7. Draw the masked ribs onto the main canvas
+  const finalRibsCanvas = document.createElement("canvas");
+  finalRibsCanvas.width = width;
+  finalRibsCanvas.height = height;
+  const frCtx = finalRibsCanvas.getContext("2d");
+  if (frCtx) {
+    frCtx.drawImage(ribCanvas, 0, 0);
+    frCtx.globalCompositeOperation = "destination-in";
+    frCtx.drawImage(effectMaskCanvas, 0, 0);
+  }
+  ctx.drawImage(finalRibsCanvas, 0, 0);
+
+  // 8. Draw 3D highlights and shadows on top of the columns (applying the effect mask)
+  const overlaysCanvas = document.createElement("canvas");
+  overlaysCanvas.width = width;
+  overlaysCanvas.height = height;
+  const oCtx = overlaysCanvas.getContext("2d");
+  if (oCtx) {
+    for (let y = 0; y < height; y += 2) {
+      const xOffset = hasWaviness ? (Math.sin(y * freq1 + phase1) * amp1 + Math.sin(y * freq2 + phase2) * amp2) : 0;
+      for (let x = -40; x < width + 40; x += ribWidth) {
+        const curX = x + xOffset;
+        
+        const borderAlpha = 0.08 + 0.10 * Math.sin(y / height * Math.PI);
+        const shadowAlpha = 0.18 + 0.14 * Math.sin(y / height * Math.PI);
+        
+        // Left Fresnel border (bright specular edge)
+        oCtx.fillStyle = `rgba(255, 255, 255, ${borderAlpha})`;
+        oCtx.fillRect(curX, y, 1.2, 2);
+        
+        // Right shadow boundary gap (creates the 3D mirror separation between tubes)
+        oCtx.fillStyle = `${shadowColorStr}, ${shadowAlpha})`;
+        oCtx.fillRect(curX + ribWidth - 1.5, y, 1.5, 2);
+        
+        // Mirror peak specular line (representing light source reflection)
+        const peakAlpha = 0.12 + 0.14 * Math.sin(y / height * Math.PI);
+        oCtx.fillStyle = `rgba(255, 255, 255, ${peakAlpha})`;
+        oCtx.fillRect(curX + Math.floor(ribWidth * 0.22), y, 1.2, 2);
+        
+        // Soft cylinder shading to make the flat blurred background look round
+        const cylinderGrad = oCtx.createLinearGradient(curX, 0, curX + ribWidth, 0);
+        cylinderGrad.addColorStop(0, "rgba(255, 255, 255, 0.04)");
+        cylinderGrad.addColorStop(0.2, "rgba(255, 255, 255, 0.10)");
+        cylinderGrad.addColorStop(0.4, "rgba(0, 0, 0, 0.0)");
+        cylinderGrad.addColorStop(0.78, `${shadowColorStr}, 0.12)`);
+        cylinderGrad.addColorStop(1, "rgba(255, 255, 255, 0.03)");
+        oCtx.fillStyle = cylinderGrad;
+        oCtx.fillRect(curX, y, ribWidth, 2);
+      }
+    }
+    
+    oCtx.globalCompositeOperation = "destination-in";
+    oCtx.drawImage(effectMaskCanvas, 0, 0);
+  }
+  ctx.drawImage(overlaysCanvas, 0, 0);
+
+  // 10. Add premium glassy specular highlight overlay
+  const flare = ctx.createLinearGradient(0, 0, width, height * 0.8);
+  flare.addColorStop(0, "rgba(255, 255, 255, 0.06)");
+  flare.addColorStop(0.25, "rgba(255, 255, 255, 0.02)");
+  flare.addColorStop(0.45, "rgba(255, 255, 255, 0.0)");
+  ctx.fillStyle = flare;
   ctx.fillRect(0, 0, width, height);
 
-  // Draw a subtle matte paper noise texture on top
-  const imgData = ctx.getImageData(0, 0, width, height);
-  const d = imgData.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const noise = (random() - 0.5) * 8;
-    d[i] = Math.min(255, Math.max(0, d[i] + noise));
-    d[i + 1] = Math.min(255, Math.max(0, d[i + 1] + noise));
-    d[i + 2] = Math.min(255, Math.max(0, d[i + 2] + noise));
-  }
-  ctx.putImageData(imgData, 0, 0);
-
-  // Clean subtle inner border
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
+  // 11. Glass inner border
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
   ctx.lineWidth = 1.5;
   ctx.strokeRect(0, 0, width, height);
 
