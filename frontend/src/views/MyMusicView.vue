@@ -131,6 +131,7 @@ async function onReachEnd() {
       recentNextFrom.value = list.next_from || null;
     } catch (err) {
       console.error("Failed to load more recent tracks", err);
+      recentNextFrom.value = null; // Clear cursor on error to prevent infinite retry loops
     } finally {
       recentMusicLoadingMore.value = false;
     }

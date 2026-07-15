@@ -282,7 +282,7 @@ export const api = {
     start_from: string;
     count?: number;
   }): Promise<TrackList> {
-    const { data } = await http.get<TrackList>("/catalog/block/items", { params });
+    const { data } = await http.get<TrackList>("/audio/catalog/block/items", { params });
     return data;
   },
   async recommendations(params: {
