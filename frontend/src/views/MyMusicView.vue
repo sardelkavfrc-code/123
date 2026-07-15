@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch, nextTick, onBeforeUnmount } from "vue";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -26,11 +26,36 @@ const recentMusic = ref<Track[]>([]);
 const recentMusicLoading = ref(false);
 const recentMusicError = ref<string | null>(null);
 
+const tabLibrary = ref<HTMLElement | null>(null);
+const tabRecent = ref<HTMLElement | null>(null);
+const indicatorStyle = ref({
+  left: "0px",
+  width: "0px",
+});
+
+function updateIndicator() {
+  const activeEl = activeTab.value === "library" ? tabLibrary.value : tabRecent.value;
+  if (activeEl) {
+    indicatorStyle.value = {
+      left: `${activeEl.offsetLeft}px`,
+      width: `${activeEl.clientWidth}px`,
+    };
+  }
+}
+
 const showUnavailableModal = ref(false);
 
 onMounted(async () => {
   await library.loadMyMusic();
   void library.loadAllMyMusic();
+  window.addEventListener("resize", updateIndicator);
+  setTimeout(() => {
+    updateIndicator();
+  }, 100);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", updateIndicator);
 });
 
 async function loadRecent() {
@@ -51,6 +76,9 @@ watch(activeTab, (tab) => {
   if (tab === "recent") {
     void loadRecent();
   }
+  nextTick(() => {
+    updateIndicator();
+  });
 });
 
 const unavailableTracks = computed(() => myMusic.value.filter(t => !t.url));
@@ -230,6 +258,7 @@ async function deleteAllTracks() {
     <section class="my-music">
       <div class="my-music__tabs" role="tablist">
         <button
+          ref="tabLibrary"
           class="my-music__tab"
           :class="{ 'my-music__tab--active': activeTab === 'library' }"
           @click="activeTab = 'library'"
@@ -239,6 +268,7 @@ async function deleteAllTracks() {
           Библиотека
         </button>
         <button
+          ref="tabRecent"
           class="my-music__tab"
           :class="{ 'my-music__tab--active': activeTab === 'recent' }"
           @click="activeTab = 'recent'"
@@ -247,6 +277,7 @@ async function deleteAllTracks() {
         >
           Недавние
         </button>
+        <div class="my-music__tab-indicator" :style="indicatorStyle" />
       </div>
 
       <template v-if="activeTab === 'library'">
@@ -304,6 +335,7 @@ async function deleteAllTracks() {
   padding: 0 32px 24px;
 }
 .my-music__tabs {
+  position: relative;
   display: flex;
   gap: 24px;
   border-bottom: 1px solid var(--border);
@@ -327,15 +359,14 @@ async function deleteAllTracks() {
 .my-music__tab--active {
   color: var(--text-0);
 }
-.my-music__tab--active::after {
-  content: "";
+.my-music__tab-indicator {
   position: absolute;
-  bottom: -7px;
-  left: 0;
-  right: 0;
+  bottom: -1px;
   height: 2px;
   background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
   border-radius: 99px;
+  transition: left var(--motion-duration-slow) var(--motion-ease-out),
+              width var(--motion-duration-slow) var(--motion-ease-out);
 }
 .my-music__filter {
   width: 280px;
