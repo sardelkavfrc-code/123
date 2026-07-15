@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { useUIStore } from "@/stores/ui";
+import { api, APIError } from "@/api/client";
 import type { Track } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
@@ -20,6 +21,11 @@ const { myMusic, myMusicLoading, myMusicLoadingMore, myMusicHasMore, myMusicTota
   storeToRefs(library);
 const query = ref("");
 
+const activeTab = ref<"library" | "recent">("library");
+const recentMusic = ref<Track[]>([]);
+const recentMusicLoading = ref(false);
+const recentMusicError = ref<string | null>(null);
+
 const showUnavailableModal = ref(false);
 
 onMounted(async () => {
@@ -27,17 +33,46 @@ onMounted(async () => {
   void library.loadAllMyMusic();
 });
 
+async function loadRecent() {
+  if (recentMusic.value.length > 0) return;
+  recentMusicLoading.value = true;
+  recentMusicError.value = null;
+  try {
+    const list = await api.recentTracks();
+    recentMusic.value = list.items;
+  } catch (err) {
+    recentMusicError.value = err instanceof APIError ? err.message : (err as Error).message;
+  } finally {
+    recentMusicLoading.value = false;
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === "recent") {
+    void loadRecent();
+  }
+});
+
 const unavailableTracks = computed(() => myMusic.value.filter(t => !t.url));
+
+const activeFullList = computed(() => {
+  return activeTab.value === "recent" ? recentMusic.value : myMusic.value;
+});
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase();
-  if (!q) return myMusic.value;
-  return myMusic.value.filter(
+  const list = activeFullList.value;
+  if (!q) return list;
+  return list.filter(
     (t: Track) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
   );
 });
 
 const subtitle = computed(() => {
+  if (activeTab.value === "recent") {
+    if (recentMusicLoading.value) return "Загружаем недавние треки…";
+    return tracksLabel(recentMusic.value.length);
+  }
   if (!myMusic.value.length) return "Загружаем твои треки…";
   if (myMusicTotal.value && myMusicTotal.value > myMusic.value.length) {
     return `${tracksLabel(myMusic.value.length)} из ${myMusicTotal.value}`;
@@ -46,9 +81,8 @@ const subtitle = computed(() => {
 });
 
 function onReachEnd() {
+  if (activeTab.value !== "library") return;
   if (!myMusicHasMore.value || myMusicLoadingMore.value || myMusicLoading.value) return;
-  // While the user is filtering, infinite scroll still hits the full list —
-  // VK returns the unfiltered library and we filter client-side.
   void library.loadMoreMyMusic();
 }
 
@@ -59,18 +93,19 @@ async function handlePlay(_track: Track, index: number) {
     player.playQueue(filtered.value, index);
     return;
   }
-  // Play immediately with currently loaded tracks
-  player.playQueue(myMusic.value, index);
   
-  // Load the rest of the library in the background
-  void (async () => {
-    try {
-      const all = await library.loadAllMyMusic();
-      player.setQueue(all);
-    } catch (err) {
-      console.error("Failed to load all music in background", err);
-    }
-  })();
+  player.playQueue(activeFullList.value, index);
+  
+  if (activeTab.value === "library") {
+    void (async () => {
+      try {
+        const all = await library.loadAllMyMusic();
+        player.setQueue(all);
+      } catch (err) {
+        console.error("Failed to load all music in background", err);
+      }
+    })();
+  }
 }
 
 async function playAll() {
@@ -79,18 +114,19 @@ async function playAll() {
     player.playQueue(filtered.value, 0);
     return;
   }
-  // Play immediately with currently loaded tracks
-  player.playQueue(myMusic.value, 0);
   
-  // Load the rest of the library in the background
-  void (async () => {
-    try {
-      const all = await library.loadAllMyMusic();
-      player.setQueue(all);
-    } catch (err) {
-      console.error("Failed to load all music in background", err);
-    }
-  })();
+  player.playQueue(activeFullList.value, 0);
+  
+  if (activeTab.value === "library") {
+    void (async () => {
+      try {
+        const all = await library.loadAllMyMusic();
+        player.setQueue(all);
+      } catch (err) {
+        console.error("Failed to load all music in background", err);
+      }
+    })();
+  }
 }
 
 async function shufflePlay() {
@@ -100,19 +136,20 @@ async function shufflePlay() {
     player.playQueue(filtered.value, -1);
     return;
   }
-  // Shuffle immediate queue
-  player.shuffle = true;
-  player.playQueue(myMusic.value, -1);
   
-  // Load the rest of the library in the background
-  void (async () => {
-    try {
-      const all = await library.loadAllMyMusic();
-      player.setQueue(all);
-    } catch (err) {
-      console.error("Failed to load all music in background", err);
-    }
-  })();
+  player.shuffle = true;
+  player.playQueue(activeFullList.value, -1);
+  
+  if (activeTab.value === "library") {
+    void (async () => {
+      try {
+        const all = await library.loadAllMyMusic();
+        player.setQueue(all);
+      } catch (err) {
+        console.error("Failed to load all music in background", err);
+      }
+    })();
+  }
 }
 
 async function deleteTrack(track: Track) {
@@ -191,21 +228,63 @@ async function deleteAllTracks() {
     </PageHeader>
 
     <section class="my-music">
-      <div v-if="myMusicLoading && !myMusic.length" class="my-music__loading">
-        <Spinner :size="20" /> Грузим библиотеку…
+      <div class="my-music__tabs" role="tablist">
+        <button
+          class="my-music__tab"
+          :class="{ 'my-music__tab--active': activeTab === 'library' }"
+          @click="activeTab = 'library'"
+          role="tab"
+          :aria-selected="activeTab === 'library'"
+        >
+          Библиотека
+        </button>
+        <button
+          class="my-music__tab"
+          :class="{ 'my-music__tab--active': activeTab === 'recent' }"
+          @click="activeTab = 'recent'"
+          role="tab"
+          :aria-selected="activeTab === 'recent'"
+        >
+          Недавние
+        </button>
       </div>
-      <template v-else>
-        <TrackList
-          :tracks="filtered"
-          show-index
-          manual-play
-          empty-title="В библиотеке пусто"
-          empty-subtitle="Сохрани треки из поиска или рекомендаций — они появятся здесь"
-          @play="handlePlay"
-        />
-        <div v-if="myMusicLoadingMore" class="my-music__loading">
-          <Spinner :size="16" /> Подгружаем ещё…
+
+      <template v-if="activeTab === 'library'">
+        <div v-if="myMusicLoading && !myMusic.length" class="my-music__loading">
+          <Spinner :size="20" /> Грузим библиотеку…
         </div>
+        <template v-else>
+          <TrackList
+            :tracks="filtered"
+            show-index
+            manual-play
+            empty-title="В библиотеке пусто"
+            empty-subtitle="Сохрани треки из поиска или рекомендаций — они появятся здесь"
+            @play="handlePlay"
+          />
+          <div v-if="myMusicLoadingMore" class="my-music__loading">
+            <Spinner :size="16" /> Подгружаем ещё…
+          </div>
+        </template>
+      </template>
+
+      <template v-else>
+        <div v-if="recentMusicLoading" class="my-music__loading">
+          <Spinner :size="20" /> Загружаем недавние треки…
+        </div>
+        <div v-else-if="recentMusicError" class="my-music__error">
+          {{ recentMusicError }}
+        </div>
+        <template v-else>
+          <TrackList
+            :tracks="filtered"
+            show-index
+            manual-play
+            empty-title="Недавно воспроизведенных треков нет"
+            empty-subtitle="Слушай музыку из поиска или рекомендаций, чтобы она появлялась здесь"
+            @play="handlePlay"
+          />
+        </template>
       </template>
     </section>
 
@@ -224,6 +303,36 @@ async function deleteAllTracks() {
 .my-music {
   padding: 0 32px 24px;
 }
+.my-music__tabs {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  gap: 2px;
+  margin-bottom: 24px;
+}
+.my-music__tab {
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition:
+    background var(--motion-duration-fast) var(--motion-ease-out),
+    color var(--motion-duration-fast) var(--motion-ease-out);
+}
+.my-music__tab:hover:not(.my-music__tab--active) {
+  color: var(--text-0);
+}
+.my-music__tab--active {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  color: var(--accent-text, #fff);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
 .my-music__filter {
   width: 280px;
   height: 38px;
@@ -234,6 +343,11 @@ async function deleteAllTracks() {
   gap: 10px;
   color: var(--text-2);
   padding: 12px 0;
+}
+.my-music__error {
+  color: var(--danger);
+  padding: 12px 0;
+  font-size: calc(13px * var(--font-scale, 1));
 }
 .btn--unavailable {
   padding: 4px;

@@ -289,6 +289,76 @@ async def search_catalog(
     return parse_catalog_search(response)
 
 
+@router.get("/my/catalog", response_model=TrackList)
+async def my_catalog(
+    vk: VKDep,
+    session: SessionDep,
+) -> TrackList:
+    catalog = await vk.call("catalog.getAudio", session.access_token)
+    sections = catalog.get("catalog", {}).get("sections", [])
+    
+    my_music_sec_id = None
+    for sec in sections:
+        if sec.get("title") == "Моя музыка":
+            my_music_sec_id = sec.get("id")
+            break
+            
+    if not my_music_sec_id:
+        my_music_sec_id = "PUldVA8FR0RzSVNUWE1JSmRSS0wEGEleZFFcRA0NWVd2U1oL"
+        
+    section_data = await vk.call(
+        "catalog.getSection",
+        session.access_token,
+        section_id=my_music_sec_id,
+        need_blocks=1,
+    )
+    
+    response_obj = section_data.get("section", {})
+    blocks = response_obj.get("blocks", [])
+    
+    recent_block = None
+    for b in blocks:
+        if b.get("data_type") != "music_audios":
+            continue
+        is_recent = False
+        url_val = b.get("url") or ""
+        title_val = b.get("title") or ""
+        layout_title = (b.get("layout") or {}).get("title") or ""
+        
+        if "block=recent" in url_val:
+            is_recent = True
+        elif title_val == "Недавно прослушанные":
+            is_recent = True
+        elif layout_title == "Недавно прослушанные":
+            is_recent = True
+            
+        if is_recent:
+            recent_block = b
+            break
+            
+    if not recent_block:
+        return parse_track_list({"count": 0, "items": []})
+        
+    audios_ids = recent_block.get("audios_ids") or []
+    raw_audios = section_data.get("audios") or []
+    
+    audios_map = {}
+    for a in raw_audios:
+        if isinstance(a, dict):
+            full_id = f"{a.get('owner_id')}_{a.get('id')}"
+            audios_map[full_id] = a
+            
+    resolved_tracks = []
+    for aid in audios_ids:
+        if aid in audios_map:
+            resolved_tracks.append(audios_map[aid])
+            
+    if resolved_tracks:
+        await _fill_missing_urls(vk, session, resolved_tracks)
+        
+    return parse_track_list({"count": len(resolved_tracks), "items": resolved_tracks})
+
+
 @router.get("/recommendations", response_model=TrackList)
 async def recommendations(
     vk: VKDep,

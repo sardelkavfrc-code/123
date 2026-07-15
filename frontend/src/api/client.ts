@@ -273,6 +273,10 @@ export const api = {
     const { data } = await http.get<CatalogSearchResult>("/audio/search/catalog", { params });
     return data;
   },
+  async recentTracks(): Promise<TrackList> {
+    const { data } = await http.get<TrackList>("/audio/my/catalog");
+    return data;
+  },
   async recommendations(params: {
     target_audio?: string;
     user_id?: number;
