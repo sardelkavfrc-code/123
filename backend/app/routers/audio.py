@@ -374,6 +374,8 @@ async def algorithms(vk: VKDep, session: SessionDep) -> AlbumList:
                 cover=_get_playlist_cover(pl),
                 year=pl.get("year"),
                 track_count=pl.get("count", 0),
+                type=pl.get("type"),
+                main_color=pl.get("main_color"),
             ))
             
     return AlbumList(items=items, count=len(items))
@@ -436,6 +438,8 @@ async def moods(vk: VKDep, session: SessionDep) -> AlbumList:
                         subtitle=pl.get("description") or pl.get("subtitle") or "",
                         cover=_get_playlist_cover(pl),
                         track_count=pl.get("count", 0),
+                        type=pl.get("type"),
+                        main_color=pl.get("main_color"),
                     )
                 )
         

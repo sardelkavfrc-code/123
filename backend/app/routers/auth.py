@@ -27,12 +27,14 @@ class ValidateRequest(BaseModel):
 
 class SendSmsRequest(BaseModel):
     sid: str
+    login: str | None = None
 
 
 class CheckOtpRequest(BaseModel):
     sid: str
     code: str
     verification_method: str
+    login: str | None = None
 
 
 class ConfirmRequest(BaseModel):
@@ -42,6 +44,8 @@ class ConfirmRequest(BaseModel):
     password: str | None = None
     remember: bool = True
     sid: str | None = None
+    captcha_sid: str | None = None
+    captcha_key: str | None = None
 
 
 async def _download_captcha_base64(url: str) -> str | None:
@@ -123,6 +127,21 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
     for attempt in range(3):
         try:
             has_audio = await _probe_audio(vk, session.access_token)
+            if not session.refresh_token:
+                try:
+                    exchange_res = await vk.call(
+                        "auth.getExchangeToken",
+                        session.access_token,
+                        create_common_token=1,
+                        create_tier_tokens=0,
+                        api_id=2274003,
+                    )
+                    if exchange_res and "common_token" in exchange_res:
+                        session.refresh_token = exchange_res["common_token"]
+                        storage.save(session)
+                        logger.info("Successfully populated missing refresh token on status check")
+                except Exception as exc:
+                    logger.warning("Failed to populate missing refresh token: %s", exc)
             return await _resolve_user(vk, session.access_token, has_audio=has_audio)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_502_BAD_GATEWAY and attempt < 2:
@@ -132,6 +151,8 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
                 storage.clear()
                 return AuthStatus(authenticated=False)
             raise exc
+
+    return AuthStatus(authenticated=False)
 
 
 @router.post("/token", response_model=AuthStatus)
@@ -173,6 +194,19 @@ async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
         logger.warning("audio.get probe failed on token — audio gated")
 
     if payload.remember:
+        try:
+            exchange_res = await vk.call(
+                "auth.getExchangeToken",
+                session.access_token,
+                create_common_token=1,
+                create_tier_tokens=0,
+                api_id=2274003,
+            )
+            if exchange_res and "common_token" in exchange_res:
+                session.refresh_token = exchange_res["common_token"]
+                logger.info("Successfully obtained exchange token for background refresh")
+        except Exception as exc:
+            logger.warning("Failed to obtain exchange token during login: %s", exc)
         storage.save(session)
     return await _resolve_user(vk, session.access_token, has_audio=has_audio)
 
@@ -271,6 +305,18 @@ async def send_sms(payload: SendSmsRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND SEND SMS VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
+            if exc.code == 3615 or "code" in exc.message.lower():
+                print(f"SendSms failed with 3615. Clearing device_id and anonymous token to bypass rate limit...", flush=True)
+                storage.clear_device_id()
+                vk.clear_anonymous_token()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "kind": "vk_error",
+                        "code": exc.code,
+                        "message": "Не удалось отправить SMS (лимиты или VPN). Устройство сброшено, попробуйте войти ещё раз.",
+                    }
+                )
             if exc.code in (28, 5, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
@@ -305,9 +351,23 @@ async def send_callreset(payload: SendSmsRequest, vk: VKDep):
                 "https": 1,
             }
             response = await vk.call_anonymous("ecosystem.sendOtpCallReset", params, sign=False)
+            if isinstance(response, dict):
+                response["verification_method"] = "callreset"
             return response
         except VKError as exc:
             print(f"BACKEND SEND CALLRESET VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
+            if exc.code == 3615 or "code" in exc.message.lower():
+                print(f"SendCallReset failed with 3615. Clearing device_id and anonymous token to bypass rate limit...", flush=True)
+                storage.clear_device_id()
+                vk.clear_anonymous_token()
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "kind": "vk_error",
+                        "code": exc.code,
+                        "message": "Не удалось сделать звонок (лимиты или VPN). Устройство сброшено, попробуйте войти ещё раз.",
+                    }
+                )
             if exc.code in (28, 5, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
@@ -345,6 +405,80 @@ async def send_email(payload: SendSmsRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND SEND EMAIL VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
+            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+                vk.clear_anonymous_token()
+                continue
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "kind": "vk_error",
+                    "code": exc.code,
+                    "message": exc.message,
+                    "captcha_sid": exc.raw.get("captcha_sid") if exc.raw else None,
+                    "redirect_uri": exc.raw.get("redirect_uri") if exc.raw else None,
+                }
+            )
+
+
+@router.post("/send-push")
+async def send_push(payload: SendSmsRequest, vk: VKDep):
+    print(f"BACKEND RECEIVED SEND PUSH: sid={payload.sid}", flush=True)
+    device_id = storage.get_device_id()
+    
+    for attempt in range(2):
+        try:
+            anonym_token = await vk.get_anonymous_token()
+            params = {
+                "sid": payload.sid,
+                "sak_version": "1.112",
+                "v": "5.274",
+                "api_id": 2274003,
+                "lang": "ru",
+                "device_id": device_id,
+                "access_token": anonym_token,
+                "https": 1,
+            }
+            response = await vk.call_anonymous("ecosystem.sendOtpPush", params, sign=False)
+            return response
+        except VKError as exc:
+            print(f"BACKEND SEND PUSH VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
+            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+                vk.clear_anonymous_token()
+                continue
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "kind": "vk_error",
+                    "code": exc.code,
+                    "message": exc.message,
+                    "captcha_sid": exc.raw.get("captcha_sid") if exc.raw else None,
+                    "redirect_uri": exc.raw.get("redirect_uri") if exc.raw else None,
+                }
+            )
+
+
+@router.post("/send-max")
+async def send_max(payload: SendSmsRequest, vk: VKDep):
+    print(f"BACKEND RECEIVED SEND MAX: sid={payload.sid}", flush=True)
+    device_id = storage.get_device_id()
+    
+    for attempt in range(2):
+        try:
+            anonym_token = await vk.get_anonymous_token()
+            params = {
+                "sid": payload.sid,
+                "sak_version": "1.112",
+                "v": "5.274",
+                "api_id": 2274003,
+                "lang": "ru",
+                "device_id": device_id,
+                "access_token": anonym_token,
+                "https": 1,
+            }
+            response = await vk.call_anonymous("ecosystem.sendOtpMax", params, sign=False)
+            return response
+        except VKError as exc:
+            print(f"BACKEND SEND MAX VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
             if exc.code in (28, 5, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
@@ -423,15 +557,21 @@ async def confirm_auth(payload: ConfirmRequest, vk: VKDep) -> AuthStatus:
     }
     if payload.sid:
         oauth_payload["sid"] = payload.sid
+    if payload.captcha_sid:
+        oauth_payload["captcha_sid"] = payload.captcha_sid
+    if payload.captcha_key:
+        oauth_payload["captcha_key"] = payload.captcha_key
     if payload.grant_type == "password":
         oauth_payload["password"] = payload.password
+        if payload.code:
+            oauth_payload["code"] = payload.code
     elif payload.grant_type in ("phone_code", "auth_code"):
         oauth_payload["code"] = payload.code
 
     print(f"BACKEND SENDING OAUTH/TOKEN PAYLOAD: {oauth_payload}", flush=True)
 
     try:
-        resp = await vk._client.post("https://api.vk.com/oauth/token", data=oauth_payload)
+        resp = await vk._client.post("https://oauth.vk.com/token", data=oauth_payload)
         resp_json = resp.json()
         print(f"BACKEND OAUTH/TOKEN RESPONSE: {resp_json}", flush=True)
     except Exception as exc:
@@ -445,9 +585,24 @@ async def confirm_auth(payload: ConfirmRequest, vk: VKDep) -> AuthStatus:
         err = resp_json.get("error")
         err_desc = resp_json.get("error_description", "Unknown OAuth error")
         print(f"BACKEND OAUTH/TOKEN ERROR RESULT: err={err}, desc={err_desc}", flush=True)
+        
+        captcha_img = resp_json.get("captcha_img")
+        if captcha_img:
+            captcha_img = await _download_captcha_base64(captcha_img)
+            
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"kind": "oauth_error", "error": err, "message": err_desc}
+            detail={
+                "kind": "oauth_error",
+                "error": err,
+                "message": err_desc,
+                "validation_type": resp_json.get("validation_type"),
+                "validation_sid": resp_json.get("validation_sid"),
+                "phone_mask": resp_json.get("phone_mask"),
+                "masked_email": resp_json.get("masked_email"),
+                "captcha_sid": resp_json.get("captcha_sid"),
+                "captcha_img": captcha_img,
+            }
         )
 
     if "access_token" not in resp_json:
@@ -464,6 +619,20 @@ async def confirm_auth(payload: ConfirmRequest, vk: VKDep) -> AuthStatus:
 
     has_audio = await _probe_audio(vk, session.access_token)
     if payload.remember:
+        if not session.refresh_token:
+            try:
+                exchange_res = await vk.call(
+                    "auth.getExchangeToken",
+                    session.access_token,
+                    create_common_token=1,
+                    create_tier_tokens=0,
+                    api_id=2274003,
+                )
+                if exchange_res and "common_token" in exchange_res:
+                    session.refresh_token = exchange_res["common_token"]
+                    logger.info("Successfully obtained exchange token for background refresh")
+            except Exception as exc:
+                logger.warning("Failed to obtain exchange token: %s", exc)
         storage.save(session)
 
     return await _resolve_user(vk, session.access_token, has_audio=has_audio)

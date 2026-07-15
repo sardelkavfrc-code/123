@@ -100,6 +100,16 @@ def get_device_id() -> str:
     return dev_id
 
 
+def clear_device_id() -> None:
+    """Delete the saved device_id file to force a fresh ID on next request."""
+    path = _path().parent / "device_id.txt"
+    if path.exists():
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def get_session_age_seconds() -> float:
     """Return the time in seconds since the session file was last modified."""
     import time

@@ -45,6 +45,11 @@ export interface APIErrorDetail {
   captcha_img?: string;
   redirect_uri?: string;
   remixstlid?: string;
+  validation_type?: string;
+  validation_sid?: string;
+  phone_mask?: string;
+  masked_email?: string;
+  error?: string;
 }
 
 export class APIError extends Error {
@@ -189,22 +194,31 @@ export const api = {
     const { data } = await http.post<VKValidateAccountResponse>("/auth/validate", payload);
     return data;
   },
-  async sendOtpSms(payload: { sid: string }): Promise<any> {
+  async sendOtpSms(payload: { sid: string; login?: string }): Promise<any> {
     const { data } = await http.post("/auth/send-sms", payload);
     return data;
   },
-  async sendCallreset(payload: { sid: string }): Promise<any> {
+  async sendCallreset(payload: { sid: string; login?: string }): Promise<any> {
     const { data } = await http.post("/auth/send-callreset", payload);
     return data;
   },
-  async sendEmail(payload: { sid: string }): Promise<any> {
+  async sendEmail(payload: { sid: string; login?: string }): Promise<any> {
     const { data } = await http.post("/auth/send-email", payload);
+    return data;
+  },
+  async sendOtpPush(payload: { sid: string; login?: string }): Promise<any> {
+    const { data } = await http.post("/auth/send-push", payload);
+    return data;
+  },
+  async sendOtpMax(payload: { sid: string; login?: string }): Promise<any> {
+    const { data } = await http.post("/auth/send-max", payload);
     return data;
   },
   async checkOtp(payload: {
     sid: string;
     code: string;
     verification_method: string;
+    login?: string;
   }): Promise<VKCheckOtpResponse> {
     const { data } = await http.post<VKCheckOtpResponse>("/auth/check-otp", payload);
     return data;
@@ -216,6 +230,8 @@ export const api = {
     password?: string;
     remember?: boolean;
     sid?: string;
+    captcha_sid?: string;
+    captcha_key?: string;
   }): Promise<AuthStatus> {
     const { data } = await http.post<AuthStatus>("/auth/confirm", payload);
     return data;

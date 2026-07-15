@@ -157,7 +157,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function sendOtpSms(payload: { sid: string }) {
+  async function sendOtpSms(payload: { sid: string; login?: string }) {
     lastError.value = null;
     loading.value = true;
     try {
@@ -174,7 +174,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function sendCallreset(payload: { sid: string }) {
+  async function sendCallreset(payload: { sid: string; login?: string }) {
     lastError.value = null;
     loading.value = true;
     try {
@@ -191,7 +191,7 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  async function sendEmail(payload: { sid: string }) {
+  async function sendEmail(payload: { sid: string; login?: string }) {
     lastError.value = null;
     loading.value = true;
     try {
@@ -208,10 +208,45 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function sendOtpPush(payload: { sid: string; login?: string }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.sendOtpPush(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function sendOtpMax(payload: { sid: string; login?: string }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.sendOtpMax(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function checkOtp(payload: {
     sid: string;
     code: string;
     verification_method: string;
+    login?: string;
   }) {
     lastError.value = null;
     loading.value = true;
@@ -236,6 +271,8 @@ export const useAuthStore = defineStore("auth", () => {
     password?: string;
     remember?: boolean;
     sid?: string;
+    captcha_sid?: string;
+    captcha_key?: string;
   }) {
     lastError.value = null;
     loading.value = true;
@@ -249,7 +286,7 @@ export const useAuthStore = defineStore("auth", () => {
       } else {
         lastError.value = (err as Error).message;
       }
-      return false;
+      throw err;
     } finally {
       loading.value = false;
     }
@@ -270,6 +307,8 @@ export const useAuthStore = defineStore("auth", () => {
     sendOtpSms,
     sendCallreset,
     sendEmail,
+    sendOtpPush,
+    sendOtpMax,
     checkOtp,
     confirmAuth,
     logout,

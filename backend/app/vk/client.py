@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import asyncio
 import httpx
 import logging
 
@@ -64,13 +65,26 @@ class VKClient:
         if remixstlid:
             self._client.cookies.set("remixstlid", str(remixstlid), domain=".vk.com", path="/")
 
-        try:
-            resp = await self._client.post(f"/method/{method}", data=payload)
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            raise VKError(code=-2, message=f"HTTP status error {exc.response.status_code}: {str(exc)}") from exc
-        except httpx.RequestError as exc:
-            raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                resp = await self._client.post(f"/method/{method}", data=payload)
+                resp.raise_for_status()
+                break
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                if attempt < max_attempts - 1:
+                    logger.warning(
+                        "VK API connection failed (attempt %d/%d) for method %s: %s. Retrying...",
+                        attempt + 1,
+                        max_attempts,
+                        method,
+                        exc,
+                    )
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                if isinstance(exc, httpx.HTTPStatusError):
+                    raise VKError(code=-2, message=f"HTTP status error {exc.response.status_code}: {str(exc)}") from exc
+                raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
         
         data = resp.json()
 
@@ -115,7 +129,7 @@ class VKClient:
         return hashlib.md5(to_hash.encode("utf-8")).hexdigest()
 
     async def call_anonymous(self, method: str, params: dict[str, Any], sign: bool = True) -> Any:
-        payload = {}
+        payload: dict[str, Any] = {}
         for key, value in params.items():
             if value is None:
                 continue
@@ -131,15 +145,25 @@ class VKClient:
 
         print(f"VK ANONYMOUS CALL: method={method}, params={payload}", flush=True)
 
-        try:
-            resp = await self._client.post(f"/method/{method}", data=payload)
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as exc:
-            print(f"VK ANONYMOUS HTTP ERROR: {exc.response.status_code} - {exc.response.text}", flush=True)
-            raise VKError(code=-2, message=f"HTTP status error {exc.response.status_code}: {str(exc)}") from exc
-        except httpx.RequestError as exc:
-            print(f"VK ANONYMOUS REQUEST ERROR: {str(exc)}", flush=True)
-            raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            try:
+                resp = await self._client.post(f"/method/{method}", data=payload)
+                resp.raise_for_status()
+                break
+            except (httpx.RequestError, httpx.HTTPStatusError) as exc:
+                if attempt < max_attempts - 1:
+                    print(
+                        f"VK ANONYMOUS CALL FAILED (attempt {attempt + 1}/{max_attempts}) for method={method}: {exc}. Retrying...",
+                        flush=True,
+                    )
+                    await asyncio.sleep(0.5 * (attempt + 1))
+                    continue
+                if isinstance(exc, httpx.HTTPStatusError):
+                    print(f"VK ANONYMOUS HTTP ERROR: {exc.response.status_code} - {exc.response.text}", flush=True)
+                    raise VKError(code=-2, message=f"HTTP status error {exc.response.status_code}: {str(exc)}") from exc
+                print(f"VK ANONYMOUS REQUEST ERROR: {str(exc)}", flush=True)
+                raise VKError(code=-2, message=f"Network error: {str(exc)}") from exc
 
         data = resp.json()
         print(f"VK ANONYMOUS RESPONSE: {data}", flush=True)
@@ -159,11 +183,15 @@ class VKClient:
             return False
             
         device_id = storage.get_device_id()
+        # Use refresh_token (which holds the exchange/common token) if available.
+        # Fall back to access_token if refresh_token is missing.
+        exchange_token = session.refresh_token or session.access_token
+        
         params = {
             "api_id": self._settings.vk_client_id,
             "client_id": self._settings.vk_client_id,
             "client_secret": self._settings.vk_client_secret,
-            "exchange_tokens": session.access_token,
+            "exchange_tokens": exchange_token,
             "scope": "all",
             "device_id": device_id,
             "v": self._settings.vk_api_version,
@@ -172,15 +200,36 @@ class VKClient:
         
         try:
             response = await self.call_anonymous("auth.refreshTokens", params, sign=True)
-            if response and "access_token" in response:
-                new_access_token = response["access_token"]
-                new_refresh_token = response.get("refresh_token")
-                session.access_token = new_access_token
-                if new_refresh_token:
-                    session.refresh_token = new_refresh_token
-                storage.save(session)
-                logger.info("Successfully refreshed session token in background")
-                return True
+            if not response:
+                logger.error("Failed to refresh session token: response is empty")
+                return False
+                
+            errors = response.get("errors")
+            if errors:
+                logger.error("Failed to refresh session token due to API errors: %s", errors)
+                return False
+                
+            success = response.get("success")
+            if success and isinstance(success, list) and len(success) > 0:
+                token_data = success[0]
+                new_access_token = token_data.get("token")
+                if new_access_token:
+                    session.access_token = new_access_token
+                    expires_in = token_data.get("expires_in")
+                    if expires_in:
+                        import time
+                        session.expires_at = int(time.time()) + int(expires_in)
+                    # If VK ID eventually returns a new refresh token, update it.
+                    new_refresh_token = token_data.get("refresh_token")
+                    if new_refresh_token:
+                        session.refresh_token = new_refresh_token
+                    storage.save(session)
+                    logger.info("Successfully refreshed session token in background")
+                    return True
+                else:
+                    logger.error("Refresh response success list did not contain 'token' field")
+            else:
+                logger.error("Refresh response success list is empty or invalid: %s", response)
         except Exception as exc:
             logger.error("Failed to refresh session token: %s", exc)
             

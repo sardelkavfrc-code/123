@@ -416,6 +416,7 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       spellcheck: false,
       backgroundThrottling: false,
+      webviewTag: true,
     },
   });
 

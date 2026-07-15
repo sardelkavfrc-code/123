@@ -70,6 +70,8 @@ class AlbumSummary(APIModel):
     cover: str | None = None
     year: int | None = None
     track_count: int | None = None
+    type: str | None = None
+    main_color: str | None = None
 
 
 class AlbumList(APIModel):

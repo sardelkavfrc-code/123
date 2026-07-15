@@ -370,6 +370,8 @@ def parse_albums(response: Any) -> AlbumList:
                 cover=_album_cover(raw),
                 year=_album_year(raw),
                 track_count=track_count,
+                type=raw.get("type"),
+                main_color=raw.get("main_color"),
             )
         )
     return AlbumList(items=albums, count=count or len(albums))

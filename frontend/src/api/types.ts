@@ -61,6 +61,8 @@ export interface AlbumSummary {
   cover: string | null;
   year: number | null;
   track_count: number | null;
+  type?: string | null;
+  main_color?: string | null;
 }
 
 export interface ArtistAlbumBlock {
@@ -124,4 +126,5 @@ export interface VKValidateAccountResponse {
 export interface VKCheckOtpResponse {
   access_token?: string;
   auth_code?: string;
+  can_skip_password?: boolean;
 }
