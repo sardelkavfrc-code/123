@@ -304,34 +304,38 @@ async function deleteAllTracks() {
   padding: 0 32px 24px;
 }
 .my-music__tabs {
-  display: inline-flex;
-  padding: 4px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  gap: 2px;
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
   margin-bottom: 24px;
 }
 .my-music__tab {
-  padding: 6px 18px;
-  border-radius: 999px;
-  font-size: calc(13px * var(--font-scale, 1));
-  font-weight: 500;
+  position: relative;
+  font-size: calc(15px * var(--font-scale, 1));
+  font-weight: 600;
   color: var(--text-2);
   cursor: pointer;
   background: transparent;
   border: none;
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
+  padding: 8px 4px;
+  transition: color var(--motion-duration-fast) var(--motion-ease-out);
 }
 .my-music__tab:hover:not(.my-music__tab--active) {
   color: var(--text-0);
 }
 .my-music__tab--active {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
-  color: var(--accent-text, #fff);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: var(--text-0);
+}
+.my-music__tab--active::after {
+  content: "";
+  position: absolute;
+  bottom: -7px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-1), var(--accent-3));
+  border-radius: 99px;
 }
 .my-music__filter {
   width: 280px;
