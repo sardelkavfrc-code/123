@@ -44,6 +44,18 @@ class VKClient:
                     if new_session and new_session.access_token:
                         logger.info("Retrying VK request with refreshed token")
                         return await self._call_internal(method, new_session.access_token, **params)
+                else:
+                    from .. import storage
+                    storage.clear()
+                    logger.warning("Session token is permanently invalid and refresh failed. Cleared session storage.")
+                    from fastapi import HTTPException, status
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail={
+                            "kind": "not_authenticated",
+                            "message": "Сессия VK устарела или недействительна. Пожалуйста, войдите снова.",
+                        },
+                    ) from exc
             raise exc
 
     async def _call_internal(self, method: str, token: str, **params: Any) -> Any:
