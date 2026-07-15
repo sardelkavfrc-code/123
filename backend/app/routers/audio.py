@@ -356,7 +356,51 @@ async def my_catalog(
     if resolved_tracks:
         await _fill_missing_urls(vk, session, resolved_tracks)
         
-    return parse_track_list({"count": len(resolved_tracks), "items": resolved_tracks})
+    track_list = parse_track_list({"count": len(resolved_tracks), "items": resolved_tracks})
+    track_list.next_from = recent_block.get("next_from")
+    track_list.block_id = recent_block.get("id")
+    return track_list
+
+
+@router.get("/catalog/block/items", response_model=TrackList)
+async def catalog_block_items(
+    vk: VKDep,
+    session: SessionDep,
+    block_id: str = Query(..., description="ID блока каталога"),
+    start_from: str = Query(..., description="Курсор для следующей порции"),
+    count: int = Query(20, ge=1, le=100),
+) -> TrackList:
+    response = await vk.call(
+        "catalog.getBlockItems",
+        session.access_token,
+        block_id=block_id,
+        start_from=start_from,
+        count=count,
+    )
+    
+    block_obj = response.get("block") or {}
+    next_from = block_obj.get("next_from")
+    audios_ids = block_obj.get("audios_ids") or []
+    
+    raw_audios = response.get("audios") or []
+    audios_map = {}
+    for a in raw_audios:
+        if isinstance(a, dict):
+            full_id = f"{a.get('owner_id')}_{a.get('id')}"
+            audios_map[full_id] = a
+            
+    resolved_tracks = []
+    for aid in audios_ids:
+        if aid in audios_map:
+            resolved_tracks.append(audios_map[aid])
+            
+    if resolved_tracks:
+        await _fill_missing_urls(vk, session, resolved_tracks)
+        
+    track_list = parse_track_list({"count": len(resolved_tracks), "items": resolved_tracks})
+    track_list.next_from = next_from
+    track_list.block_id = block_id
+    return track_list
 
 
 @router.get("/recommendations", response_model=TrackList)

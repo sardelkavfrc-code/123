@@ -24,6 +24,7 @@ export interface TrackList {
   items: Track[];
   count: number;
   next_from: string | null;
+  block_id?: string | null;
 }
 
 export interface RecommendationBlock {

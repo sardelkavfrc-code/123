@@ -277,6 +277,14 @@ export const api = {
     const { data } = await http.get<TrackList>("/audio/my/catalog");
     return data;
   },
+  async catalogBlockItems(params: {
+    block_id: string;
+    start_from: string;
+    count?: number;
+  }): Promise<TrackList> {
+    const { data } = await http.get<TrackList>("/catalog/block/items", { params });
+    return data;
+  },
   async recommendations(params: {
     target_audio?: string;
     user_id?: number;

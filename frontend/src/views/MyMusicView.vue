@@ -24,7 +24,10 @@ const query = ref("");
 const activeTab = ref<"library" | "recent">("library");
 const recentMusic = ref<Track[]>([]);
 const recentMusicLoading = ref(false);
+const recentMusicLoadingMore = ref(false);
 const recentMusicError = ref<string | null>(null);
+const recentNextFrom = ref<string | null>(null);
+const recentBlockId = ref<string | null>(null);
 
 const tabLibrary = ref<HTMLElement | null>(null);
 const tabRecent = ref<HTMLElement | null>(null);
@@ -65,6 +68,8 @@ async function loadRecent() {
   try {
     const list = await api.recentTracks();
     recentMusic.value = list.items;
+    recentNextFrom.value = list.next_from || null;
+    recentBlockId.value = list.block_id || null;
   } catch (err) {
     recentMusicError.value = err instanceof APIError ? err.message : (err as Error).message;
   } finally {
@@ -108,10 +113,28 @@ const subtitle = computed(() => {
   return tracksLabel(myMusic.value.length);
 });
 
-function onReachEnd() {
-  if (activeTab.value !== "library") return;
-  if (!myMusicHasMore.value || myMusicLoadingMore.value || myMusicLoading.value) return;
-  void library.loadMoreMyMusic();
+async function onReachEnd() {
+  if (activeTab.value === "library") {
+    if (!myMusicHasMore.value || myMusicLoadingMore.value || myMusicLoading.value) return;
+    void library.loadMoreMyMusic();
+  } else if (activeTab.value === "recent") {
+    if (!recentNextFrom.value || recentMusicLoadingMore.value || recentMusicLoading.value) return;
+    recentMusicLoadingMore.value = true;
+    try {
+      const list = await api.catalogBlockItems({
+        block_id: recentBlockId.value!,
+        start_from: recentNextFrom.value,
+      });
+      const have = new Set(recentMusic.value.map((t) => `${t.owner_id}_${t.id}`));
+      const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+      recentMusic.value = [...recentMusic.value, ...fresh];
+      recentNextFrom.value = list.next_from || null;
+    } catch (err) {
+      console.error("Failed to load more recent tracks", err);
+    } finally {
+      recentMusicLoadingMore.value = false;
+    }
+  }
 }
 
 const isGlobalLoading = ref(false);
@@ -315,6 +338,9 @@ async function deleteAllTracks() {
             empty-subtitle="Слушай музыку из поиска или рекомендаций, чтобы она появлялась здесь"
             @play="handlePlay"
           />
+          <div v-if="recentMusicLoadingMore" class="my-music__loading">
+            <Spinner :size="16" /> Подгружаем ещё…
+          </div>
         </template>
       </template>
     </section>

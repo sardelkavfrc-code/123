@@ -35,6 +35,7 @@ class TrackList(APIModel):
     items: list[Track] = Field(default_factory=list)
     count: int = 0
     next_from: str | None = None
+    block_id: str | None = None
 
 
 class RecommendationBlock(APIModel):
