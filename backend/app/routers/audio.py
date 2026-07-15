@@ -669,77 +669,173 @@ def _slug_to_name(slug: str) -> str:
     return slug.replace("-", " ").replace("_", " ").strip().title() or slug
 
 
+async def _find_artist_photo_by_search(vk, token: str, name: str) -> tuple[str | None, str | None]:
+    try:
+        from ..services.audio import parse_catalog_artist
+        search_res = await vk.call(
+            "catalog.getAudioSearch",
+            token,
+            query=name,
+            need_blocks=1,
+        )
+        
+        for raw in search_res.get("artists") or []:
+            if isinstance(raw, dict) and raw.get("name", "").lower() == name.lower():
+                parsed = parse_artist(raw)
+                if parsed and (parsed.photo or parsed.banner):
+                    return parsed.photo, parsed.banner
+                    
+        for link in search_res.get("links") or []:
+            if isinstance(link, dict) and link.get("title", "").lower() == name.lower():
+                parsed = parse_catalog_artist(link)
+                if parsed and (parsed.photo or parsed.banner):
+                    return parsed.photo, parsed.banner
+    except Exception as e:
+        print(f"[FallbackSearch] Exception finding photo: {e}")
+    return None, None
+
+
+async def _find_artist_albums_by_search(vk, token: str, name: str) -> list[dict]:
+    try:
+        search_res = await vk.call(
+            "catalog.getAudioSearch",
+            token,
+            query=name,
+            need_blocks=1,
+        )
+        
+        catalog = search_res.get("catalog") or {}
+        sections = catalog.get("sections") or []
+        playlists_data = search_res.get("playlists") or []
+        playlists_map = {f"{p.get('owner_id')}_{p.get('id')}": p for p in playlists_data if isinstance(p, dict)}
+        
+        result_blocks = []
+        if sections:
+            sec_id = sections[0].get("id")
+            sec_res = await vk.call("catalog.getSection", token, section_id=sec_id)
+            blocks = sec_res.get("section", {}).get("blocks", [])
+            sec_playlists = sec_res.get("playlists") or []
+            for pl in sec_playlists:
+                if isinstance(pl, dict):
+                    playlists_map[f"{pl.get('owner_id')}_{pl.get('id')}"] = pl
+                
+            for b in blocks:
+                if b.get("data_type") == "music_playlists":
+                    title = b.get("layout", {}).get("title") or b.get("title") or "Релизы"
+                    pids = b.get("playlists_ids") or []
+                    albums = []
+                    for pid in pids:
+                        pl = playlists_map.get(pid)
+                        if pl:
+                            albums.append({
+                                "id": str(pl["id"]),
+                                "owner_id": pl["owner_id"],
+                                "title": pl["title"],
+                                "subtitle": pl.get("description") or pl.get("subtitle") or "",
+                                "cover": _get_playlist_cover(pl),
+                                "year": pl.get("year"),
+                                "track_count": pl.get("count", 0),
+                            })
+                    if albums:
+                        result_blocks.append({
+                            "title": title,
+                            "albums": albums
+                        })
+        if not result_blocks and playlists_data:
+            albums = []
+            for pl in playlists_data:
+                albums.append({
+                    "id": str(pl["id"]),
+                    "owner_id": pl["owner_id"],
+                    "title": pl["title"],
+                    "subtitle": pl.get("description") or pl.get("subtitle") or "",
+                    "cover": _get_playlist_cover(pl),
+                    "year": pl.get("year"),
+                    "track_count": pl.get("count", 0),
+                })
+            if albums:
+                result_blocks.append({
+                    "title": "Альбомы",
+                    "albums": albums
+                })
+        return result_blocks
+    except Exception as e:
+        print(f"[FallbackSearch] Exception finding albums: {e}")
+        return []
+
+
 @router.get("/artist_albums/{artist_id}")
 async def artist_albums(
     artist_id: str,
     vk: VKDep,
     session: SessionDep,
+    name: str | None = Query(None, description="Имя артиста для fallback поиска"),
 ):
     """Albums for a VK artist via catalog."""
     try:
-        # Get artist catalog
         catalog_raw = await vk.call("catalog.getAudioArtist", session.access_token, artist_id=artist_id)
         sections = catalog_raw.get("catalog", {}).get("sections", [])
-        if not sections:
-            return {"blocks": []}
+        if sections and sections[0].get("id"):
+            section_id = sections[0]["id"]
+            section_raw = await vk.call("catalog.getSection", session.access_token, section_id=section_id)
+            blocks = section_raw.get("section", {}).get("blocks", [])
+            playlists_data = section_raw.get("playlists", [])
             
-        section_id = sections[0].get("id")
-        if not section_id:
-            return {"blocks": []}
-            
-        # Get section
-        section_raw = await vk.call("catalog.getSection", session.access_token, section_id=section_id)
-        blocks = section_raw.get("section", {}).get("blocks", [])
-        playlists_data = section_raw.get("playlists", [])
-        
-        result_blocks = []
-        block_titles = ["Релизы", "Участие в релизах"]
-        block_idx = 0
-        
-        for b in blocks:
-            if b.get("data_type") == "music_playlists":
-                title = b.get("layout", {}).get("title") or b.get("title")
-                if not title or title == "Альбомы":
-                    title = block_titles[block_idx] if block_idx < len(block_titles) else "Альбомы"
+            has_real_blocks = any(b.get("data_type") == "music_playlists" for b in blocks)
+            if has_real_blocks:
+                result_blocks = []
+                block_titles = ["Релизы", "Участие в релизах"]
+                block_idx = 0
                 
-                playlists_ids = b.get("playlists_ids", [])
-                
-                albums = []
-                for pl in playlists_data:
-                    pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
-                    if pl_id in playlists_ids:
-                        albums.append({
-                            "id": str(pl["id"]),
-                            "owner_id": pl["owner_id"],
-                            "title": pl["title"],
-                            "subtitle": pl.get("description") or pl.get("subtitle") or "",
-                            "cover": _get_playlist_cover(pl),
-                            "year": pl.get("year"),
-                            "track_count": pl.get("count", 0),
-                        })
-                
-                if albums:
-                    # Deduplicate while preserving order
-                    seen = set()
-                    unique_albums = []
-                    for a in albums:
-                        key = f"{a['owner_id']}_{a['id']}"
-                        if key not in seen:
-                            seen.add(key)
-                            unique_albums.append(a)
-                    
-                    result_blocks.append({
-                        "title": title,
-                        "albums": unique_albums
-                    })
-                    block_idx += 1
-                    
-                    if len(result_blocks) >= 2:
-                        break
-                    
-        return {"blocks": result_blocks}
-    except VKError:
-        return {"blocks": []}
+                for b in blocks:
+                    if b.get("data_type") == "music_playlists":
+                        title = b.get("layout", {}).get("title") or b.get("title")
+                        if not title or title == "Альбомы":
+                            title = block_titles[block_idx] if block_idx < len(block_titles) else "Альбомы"
+                        
+                        playlists_ids = b.get("playlists_ids", [])
+                        
+                        albums = []
+                        for pl in playlists_data:
+                            pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
+                            if pl_id in playlists_ids:
+                                albums.append({
+                                    "id": str(pl["id"]),
+                                    "owner_id": pl["owner_id"],
+                                    "title": pl["title"],
+                                    "subtitle": pl.get("description") or pl.get("subtitle") or "",
+                                    "cover": _get_playlist_cover(pl),
+                                    "year": pl.get("year"),
+                                    "track_count": pl.get("count", 0),
+                                })
+                        
+                        if albums:
+                            seen = set()
+                            unique_albums = []
+                            for a in albums:
+                                key = f"{a['owner_id']}_{a['id']}"
+                                if key not in seen:
+                                    seen.add(key)
+                                    unique_albums.append(a)
+                            
+                            result_blocks.append({
+                                "title": title,
+                                "albums": unique_albums
+                            })
+                            block_idx += 1
+                            
+                            if len(result_blocks) >= 2:
+                                break
+                                
+                return {"blocks": result_blocks}
+    except Exception:
+        pass
+
+    artist_name = name or _slug_to_name(artist_id)
+    if artist_name:
+        blocks = await _find_artist_albums_by_search(vk, session.access_token, artist_name)
+        return {"blocks": blocks}
+    return {"blocks": []}
 
 
 @router.get("/by_artist/{artist_id}", response_model=TrackList)
@@ -767,7 +863,9 @@ async def by_artist(
             offset=offset,
             count=count,
         )
-        return parse_track_list(response)
+        parsed = parse_track_list(response)
+        if parsed.items or offset > 0:
+            return parsed
     except VKError as exc:
         if exc.code not in (3, 4, 15, 100):
             raise HTTPException(
@@ -872,7 +970,7 @@ async def artist_info(
             extended=1,
         )
         parsed = parse_artist(response)
-        if parsed:
+        if parsed and (parsed.photo or parsed.banner):
             return parsed
     except VKError as exc:
         if exc.code not in (3, 4, 15, 100):
@@ -893,18 +991,23 @@ async def artist_info(
                 # find exact match or just use the first one
                 artist_data = next((a for a in artists if str(a.get("id")) == artist_id), artists[0])
                 parsed = parse_artist(artist_data)
-                if parsed:
+                if parsed and (parsed.photo or parsed.banner):
                     return parsed
     except VKError:
         pass
 
-    # Complete fallback stub
+    # Fallback search by artist name to get photo/banner
+    photo, banner = None, None
+    artist_name = name or _slug_to_name(artist_id)
+    if artist_name:
+        photo, banner = await _find_artist_photo_by_search(vk, session.access_token, artist_name)
+
     return Artist(
         id=artist_id,
-        name=name or _slug_to_name(artist_id),
+        name=artist_name,
         domain=None,
-        photo=None,
-        banner=None,
+        photo=photo,
+        banner=banner,
         is_followed=False,
     )
 

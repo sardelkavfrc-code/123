@@ -349,8 +349,8 @@ export const api = {
     const { data } = await http.get<AlbumList>(`/audio/albums/${ownerId}`, { params });
     return data;
   },
-  async artistAlbums(artistId: string): Promise<ArtistAlbumsResponse> {
-    const { data } = await http.get<ArtistAlbumsResponse>(`/audio/artist_albums/${encodeURIComponent(artistId)}`);
+  async artistAlbums(artistId: string, params: { name?: string } = {}): Promise<ArtistAlbumsResponse> {
+    const { data } = await http.get<ArtistAlbumsResponse>(`/audio/artist_albums/${encodeURIComponent(artistId)}`, { params });
     return data;
   },
   async playlistTracks(

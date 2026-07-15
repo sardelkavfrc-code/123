@@ -151,7 +151,8 @@ async function ensureAlbums() {
   albumsError.value = null;
   try {
     const currentId = props.id;
-    const res = await api.artistAlbums(props.id);
+    const name = hintedName.value ?? undefined;
+    const res = await api.artistAlbums(props.id, name ? { name } : {});
     if (currentId !== props.id) return;
     albumsBlocks.value = res.blocks || [];
   } catch (err) {
@@ -257,7 +258,7 @@ function handlePlay(_track: Track, index: number) {
         class="artist__hero"
         :style="(artist?.banner || artist?.photo) 
           ? { 
-              backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url(${artist.banner || artist.photo})`,
+              backgroundImage: `linear-gradient(to top, var(--bg-1) 0%, rgba(17, 19, 25, 0.4) 100%), url('${artist.banner || artist.photo}')`,
               color: '#ffffff'
             } 
           : { color: 'var(--accent-text)' }"
