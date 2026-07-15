@@ -203,8 +203,43 @@ onMounted(load);
 watch(() => props.id, load);
 watch(() => route.query.name, load);
 
+async function onArtistNearEnd() {
+  if (!tracksHasMore.value || tracksLoadingMore.value || loading.value) return;
+  tracksLoadingMore.value = true;
+  try {
+    const name = hintedName.value ?? undefined;
+    const currentId = props.id;
+    const list = await api.byArtist(props.id, {
+      count: PAGE_SIZE,
+      offset: tracks.value.length,
+      ...(name ? { q: name } : {}),
+    });
+    if (currentId !== props.id) return;
+    
+    const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    tracks.value = [...tracks.value, ...fresh];
+    if (list.count > 0) tracksTotal.value = list.count;
+    
+    const newPlayable = fresh.filter((t) => t.url);
+    if (newPlayable.length > 0) {
+      player.appendTracksToQueue(newPlayable);
+    }
+  } catch {
+    // swallow
+  } finally {
+    tracksLoadingMore.value = false;
+  }
+}
+
 function playAll() {
-  if (tracks.value.length) player.playQueue(tracks.value);
+  if (tracks.value.length) {
+    player.playQueue(tracks.value, 0, { autoPlay: true }, onArtistNearEnd);
+  }
+}
+
+function handlePlay(_track: Track, index: number) {
+  player.playQueue(tracks.value, index, { autoPlay: true }, onArtistNearEnd);
 }
 </script>
 
@@ -275,7 +310,9 @@ function playAll() {
             <TrackList
               :tracks="tracks"
               show-index
+              manual-play
               empty-title="У артиста пока нет треков"
+              @play="handlePlay"
             />
             <div v-if="tracksLoadingMore" class="artist__loading">
               <Spinner :size="16" /> Подгружаем ещё…

@@ -142,8 +142,39 @@ async function loadAll() {
 onMounted(load);
 watch(() => props.id, load);
 
+async function onFriendNearEnd() {
+  if (!hasMore.value || loadingMore.value || loadingAll.value) return;
+  loadingMore.value = true;
+  try {
+    const userId = Number(props.id);
+    const list = await api.musicOfOwner(userId, {
+      count: PAGE_SIZE,
+      offset: tracks.value.length,
+    });
+    const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    tracks.value = [...tracks.value, ...fresh];
+    if (list.count > 0) total.value = list.count;
+    
+    const newPlayable = fresh.filter((t) => t.url);
+    if (newPlayable.length > 0) {
+      player.appendTracksToQueue(newPlayable);
+    }
+  } catch (err) {
+    console.error("Failed to load more friend tracks in player callback", err);
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
 function playAll() {
-  if (filtered.value.length) player.playQueue(filtered.value);
+  if (filtered.value.length) {
+    player.playQueue(filtered.value, 0, { autoPlay: true }, onFriendNearEnd);
+  }
+}
+
+function handlePlay(_track: Track, index: number) {
+  player.playQueue(filtered.value, index, { autoPlay: true }, onFriendNearEnd);
 }
 </script>
 
@@ -188,8 +219,10 @@ function playAll() {
         <TrackList
           :tracks="filtered"
           show-index
+          manual-play
           :empty-title="query ? 'Ничего не найдено' : 'Музыка недоступна'"
           :empty-subtitle="query ? 'Попробуйте изменить поисковый запрос' : 'ВК запретил доступ к аудио этого пользователя'"
+          @play="handlePlay"
         />
         <div v-if="loadingMore" class="friend-music__loading">
           <Spinner :size="16" /> Подгружаем ещё…

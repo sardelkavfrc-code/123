@@ -17,7 +17,11 @@ const player = usePlayerStore();
 
 const tracks = ref<Track[]>([]);
 const loading = ref(false);
+const loadingMore = ref(false);
+const total = ref(0);
 const error = ref<string | null>(null);
+
+const hasMore = computed(() => total.value > 0 && tracks.value.length < total.value);
 
 const hintedArtist = computed(() => {
   const v = route.query.artist;
@@ -40,12 +44,14 @@ async function load() {
   loading.value = true;
   error.value = null;
   tracks.value = [];
+  total.value = 0;
   try {
     const res = await api.recommendations({
       target_audio: props.audioId,
-      count: 100,
+      count: 50,
     });
     tracks.value = res.items;
+    total.value = res.count;
   } catch (err) {
     error.value =
       err instanceof APIError
@@ -59,13 +65,64 @@ async function load() {
 onMounted(load);
 watch(() => props.audioId, load);
 
+async function onSimilarNearEnd() {
+  if (!hasMore.value || loadingMore.value) return;
+  loadingMore.value = true;
+  try {
+    const res = await api.recommendations({
+      target_audio: props.audioId,
+      count: 50,
+      offset: tracks.value.length,
+    });
+    const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = res.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    tracks.value = [...tracks.value, ...fresh];
+    if (res.count > 0) total.value = res.count;
+    
+    const newPlayable = fresh.filter((t) => t.url);
+    if (newPlayable.length > 0) {
+      player.appendTracksToQueue(newPlayable);
+    }
+  } catch (err) {
+    console.error("Failed to load more similar tracks in player callback", err);
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
+async function loadMore() {
+  if (!hasMore.value || loadingMore.value || loading.value) return;
+  loadingMore.value = true;
+  try {
+    const res = await api.recommendations({
+      target_audio: props.audioId,
+      count: 50,
+      offset: tracks.value.length,
+    });
+    const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = res.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    tracks.value = [...tracks.value, ...fresh];
+    if (res.count > 0) total.value = res.count;
+  } catch (err) {
+    console.error("Failed to load more similar tracks", err);
+  } finally {
+    loadingMore.value = false;
+  }
+}
+
 function playAll() {
-  if (tracks.value.length) player.playQueue(tracks.value);
+  if (tracks.value.length) {
+    player.playQueue(tracks.value, 0, { autoPlay: true }, onSimilarNearEnd);
+  }
+}
+
+function handlePlay(_track: Track, index: number) {
+  player.playQueue(tracks.value, index, { autoPlay: true }, onSimilarNearEnd);
 }
 </script>
 
 <template>
-  <ScrollArea>
+  <ScrollArea @reach-end="loadMore">
     <PageHeader
       eyebrow="Похожие"
       :title="hintedTitle ? `Похожие на «${hintedTitle}»` : 'Похожие треки'"
@@ -85,14 +142,19 @@ function playAll() {
       <div v-else-if="error" class="similar__error">{{ error }}</div>
       <template v-else>
         <div v-if="tracks.length" class="similar__head">
-          <span>{{ tracksLabel(tracks.length) }}</span>
+          <span>{{ tracksLabel(total || tracks.length) }}</span>
         </div>
         <TrackList
           :tracks="tracks"
           show-index
+          manual-play
           empty-title="Похожих не нашлось"
           empty-subtitle="ВК не вернул рекомендации для этого трека"
+          @play="handlePlay"
         />
+        <div v-if="loadingMore" class="similar__loading">
+          <Spinner :size="16" /> Подбираем ещё…
+        </div>
       </template>
     </section>
   </ScrollArea>
