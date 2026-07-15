@@ -602,16 +602,31 @@ async def add(
         audio_id=audio_id,
         owner_id=owner_id,
     )
+    
+    real_id = None
+    if isinstance(new_id, dict):
+        items = new_id.get("items") or []
+        if items and isinstance(items[0], dict):
+            real_id = items[0].get("new_audio_id") or items[0].get("id")
+        if not real_id:
+            real_id = new_id.get("id") or new_id.get("new_audio_id")
+    else:
+        real_id = new_id
+
+    if real_id is None:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail="Failed to parse added audio ID")
+
     # audio.add returns the new audio_id under the current user.
     fetched = await _safe_call(
         vk,
         "audio.getById",
         session.access_token,
-        audios=f"{session.user_id}_{int(new_id)}",
+        audios=f"{session.user_id}_{int(real_id)}",
     )
     if isinstance(fetched, list) and fetched:
         return parse_track(fetched[0])
-    return parse_track({"id": new_id, "owner_id": session.user_id, "title": "", "artist": ""})
+    return parse_track({"id": real_id, "owner_id": session.user_id, "title": "", "artist": ""})
 
 
 @router.post("/delete")

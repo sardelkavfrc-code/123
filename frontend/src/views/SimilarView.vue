@@ -21,7 +21,8 @@ const loadingMore = ref(false);
 const total = ref(0);
 const error = ref<string | null>(null);
 
-const hasMore = computed(() => total.value > 0 && tracks.value.length < total.value);
+const hasMore = ref(true);
+const recommendationsOffset = ref(50);
 
 const hintedArtist = computed(() => {
   const v = route.query.artist;
@@ -45,6 +46,8 @@ async function load() {
   error.value = null;
   tracks.value = [];
   total.value = 0;
+  hasMore.value = true;
+  recommendationsOffset.value = 50;
   try {
     const res = await api.recommendations({
       target_audio: props.audioId,
@@ -52,6 +55,7 @@ async function load() {
     });
     tracks.value = res.items;
     total.value = res.count;
+    hasMore.value = res.items.length === 50;
   } catch (err) {
     error.value =
       err instanceof APIError
@@ -72,12 +76,14 @@ async function onSimilarNearEnd() {
     const res = await api.recommendations({
       target_audio: props.audioId,
       count: 50,
-      offset: tracks.value.length,
+      offset: recommendationsOffset.value,
     });
+    recommendationsOffset.value += 50;
     const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
     const fresh = res.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
     tracks.value = [...tracks.value, ...fresh];
     if (res.count > 0) total.value = res.count;
+    hasMore.value = res.items.length === 50;
     
     const newPlayable = fresh.filter((t) => t.url);
     if (newPlayable.length > 0) {
@@ -97,12 +103,14 @@ async function loadMore() {
     const res = await api.recommendations({
       target_audio: props.audioId,
       count: 50,
-      offset: tracks.value.length,
+      offset: recommendationsOffset.value,
     });
+    recommendationsOffset.value += 50;
     const have = new Set(tracks.value.map((t) => `${t.owner_id}_${t.id}`));
     const fresh = res.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
     tracks.value = [...tracks.value, ...fresh];
     if (res.count > 0) total.value = res.count;
+    hasMore.value = res.items.length === 50;
   } catch (err) {
     console.error("Failed to load more similar tracks", err);
   } finally {

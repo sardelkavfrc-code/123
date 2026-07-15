@@ -140,12 +140,15 @@ async function runGlobal() {
   loading.value = true;
   error.value = null;
   try {
-    const res = await api.searchCatalog({ q });
+    const [res, countRes] = await Promise.all([
+      api.searchCatalog({ q }),
+      api.search({ q, count: 1, performer_only: false }).catch(() => null),
+    ]);
     if (token !== runToken) return;
     results.value = res.tracks;
     searchArtists.value = res.artists;
     searchPlaylists.value = res.playlists;
-    total.value = res.tracks.length;
+    total.value = countRes ? countRes.count : (res.tracks.length > 0 ? 1000000 : 0);
   } catch (err) {
     if (token !== runToken) return;
     error.value =
@@ -201,8 +204,44 @@ watch(
   }
 );
 
+async function onSearchNearEnd() {
+  if (!hasMore.value || loadingMore.value) return;
+  const q = query.value.trim();
+  if (!q) return;
+  const token = runToken;
+  loadingMore.value = true;
+  try {
+    const list = await api.search({
+      q,
+      performer_only: false,
+      count: PAGE_SIZE,
+      offset: results.value.length,
+    });
+    if (token !== runToken) return;
+    const have = new Set(results.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    results.value = [...results.value, ...fresh];
+    if (list.count > 0) total.value = list.count;
+    
+    const newPlayable = fresh.filter((t) => t.url);
+    if (newPlayable.length > 0) {
+      player.appendTracksToQueue(newPlayable);
+    }
+  } catch (err) {
+    console.error("Failed to load more search tracks in player callback", err);
+  } finally {
+    if (token === runToken) loadingMore.value = false;
+  }
+}
+
 function playMany(tracks: Track[]) {
-  if (tracks.length) player.playQueue(tracks);
+  if (tracks.length) {
+    player.playQueue(tracks, 0, { autoPlay: true }, onSearchNearEnd);
+  }
+}
+
+function handlePlay(_track: Track, index: number) {
+  player.playQueue(results.value, index, { autoPlay: true }, onSearchNearEnd);
 }
 
 async function playAlbum(album: AlbumSummary) {
@@ -300,7 +339,13 @@ async function playAlbum(album: AlbumSummary) {
               Слушать всё
             </button>
           </div>
-          <TrackList :tracks="results" show-index empty-title="Ничего не нашлось" />
+          <TrackList
+            :tracks="results"
+            show-index
+            manual-play
+            empty-title="Ничего не нашлось"
+            @play="handlePlay"
+          />
           <div v-if="loadingMore" class="search__loading">
             <Spinner :size="16" /> Подгружаем ещё…
           </div>
