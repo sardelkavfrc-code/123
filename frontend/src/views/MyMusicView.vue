@@ -138,6 +138,30 @@ async function onReachEnd() {
   }
 }
 
+async function onRecentNearEnd() {
+  if (!recentNextFrom.value || recentMusicLoadingMore.value) return;
+  recentMusicLoadingMore.value = true;
+  try {
+    const list = await api.catalogBlockItems({
+      block_id: recentBlockId.value!,
+      start_from: recentNextFrom.value,
+    });
+    const have = new Set(recentMusic.value.map((t) => `${t.owner_id}_${t.id}`));
+    const fresh = list.items.filter((t) => !have.has(`${t.owner_id}_${t.id}`));
+    recentMusic.value = [...recentMusic.value, ...fresh];
+    recentNextFrom.value = list.next_from || null;
+    
+    const newPlayable = fresh.filter((t) => t.url);
+    if (newPlayable.length > 0) {
+      player.appendTracksToQueue(newPlayable);
+    }
+  } catch (err) {
+    console.error("Failed to load more recent tracks in player callback", err);
+  } finally {
+    recentMusicLoadingMore.value = false;
+  }
+}
+
 const isGlobalLoading = ref(false);
 
 async function handlePlay(_track: Track, index: number) {
@@ -146,7 +170,8 @@ async function handlePlay(_track: Track, index: number) {
     return;
   }
   
-  player.playQueue(activeFullList.value, index);
+  const onNearEnd = activeTab.value === "recent" ? onRecentNearEnd : undefined;
+  player.playQueue(activeFullList.value, index, { autoPlay: true }, onNearEnd);
   
   if (activeTab.value === "library") {
     void (async () => {
@@ -167,7 +192,8 @@ async function playAll() {
     return;
   }
   
-  player.playQueue(activeFullList.value, 0);
+  const onNearEnd = activeTab.value === "recent" ? onRecentNearEnd : undefined;
+  player.playQueue(activeFullList.value, 0, { autoPlay: true }, onNearEnd);
   
   if (activeTab.value === "library") {
     void (async () => {
@@ -190,7 +216,8 @@ async function shufflePlay() {
   }
   
   player.shuffle = true;
-  player.playQueue(activeFullList.value, -1);
+  const onNearEnd = activeTab.value === "recent" ? onRecentNearEnd : undefined;
+  player.playQueue(activeFullList.value, -1, { autoPlay: true }, onNearEnd);
   
   if (activeTab.value === "library") {
     void (async () => {
