@@ -95,3 +95,9 @@ class Artist(APIModel):
     photo: str | None = None
     banner: str | None = None
     is_followed: bool = False
+
+
+class CatalogSearchResult(APIModel):
+    artists: list[Artist] = Field(default_factory=list)
+    playlists: list[AlbumSummary] = Field(default_factory=list)
+    tracks: list[Track] = Field(default_factory=list)

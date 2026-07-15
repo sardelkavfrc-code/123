@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch, nextTick, onBeforeUnmount } from "vue";
+import { computed, onMounted, ref, watch, onBeforeUnmount } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { api, APIError } from "@/api/client";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
-import type { Artist, Track } from "@/api/types";
+import { useUIStore } from "@/stores/ui";
+import type { Artist, Track, AlbumSummary } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
 import ArtistCard from "@/components/ArtistCard.vue";
+import RecommendationCard from "@/components/RecommendationCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import Spinner from "@/components/Spinner.vue";
 
@@ -19,6 +21,7 @@ const PAGE_SIZE = 100;
 
 const library = useLibraryStore();
 const player = usePlayerStore();
+const ui = useUIStore();
 const router = useRouter();
 const route = useRoute();
 const { myMusic } = storeToRefs(library);
@@ -33,6 +36,9 @@ const loading = ref(false);
 const loadingMore = ref(false);
 const error = ref<string | null>(null);
 
+const searchArtists = ref<Artist[]>([]);
+const searchPlaylists = ref<AlbumSummary[]>([]);
+
 const hasMore = computed(() => total.value > 0 && results.value.length < total.value);
 
 let debounceHandle: number | null = null;
@@ -44,9 +50,13 @@ onMounted(() => {
 
   resizeObserver = new ResizeObserver(() => {
     checkArtistsScroll();
+    checkPlaylistsScroll();
   });
   if (artistsScroll.value) {
     resizeObserver.observe(artistsScroll.value);
+  }
+  if (playlistsScroll.value) {
+    resizeObserver.observe(playlistsScroll.value);
   }
 });
 
@@ -61,58 +71,6 @@ const libraryMatches = computed(() => {
     (t: Track) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
   );
 });
-
-const searchArtistsRaw = computed(() => {
-  if (scope.value !== "global") return [];
-  const map = new Map<string, { id: string; name: string }>();
-  for (const t of results.value) {
-    if (t.main_artists) {
-      for (const a of t.main_artists) {
-        if (a.id && !map.has(a.id)) {
-          map.set(a.id, { id: a.id, name: a.name });
-        }
-      }
-    }
-  }
-  return Array.from(map.values()).slice(0, 8);
-});
-
-const searchArtists = ref<Artist[]>([]);
-
-watch(searchArtistsRaw, async (rawArtists) => {
-  // Reset or update searchArtists
-  // We keep existing ones to prevent flicker, and fetch new ones
-  const currentMap = new Map(searchArtists.value.map(a => [a.id, a]));
-  const newList: Artist[] = [];
-  
-  for (const raw of rawArtists) {
-    if (currentMap.has(raw.id)) {
-      newList.push(currentMap.get(raw.id)!);
-    } else {
-      // push a stub first
-      const stub: Artist = {
-        id: raw.id,
-        name: raw.name,
-        domain: null,
-        photo: null,
-        banner: null,
-        is_followed: false,
-      };
-      newList.push(stub);
-      // fetch actual
-      api.artist(raw.id, { name: raw.name }).then(fullArtist => {
-        const idx = searchArtists.value.findIndex(a => a.id === fullArtist.id);
-        if (idx !== -1) {
-          searchArtists.value[idx] = fullArtist;
-        }
-      }).catch(() => {});
-    }
-  }
-  searchArtists.value = newList;
-  nextTick(() => {
-    checkArtistsScroll();
-  });
-}, { immediate: true });
 
 const artistsScroll = ref<HTMLElement | null>(null);
 const artistsAtStart = ref(true);
@@ -142,10 +100,39 @@ function scrollArtists(direction: number) {
   }
 }
 
+// Playlists slider helpers
+const playlistsScroll = ref<HTMLElement | null>(null);
+const playlistsAtStart = ref(true);
+const playlistsAtEnd = ref(false);
+
+function checkPlaylistsScroll() {
+  const el = playlistsScroll.value;
+  if (!el) return;
+  playlistsAtStart.value = el.scrollLeft <= 10;
+  playlistsAtEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
+}
+
+watch(playlistsScroll, (el, oldEl) => {
+  if (oldEl) resizeObserver?.unobserve(oldEl);
+  if (el) {
+    resizeObserver?.observe(el);
+    checkPlaylistsScroll();
+  }
+});
+
+function scrollPlaylists(direction: number) {
+  const el = playlistsScroll.value;
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
+}
+
 async function runGlobal() {
   const q = query.value.trim();
   if (!q) {
     results.value = [];
+    searchArtists.value = [];
+    searchPlaylists.value = [];
     total.value = 0;
     return;
   }
@@ -153,10 +140,12 @@ async function runGlobal() {
   loading.value = true;
   error.value = null;
   try {
-    const list = await api.search({ q, performer_only: false, count: PAGE_SIZE, offset: 0 });
-    if (token !== runToken) return; // user typed something newer
-    results.value = list.items;
-    total.value = list.count;
+    const res = await api.searchCatalog({ q });
+    if (token !== runToken) return;
+    results.value = res.tracks;
+    searchArtists.value = res.artists;
+    searchPlaylists.value = res.playlists;
+    total.value = res.tracks.length;
   } catch (err) {
     if (token !== runToken) return;
     error.value =
@@ -194,7 +183,6 @@ async function loadMore() {
 
 watch(query, (value) => {
   if (debounceHandle) window.clearTimeout(debounceHandle);
-  // Reflect query into URL so deep links / 'find similar' work both ways.
   const next = value.trim();
   const current = typeof route.query.q === "string" ? route.query.q : "";
   if (next !== current) {
@@ -215,6 +203,20 @@ watch(
 
 function playMany(tracks: Track[]) {
   if (tracks.length) player.playQueue(tracks);
+}
+
+async function playAlbum(album: AlbumSummary) {
+  if (album.owner_id == null) return;
+  try {
+    const res = await api.playlistTracks(album.owner_id, parseInt(album.id), { count: 200 });
+    if (res.items && res.items.length > 0) {
+      player.playQueue(res.items, 0);
+    } else {
+      ui.notify("Плейлист пуст", "error");
+    }
+  } catch (e) {
+    ui.notify("Не удалось загрузить треки", "error");
+  }
 }
 </script>
 
@@ -276,6 +278,22 @@ function playMany(tracks: Track[]) {
               </button>
             </div>
           </div>
+          
+          <div v-if="searchPlaylists.length" class="search__playlists-section">
+            <h3 class="search__section-title">Альбомы</h3>
+            <div class="search__slider-container">
+              <button :class="{ 'search__slider-btn--hidden': playlistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollPlaylists(-1)" aria-label="Листать влево">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <div class="search__playlists" ref="playlistsScroll" @scroll="checkPlaylistsScroll">
+                <RecommendationCard v-for="(p, idx) in searchPlaylists" :key="p.id" :block="p" :index="idx" @open="playAlbum" />
+              </div>
+              <button :class="{ 'search__slider-btn--hidden': playlistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollPlaylists(1)" aria-label="Листать вправо">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            </div>
+          </div>
+
           <div class="search__head">
             <span>Найдено треков: {{ total || results.length }}</span>
             <button class="btn btn--ghost" :disabled="!results.length" @click="playMany(results)">
@@ -367,6 +385,12 @@ function playMany(tracks: Track[]) {
   gap: 12px;
   margin-bottom: 24px;
 }
+.search__playlists-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
 .search__section-title {
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 700;
@@ -385,6 +409,20 @@ function playMany(tracks: Track[]) {
   scroll-behavior: smooth;
 }
 .search__artists::-webkit-scrollbar {
+  display: none;
+}
+.search__playlists {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-top: 16px;
+  padding-bottom: 24px;
+  margin-top: -16px;
+  margin-bottom: -24px;
+  scroll-behavior: smooth;
+}
+.search__playlists::-webkit-scrollbar {
   display: none;
 }
 .search__slider-container {

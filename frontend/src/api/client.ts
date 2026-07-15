@@ -3,6 +3,7 @@ import type {
   AlbumList,
   Artist,
   AuthStatus,
+  CatalogSearchResult,
   CoverLookup,
   FriendList,
   Track,
@@ -266,6 +267,10 @@ export const api = {
       params.remixstlid = globalRemixstlid;
     }
     const { data } = await http.get<TrackList>("/audio/search", { params });
+    return data;
+  },
+  async searchCatalog(params: { q: string }): Promise<CatalogSearchResult> {
+    const { data } = await http.get<CatalogSearchResult>("/audio/search/catalog", { params });
     return data;
   },
   async recommendations(params: {

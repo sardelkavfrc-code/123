@@ -8,6 +8,7 @@ from ..models.audio import (
     AlbumList,
     AlbumSummary,
     Artist,
+    CatalogSearchResult,
     RecommendationBlock,
     RecommendationFeed,
     Track,
@@ -397,4 +398,70 @@ def parse_artist(payload: Any) -> Artist | None:
         photo=photo,
         banner=banner,
         is_followed=bool(artist.get("is_followed") or False),
+    )
+
+
+def parse_catalog_artist(link: dict[str, Any]) -> Artist | None:
+    if not isinstance(link, dict):
+        return None
+    meta = link.get("meta") or {}
+    if meta.get("content_type") != "artist" and "artist" not in link.get("url", ""):
+        return None
+        
+    photo = None
+    images = link.get("image") or []
+    if isinstance(images, list) and images:
+        photo = str(images[-1].get("url") or "") or None
+        
+    domain = None
+    url = link.get("url") or ""
+    if "artist/" in url:
+        domain = url.split("artist/")[-1]
+        
+    return Artist(
+        id=str(link.get("id") or domain or ""),
+        name=str(link.get("title") or "Артист"),
+        domain=domain,
+        photo=photo,
+        banner=photo,
+    )
+
+
+def parse_catalog_search(response: Any) -> CatalogSearchResult:
+    if not isinstance(response, dict):
+        return CatalogSearchResult()
+        
+    artists_list = []
+    seen_artists = set()
+    
+    raw_artists = response.get("artists") or []
+    if isinstance(raw_artists, list):
+        for raw in raw_artists:
+            parsed = parse_artist(raw)
+            if parsed and parsed.id not in seen_artists:
+                seen_artists.add(parsed.id)
+                artists_list.append(parsed)
+                
+    raw_links = response.get("links") or []
+    if isinstance(raw_links, list):
+        for link in raw_links:
+            parsed = parse_catalog_artist(link)
+            if parsed and parsed.id not in seen_artists:
+                seen_artists.add(parsed.id)
+                artists_list.append(parsed)
+                
+    playlists_list = []
+    raw_playlists = response.get("playlists") or []
+    parsed_albums = parse_albums(raw_playlists)
+    playlists_list = parsed_albums.items
+    
+    tracks_list = []
+    raw_audios = response.get("audios") or []
+    if isinstance(raw_audios, list):
+        tracks_list = [parse_track(a) for a in raw_audios if isinstance(a, dict)]
+        
+    return CatalogSearchResult(
+        artists=artists_list,
+        playlists=playlists_list,
+        tracks=tracks_list,
     )

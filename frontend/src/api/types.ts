@@ -128,3 +128,9 @@ export interface VKCheckOtpResponse {
   auth_code?: string;
   can_skip_password?: boolean;
 }
+
+export interface CatalogSearchResult {
+  artists: Artist[];
+  playlists: AlbumSummary[];
+  tracks: Track[];
+}

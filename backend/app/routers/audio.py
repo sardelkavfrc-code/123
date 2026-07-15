@@ -5,10 +5,11 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import AlbumList, AlbumSummary, Artist, Track, TrackList
+from ..models.audio import AlbumList, AlbumSummary, Artist, CatalogSearchResult, Track, TrackList
 from ..services.audio import (
     parse_albums,
     parse_artist,
+    parse_catalog_search,
     parse_track,
     parse_track_list,
 )
@@ -265,6 +266,27 @@ async def search(
         vk_cookies=vk_cookies,
     )
     return parse_track_list(response)
+
+
+@router.get("/search/catalog", response_model=CatalogSearchResult)
+async def search_catalog(
+    vk: VKDep,
+    session: SessionDep,
+    q: str = Query(min_length=1),
+) -> CatalogSearchResult:
+    response = await _safe_call(
+        vk,
+        "catalog.getAudioSearch",
+        session.access_token,
+        query=q,
+        need_blocks=1,
+    )
+    
+    raw_audios = response.get("audios") or []
+    if isinstance(raw_audios, list) and raw_audios:
+        await _fill_missing_urls(vk, session, raw_audios)
+        
+    return parse_catalog_search(response)
 
 
 @router.get("/recommendations", response_model=TrackList)
