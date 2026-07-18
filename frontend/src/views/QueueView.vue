@@ -177,12 +177,11 @@ function remove(i: number) {
 <template>
   <ScrollArea>
     <PageHeader
-      eyebrow="Очередь"
       title="Сейчас в очереди"
       :subtitle="
         queue.length
           ? `${queue.length} треков · ${formatDuration(total)} · перетягивай, чтобы менять порядок`
-          : 'Запусти любой трек — он окажется здесь'
+          : ''
       "
     >
     </PageHeader>

@@ -261,7 +261,7 @@ async function playAlbum(album: AlbumSummary) {
 
 <template>
   <ScrollArea @reach-end="loadMore">
-    <PageHeader eyebrow="Поиск" title="Найти музыку" subtitle="Один запрос — ищем по всей ВК и в твоей библиотеке. Переключай вкладки ниже.">
+    <PageHeader title="Найти музыку">
       <template #actions>
         <div class="search__bar">
           <input

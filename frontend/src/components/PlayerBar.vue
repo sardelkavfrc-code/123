@@ -179,7 +179,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
         <div v-else class="player__info-wrap" key="empty-info">
           <div class="player__title player__title--empty">Выберите трек</div>
           <div class="player__artist-wrap">
-            <div class="player__artist player__artist--empty">из любого списка ниже</div>
+            <div class="player__artist player__artist--empty"></div>
           </div>
         </div>
 

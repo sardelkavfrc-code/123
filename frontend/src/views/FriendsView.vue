@@ -38,7 +38,6 @@ const tileVariants = (i: number) =>
 <template>
   <ScrollArea>
     <PageHeader
-      eyebrow="Музыка друзей"
       title="Друзья"
       :subtitle="friends ? `${friendsLabel(friends.visible_count)} с открытой музыкой из ${friends.count}` : 'Загружаем список друзей…'"
     >

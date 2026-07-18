@@ -273,7 +273,6 @@ async function deleteAllTracks() {
 <template>
   <ScrollArea @reach-end="onReachEnd">
     <PageHeader
-      eyebrow="Твоя коллекция"
       title="Моя музыка"
       :subtitle="subtitle"
     >

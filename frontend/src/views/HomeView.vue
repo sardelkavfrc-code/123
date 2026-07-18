@@ -306,7 +306,6 @@ async function playAlbum(album: AlbumSummary) {
     <div class="home__header-container">
       <PageHeader
         title="Что послушаем сегодня?"
-        subtitle="Алгоритмы ВК подбирают свежий микс под твой вкус и обновляют его автоматически."
       />
       <div class="home__actions" ref="dropdownRef">
         <button class="home__settings-btn" :class="{ 'home__settings-btn--active': showDropdown }" @click="toggleSettings" aria-label="Настройки яркости">

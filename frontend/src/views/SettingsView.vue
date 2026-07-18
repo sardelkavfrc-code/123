@@ -415,7 +415,7 @@ function onAfterLeave(el: Element) {
 
 <template>
   <ScrollArea>
-    <PageHeader eyebrow="Настройки" title="Под себя" subtitle="Всё сохраняется локально." />
+    <PageHeader title="Настройки" />
 
     <div class="settings__tabs">
       <button 
