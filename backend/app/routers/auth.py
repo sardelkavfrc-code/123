@@ -259,7 +259,7 @@ async def validate_account(payload: ValidateRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND VALIDATE VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
                 
@@ -317,7 +317,7 @@ async def send_sms(payload: SendSmsRequest, vk: VKDep):
                         "message": "Не удалось отправить SMS (лимиты или VPN). Устройство сброшено, попробуйте войти ещё раз.",
                     }
                 )
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
             raise HTTPException(
@@ -368,7 +368,7 @@ async def send_callreset(payload: SendSmsRequest, vk: VKDep):
                         "message": "Не удалось сделать звонок (лимиты или VPN). Устройство сброшено, попробуйте войти ещё раз.",
                     }
                 )
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
             raise HTTPException(
@@ -405,7 +405,7 @@ async def send_email(payload: SendSmsRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND SEND EMAIL VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
             raise HTTPException(
@@ -442,7 +442,7 @@ async def send_push(payload: SendSmsRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND SEND PUSH VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
             raise HTTPException(
@@ -479,7 +479,7 @@ async def send_max(payload: SendSmsRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND SEND MAX VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
             raise HTTPException(
@@ -518,7 +518,7 @@ async def check_otp(payload: CheckOtpRequest, vk: VKDep):
             return response
         except VKError as exc:
             print(f"BACKEND CHECK OTP VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
-            if exc.code in (28, 5, 1117, -1) and attempt == 0:
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
                 vk.clear_anonymous_token()
                 continue
             raise HTTPException(
