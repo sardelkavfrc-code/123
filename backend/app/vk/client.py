@@ -92,6 +92,17 @@ class VKClient:
                         method,
                         exc,
                     )
+                    
+                    # Refresh HTTP client to flush poisoned connections
+                    old_cookies = self._client.cookies
+                    await self._client.aclose()
+                    self._client = httpx.AsyncClient(
+                        base_url=self._settings.vk_api_url,
+                        headers={"User-Agent": self._settings.vk_user_agent},
+                        timeout=10.0,
+                        cookies=old_cookies,
+                    )
+                    
                     await asyncio.sleep(0.5 * (attempt + 1))
                     continue
                 if isinstance(exc, httpx.HTTPStatusError):
@@ -169,6 +180,17 @@ class VKClient:
                         f"VK ANONYMOUS CALL FAILED (attempt {attempt + 1}/{max_attempts}) for method={method}: {exc}. Retrying...",
                         flush=True,
                     )
+                    
+                    # Refresh HTTP client to flush poisoned connections
+                    old_cookies = self._client.cookies
+                    await self._client.aclose()
+                    self._client = httpx.AsyncClient(
+                        base_url=self._settings.vk_api_url,
+                        headers={"User-Agent": self._settings.vk_user_agent},
+                        timeout=10.0,
+                        cookies=old_cookies,
+                    )
+                    
                     await asyncio.sleep(0.5 * (attempt + 1))
                     continue
                 if isinstance(exc, httpx.HTTPStatusError):
