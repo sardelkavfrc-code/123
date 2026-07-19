@@ -79,6 +79,28 @@ const processQueue = (error: Error | null) => {
   failedQueue = [];
 };
 
+// Global Captcha Queue
+let isCaptchaModalActive = false;
+let captchaQueue: Array<{
+  sid: string;
+  img: string;
+  resolve: (key: string | null) => void;
+}> = [];
+
+async function processCaptchaQueue() {
+  if (isCaptchaModalActive || captchaQueue.length === 0) return;
+  isCaptchaModalActive = true;
+  const { useUIStore } = await import("@/stores/ui");
+  const ui = useUIStore();
+  
+  while (captchaQueue.length > 0) {
+    const current = captchaQueue.shift()!;
+    const key = await ui.requestCaptcha(current.sid, current.img);
+    current.resolve(key);
+  }
+  isCaptchaModalActive = false;
+}
+
 http.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -159,6 +181,44 @@ http.interceptors.response.use(
       } else {
         detail = { kind: "error", message: error.message };
       }
+
+      // --- Global Captcha Interceptor ---
+      if ((detail.error === "need_captcha" || detail.captcha_sid || detail.code === 14) && !detail.redirect_uri && !detail.validation_type && originalRequest) {
+        const sid = detail.captcha_sid;
+        const img = detail.captcha_img;
+        if (sid && img) {
+          return new Promise<string | null>((resolve) => {
+            captchaQueue.push({ sid, img, resolve });
+            processCaptchaQueue();
+          }).then((key) => {
+            if (key) {
+              // Retry original request with captcha details
+              originalRequest.params = originalRequest.params || {};
+              originalRequest.params.captcha_sid = sid;
+              originalRequest.params.captcha_key = key;
+
+              if (originalRequest.data && typeof originalRequest.data === "string") {
+                try {
+                  const dataObj = JSON.parse(originalRequest.data);
+                  if (typeof dataObj === "object" && dataObj !== null && !Array.isArray(dataObj)) {
+                    dataObj.captcha_sid = sid;
+                    dataObj.captcha_key = key;
+                    originalRequest.data = JSON.stringify(dataObj);
+                  }
+                } catch (e) {
+                  // Not JSON, ignore
+                }
+              }
+
+              return http(originalRequest);
+            } else {
+              // User cancelled captcha, reject original error
+              return Promise.reject(new APIError(error.response!.status, detail));
+            }
+          });
+        }
+      }
+
       return Promise.reject(new APIError(error.response.status, detail));
     }
     return Promise.reject(new APIError(0, { kind: "network", message: error.message }));

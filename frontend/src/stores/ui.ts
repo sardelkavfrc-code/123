@@ -35,6 +35,37 @@ export const useUIStore = defineStore("ui", () => {
   const activeContextMenuTrack = ref<any>(null); // Store the full track object instead of just key
   const activeContextMenuType = ref<'full' | 'edit_only'>('full');
 
+  // Captcha State
+  const captchaImg = ref<string | null>(null);
+  const captchaSid = ref<string | null>(null);
+  let captchaResolver: ((key: string | null) => void) | null = null;
+
+  function requestCaptcha(sid: string, img: string): Promise<string | null> {
+    captchaSid.value = sid;
+    captchaImg.value = img;
+    return new Promise((resolve) => {
+      captchaResolver = resolve;
+    });
+  }
+
+  function resolveCaptcha(key: string) {
+    if (captchaResolver) {
+      captchaResolver(key);
+      captchaResolver = null;
+    }
+    captchaImg.value = null;
+    captchaSid.value = null;
+  }
+
+  function cancelCaptcha() {
+    if (captchaResolver) {
+      captchaResolver(null);
+      captchaResolver = null;
+    }
+    captchaImg.value = null;
+    captchaSid.value = null;
+  }
+
   function showTrackContextMenu(event: MouseEvent, track: any, menuType: 'full' | 'edit_only' = 'full') {
     activeContextMenuTrack.value = track;
     activeContextMenuType.value = menuType;
@@ -79,6 +110,11 @@ export const useUIStore = defineStore("ui", () => {
     hoveredTrackKey,
     activeContextMenuTrack,
     activeContextMenuType,
-    showTrackContextMenu
+    showTrackContextMenu,
+    captchaImg,
+    captchaSid,
+    requestCaptcha,
+    resolveCaptcha,
+    cancelCaptcha,
   };
 });

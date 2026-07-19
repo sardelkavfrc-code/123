@@ -57,10 +57,6 @@ const validationType = ref("");
 const phoneMask = ref("");
 const maskedEmail = ref("");
 
-// Captcha State
-const captchaSid = ref<string | null>(null);
-const captchaImg = ref<string | null>(null);
-const captchaKey = ref("");
 
 // Webview Validation State
 const showWebview = ref(false);
@@ -240,9 +236,6 @@ function resetFlow() {
   step.value = "login";
   codeInput.value = "";
   passwordInput.value = "";
-  captchaSid.value = null;
-  captchaImg.value = null;
-  captchaKey.value = "";
   lastError.value = null;
   validationSid.value = "";
   validationType.value = "";
@@ -319,13 +312,7 @@ async function handleLoginSubmit() {
   try {
     const res = await auth.validateAccount({
       login: loginInput.value,
-      captcha_sid: captchaSid.value || undefined,
-      captcha_key: captchaKey.value || undefined,
     });
-    // Clear captcha
-    captchaSid.value = null;
-    captchaImg.value = null;
-    captchaKey.value = "";
     await handleValidationResponse(res);
   } catch (err) {
     if (err instanceof APIError) {
@@ -347,12 +334,6 @@ async function handleLoginSubmit() {
           lastError.value = "Ошибка при подтверждении входа: " + (valErr as Error).message;
         }
         return;
-      }
-      
-      if (err.detail?.code === 14) {
-        captchaSid.value = err.detail.captcha_sid || null;
-        captchaImg.value = err.detail.captcha_img || null;
-        captchaKey.value = "";
       }
     }
   }
@@ -469,8 +450,6 @@ async function handlePasswordSubmit() {
       password: passwordInput.value,
       sid: sid.value || undefined,
       remember: true,
-      captcha_sid: captchaSid.value || undefined,
-      captcha_key: captchaKey.value || undefined,
     });
 
     if (ok) {
@@ -485,18 +464,9 @@ async function handlePasswordSubmit() {
         phoneMask.value = err.detail.phone_mask || "";
         maskedEmail.value = err.detail.masked_email || "";
         
-        // Reset captcha
-        captchaSid.value = null;
-        captchaImg.value = null;
-        captchaKey.value = "";
-        
         // Transition to 2FA step
         step.value = "2fa";
         codeInput.value = "";
-      } else if (err.detail?.error === "need_captcha") {
-        captchaSid.value = err.detail.captcha_sid || null;
-        captchaImg.value = err.detail.captcha_img || null;
-        captchaKey.value = "";
       }
     }
   }
@@ -515,8 +485,6 @@ async function handle2faSubmit() {
       code: codeInput.value,
       sid: validationSid.value,
       remember: true,
-      captcha_sid: captchaSid.value || undefined,
-      captcha_key: captchaKey.value || undefined,
     });
 
     if (ok) {
@@ -524,11 +492,7 @@ async function handle2faSubmit() {
     }
   } catch (err) {
     if (err instanceof APIError) {
-      if (err.detail?.error === "need_captcha") {
-        captchaSid.value = err.detail.captcha_sid || null;
-        captchaImg.value = err.detail.captcha_img || null;
-        captchaKey.value = "";
-      }
+      
     }
   }
 }
@@ -565,21 +529,7 @@ async function handle2faSubmit() {
           />
         </div>
 
-        <!-- Captcha Section if required -->
-        <div v-if="captchaImg" class="auth__captcha">
-          <p class="auth__instructions auth__instructions--captcha">Введите код с картинки:</p>
-          <div class="auth__captcha-wrapper">
-            <img :src="captchaImg" alt="Captcha" class="auth__captcha-img" />
-            <input
-              v-model="captchaKey"
-              type="text"
-              class="input auth__captcha-input"
-              placeholder="Код капчи"
-              :disabled="loading"
-              required
-            />
-          </div>
-        </div>
+        
 
         <button class="btn btn--primary auth__submit" type="submit" :disabled="loading || !loginInput">
           <Spinner v-if="loading" :size="18" />
@@ -822,21 +772,7 @@ async function handle2faSubmit() {
           />
         </div>
 
-        <!-- Captcha Section if required -->
-        <div v-if="captchaImg" class="auth__captcha">
-          <p class="auth__instructions auth__instructions--captcha">Введите код с картинки:</p>
-          <div class="auth__captcha-wrapper">
-            <img :src="captchaImg" alt="Captcha" class="auth__captcha-img" />
-            <input
-              v-model="captchaKey"
-              type="text"
-              class="input auth__captcha-input"
-              placeholder="Код капчи"
-              :disabled="loading"
-              required
-            />
-          </div>
-        </div>
+        
 
         <button class="btn btn--primary auth__submit" type="submit" :disabled="loading || !passwordInput">
           <Spinner v-if="loading" :size="18" />
@@ -915,21 +851,7 @@ async function handle2faSubmit() {
           />
         </div>
 
-        <!-- Captcha Section if required -->
-        <div v-if="captchaImg" class="auth__captcha">
-          <p class="auth__instructions auth__instructions--captcha">Введите код с картинки:</p>
-          <div class="auth__captcha-wrapper">
-            <img :src="captchaImg" alt="Captcha" class="auth__captcha-img" />
-            <input
-              v-model="captchaKey"
-              type="text"
-              class="input auth__captcha-input"
-              placeholder="Код капчи"
-              :disabled="loading"
-              required
-            />
-          </div>
-        </div>
+        
 
         <button class="btn btn--primary auth__submit" type="submit" :disabled="loading || !codeInput">
           <Spinner v-if="loading" :size="18" />
