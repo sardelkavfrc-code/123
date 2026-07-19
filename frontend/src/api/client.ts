@@ -12,6 +12,7 @@ import type {
   ArtistAlbumsResponse,
   VKValidateAccountResponse,
   VKCheckOtpResponse,
+  VerificationMethodsResponse,
 } from "./types";
 
 
@@ -213,6 +214,10 @@ export const api = {
   },
   async sendOtpMax(payload: { sid: string; login?: string }): Promise<any> {
     const { data } = await http.post("/auth/send-max", payload);
+    return data;
+  },
+  async getVerificationMethods(payload: { sid: string; login?: string }): Promise<VerificationMethodsResponse> {
+    const { data } = await http.post<VerificationMethodsResponse>("/auth/verification-methods", payload);
     return data;
   },
   async checkOtp(payload: {

@@ -7,6 +7,8 @@ import { useMotion } from "@/composables/useSpring";
 import Spinner from "@/components/Spinner.vue";
 import { APIError } from "@/api/client";
 
+import type { VerificationMethod } from "@/api/types";
+
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
@@ -15,8 +17,31 @@ const motion = useMotion();
 const { loading, lastError } = storeToRefs(auth);
 
 // Flow State
-type AuthStep = "login" | "callreset" | "sms" | "password" | "email" | "push" | "max_messenger" | "codegen" | "2fa";
+type AuthStep = "login" | "callreset" | "sms" | "password" | "email" | "push" | "max_messenger" | "codegen" | "2fa" | "select_method";
 const step = ref<AuthStep>("login");
+const availableMethods = ref<VerificationMethod[]>([]);
+
+const resendTimer = ref(0);
+let timerInterval: number | null = null;
+
+function startTimer(seconds: number) {
+  if (timerInterval) clearInterval(timerInterval);
+  resendTimer.value = seconds;
+  if (seconds > 0) {
+    timerInterval = window.setInterval(() => {
+      if (resendTimer.value > 0) {
+        resendTimer.value--;
+      } else {
+        if (timerInterval) clearInterval(timerInterval);
+      }
+    }, 1000);
+  }
+}
+
+function processTimer(res: any) {
+  const delay = res?.response?.delay || res?.delay || res?.polling_delay || 60;
+  startTimer(delay);
+}
 
 const loginInput = ref("");
 const codeInput = ref("");
@@ -235,6 +260,7 @@ async function handleValidationResponse(res: any) {
     if (method === "callreset") {
       try {
         const sendRes = await auth.sendCallreset({ sid: res.sid, login: loginInput.value });
+        processTimer(sendRes);
         if (sendRes && sendRes.verification_method) {
           step.value = sendRes.verification_method as any;
         } else {
@@ -245,28 +271,32 @@ async function handleValidationResponse(res: any) {
       }
     } else if (method === "sms") {
       try {
-        await auth.sendOtpSms({ sid: res.sid, login: loginInput.value });
+        const sendRes = await auth.sendOtpSms({ sid: res.sid, login: loginInput.value });
+        processTimer(sendRes);
       } catch (err) {
         // ignore
       }
       step.value = "sms";
     } else if (method === "email") {
       try {
-        await auth.sendEmail({ sid: res.sid, login: loginInput.value });
+        const sendRes = await auth.sendEmail({ sid: res.sid, login: loginInput.value });
+        processTimer(sendRes);
       } catch (err) {
         // ignore
       }
       step.value = "email";
     } else if (method === "push") {
       try {
-        await auth.sendOtpPush({ sid: res.sid, login: loginInput.value });
+        const sendRes = await auth.sendOtpPush({ sid: res.sid, login: loginInput.value });
+        processTimer(sendRes);
       } catch (err) {
         // ignore
       }
       step.value = "push";
     } else if (method === "max_messenger") {
       try {
-        await auth.sendOtpMax({ sid: res.sid, login: loginInput.value });
+        const sendRes = await auth.sendOtpMax({ sid: res.sid, login: loginInput.value });
+        processTimer(sendRes);
       } catch (err) {
         // ignore
       }
@@ -335,6 +365,57 @@ async function requestSmsCode() {
     await auth.sendOtpSms({ sid: sid.value, login: loginInput.value });
     step.value = "sms";
     codeInput.value = "";
+  } catch (err) {
+    // Error is handled by Pinia store
+  }
+}
+
+async function requestAnotherMethods() {
+  if (loading.value || !sid.value) return;
+  try {
+    const res = await auth.getVerificationMethods({ sid: sid.value, login: loginInput.value });
+    if (res && res.methods) {
+      availableMethods.value = res.methods;
+      step.value = "select_method";
+    }
+  } catch (err) {
+    // Error is handled by Pinia store
+  }
+}
+
+async function selectMethod(methodName: string) {
+  if (loading.value || !sid.value) return;
+  try {
+    if (methodName === "sms") {
+      const r = await auth.sendOtpSms({ sid: sid.value, login: loginInput.value });
+      processTimer(r);
+      step.value = "sms";
+      codeInput.value = "";
+    } else if (methodName === "email") {
+      const r = await auth.sendEmail({ sid: sid.value, login: loginInput.value });
+      processTimer(r);
+      step.value = "email";
+      codeInput.value = "";
+    } else if (methodName === "callreset") {
+      const r = await auth.sendCallreset({ sid: sid.value, login: loginInput.value });
+      processTimer(r);
+      step.value = "callreset";
+      codeInput.value = "";
+    } else if (methodName === "push") {
+      const r = await auth.sendOtpPush({ sid: sid.value, login: loginInput.value });
+      processTimer(r);
+      step.value = "push";
+      codeInput.value = "";
+    } else if (methodName === "max_messenger") {
+      const r = await auth.sendOtpMax({ sid: sid.value, login: loginInput.value });
+      processTimer(r);
+      step.value = "max_messenger";
+      codeInput.value = "";
+    } else if (methodName === "password") {
+      step.value = "password";
+    } else if (methodName === "codegen") {
+      step.value = "codegen";
+    }
   } catch (err) {
     // Error is handled by Pinia store
   }
@@ -546,19 +627,10 @@ async function handle2faSubmit() {
             v-if="hasAnotherWays"
             type="button"
             class="btn btn--secondary auth__secondary-btn"
-            :disabled="loading"
-            @click="requestSmsCode"
+            :disabled="loading || resendTimer > 0"
+            @click="requestAnotherMethods"
           >
-            Отправить код по SMS
-          </button>
-
-          <button
-            type="button"
-            class="btn btn--secondary auth__secondary-btn"
-            :disabled="loading"
-            @click="step = 'password'"
-          >
-            Войти с помощью пароля
+            {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
           </button>
         </div>
       </form>
@@ -588,12 +660,13 @@ async function handle2faSubmit() {
           </button>
 
           <button
+            v-if="hasAnotherWays"
             type="button"
             class="btn btn--secondary auth__secondary-btn"
-            :disabled="loading"
-            @click="step = 'password'"
+            :disabled="loading || resendTimer > 0"
+            @click="requestAnotherMethods"
           >
-            Войти с помощью пароля
+            {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
           </button>
         </div>
       </form>
@@ -623,12 +696,13 @@ async function handle2faSubmit() {
           </button>
 
           <button
+            v-if="hasAnotherWays"
             type="button"
             class="btn btn--secondary auth__secondary-btn"
-            :disabled="loading"
-            @click="step = 'password'"
+            :disabled="loading || resendTimer > 0"
+            @click="requestAnotherMethods"
           >
-            Войти с помощью пароля
+            {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
           </button>
         </div>
       </form>
@@ -658,12 +732,13 @@ async function handle2faSubmit() {
           </button>
 
           <button
+            v-if="hasAnotherWays"
             type="button"
             class="btn btn--secondary auth__secondary-btn"
-            :disabled="loading"
-            @click="step = 'password'"
+            :disabled="loading || resendTimer > 0"
+            @click="requestAnotherMethods"
           >
-            Войти с помощью пароля
+            {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
           </button>
         </div>
       </form>
@@ -693,12 +768,13 @@ async function handle2faSubmit() {
           </button>
 
           <button
+            v-if="hasAnotherWays"
             type="button"
             class="btn btn--secondary auth__secondary-btn"
-            :disabled="loading"
-            @click="step = 'password'"
+            :disabled="loading || resendTimer > 0"
+            @click="requestAnotherMethods"
           >
-            Войти с помощью пароля
+            {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
           </button>
         </div>
       </form>
@@ -725,6 +801,16 @@ async function handle2faSubmit() {
           <button class="btn btn--primary auth__submit" type="submit" :disabled="loading || !codeInput">
             <Spinner v-if="loading" :size="18" />
             <span>{{ loading ? "Проверка..." : "Подтвердить" }}</span>
+          </button>
+
+          <button
+            v-if="hasAnotherWays"
+            type="button"
+            class="btn btn--secondary auth__secondary-btn"
+            :disabled="loading || resendTimer > 0"
+            @click="requestAnotherMethods"
+          >
+            {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
           </button>
         </div>
       </form>
@@ -767,7 +853,49 @@ async function handle2faSubmit() {
           <Spinner v-if="loading" :size="18" />
           <span>{{ loading ? "Проверка..." : "Войти" }}</span>
         </button>
+
+        <button
+          v-if="hasAnotherWays"
+          type="button"
+          class="btn btn--secondary auth__secondary-btn"
+          style="margin-top: 12px;"
+          :disabled="loading || resendTimer > 0"
+          @click="requestAnotherMethods"
+        >
+          {{ resendTimer > 0 ? `Запросить повторно через ${resendTimer}` : "Выбрать другой способ" }}
+        </button>
       </form>
+
+      <!-- Scenario Select Method -->
+      <div v-else-if="step === 'select_method'" class="auth__form">
+        <p class="auth__instructions">
+          Выберите доступный способ подтверждения:
+        </p>
+
+        <div class="auth__actions auth__actions--methods">
+          <button
+            v-for="method in availableMethods"
+            :key="method.name"
+            class="btn btn--secondary auth__secondary-btn"
+            :disabled="loading"
+            @click="selectMethod(method.name)"
+            style="margin-bottom: 8px; text-align: left; padding: 12px; height: auto;"
+          >
+            <strong v-if="method.name === 'sms'">Отправить SMS</strong>
+            <strong v-else-if="method.name === 'email'">Отправить письмо</strong>
+            <strong v-else-if="method.name === 'callreset'">Звонок-сброс</strong>
+            <strong v-else-if="method.name === 'push'">Push-уведомление</strong>
+            <strong v-else-if="method.name === 'max_messenger'">Сообщение ВКонтакте</strong>
+            <strong v-else-if="method.name === 'password'">Ввести пароль</strong>
+            <strong v-else-if="method.name === 'codegen'">Генератор кодов</strong>
+            <strong v-else>{{ method.name }}</strong>
+
+            <span v-if="method.info" style="display: block; font-size: 13px; opacity: 0.7; font-weight: normal; margin-top: 4px;">
+              {{ method.info }}
+            </span>
+          </button>
+        </div>
+      </div>
 
       <!-- Scenario 2FA Code (MFA) -->
       <form v-else-if="step === '2fa'" @submit.prevent="handle2faSubmit" class="auth__form">

@@ -332,6 +332,39 @@ async def send_sms(payload: SendSmsRequest, vk: VKDep):
             )
 
 
+@router.post("/verification-methods")
+async def get_verification_methods(payload: SendSmsRequest, vk: VKDep):
+    print(f"BACKEND RECEIVED GET VERIFICATION METHODS: sid={payload.sid}", flush=True)
+    device_id = storage.get_device_id()
+    
+    for attempt in range(2):
+        try:
+            anonym_token = await vk.get_anonymous_token()
+            params = {
+                "sid": payload.sid,
+                "v": "5.274",
+                "api_id": 2274003,
+                "lang": "ru",
+                "device_id": device_id,
+                "access_token": anonym_token,
+                "https": 1,
+            }
+            response = await vk.call_anonymous("ecosystem.getVerificationMethods", params, sign=False)
+            return response
+        except VKError as exc:
+            print(f"BACKEND VERIFICATION METHODS VKError: code={exc.code}, msg={exc.message}", flush=True)
+            if exc.code in (28, 5, 1114, 1117, -1) and attempt == 0:
+                vk.clear_anonymous_token()
+                continue
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "kind": "vk_error",
+                    "code": exc.code,
+                    "message": exc.message,
+                }
+            )
+
 @router.post("/send-callreset")
 async def send_callreset(payload: SendSmsRequest, vk: VKDep):
     print(f"BACKEND RECEIVED SEND CALLRESET: sid={payload.sid}", flush=True)

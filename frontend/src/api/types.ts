@@ -137,3 +137,13 @@ export interface CatalogSearchResult {
   playlists: AlbumSummary[];
   tracks: Track[];
 }
+
+export interface VerificationMethod {
+  name: string;
+  info?: string;
+  timeout?: number;
+}
+
+export interface VerificationMethodsResponse {
+  methods: VerificationMethod[];
+}

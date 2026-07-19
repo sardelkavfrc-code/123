@@ -157,6 +157,23 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function getVerificationMethods(payload: { sid: string; login?: string }) {
+    lastError.value = null;
+    loading.value = true;
+    try {
+      return await api.getVerificationMethods(payload);
+    } catch (err) {
+      if (err instanceof APIError) {
+        lastError.value = err.detail.message || err.message;
+      } else {
+        lastError.value = (err as Error).message;
+      }
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   async function sendOtpSms(payload: { sid: string; login?: string }) {
     lastError.value = null;
     loading.value = true;
@@ -304,6 +321,7 @@ export const useAuthStore = defineStore("auth", () => {
     loginWithToken,
     loginViaOAuth,
     validateAccount,
+    getVerificationMethods,
     sendOtpSms,
     sendCallreset,
     sendEmail,
