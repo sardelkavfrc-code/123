@@ -6,9 +6,11 @@ import { api } from "@/api/client";
 import type { AlbumSummary, Track } from "@/api/types";
 import { useSettingsStore } from "@/stores/settings";
 import { storeToRefs } from "pinia";
-
 import RecommendationCard from "@/components/RecommendationCard.vue";
-import MoodCard from "@/components/MoodCard.vue";
+import ActionCard from "@/components/ActionCard.vue";
+import LargePlaylistCard from "@/components/LargePlaylistCard.vue";
+import MixCard from "@/components/MixCard.vue";
+import TrackRow from "@/components/TrackRow.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import Spinner from "@/components/Spinner.vue";
@@ -98,29 +100,6 @@ onUnmounted(() => {
   window.removeEventListener("click", handleWindowClick);
 });
 
-const algorithmsScroll = ref<HTMLElement | null>(null);
-const moodsScroll = ref<HTMLElement | null>(null);
-const algAtStart = ref(true);
-const algAtEnd = ref(false);
-const moodsAtStart = ref(true);
-const moodsAtEnd = ref(false);
-
-function checkAlgScroll() {
-  if (!algorithmsScroll.value) return;
-  const el = algorithmsScroll.value;
-  algAtStart.value = el.scrollLeft <= 0;
-  algAtEnd.value = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth - 1;
-}
-
-function checkMoodsScroll() {
-  if (!moodsScroll.value) return;
-  const el = moodsScroll.value;
-  moodsAtStart.value = el.scrollLeft <= 0;
-  moodsAtEnd.value = Math.ceil(el.scrollLeft + el.clientWidth) >= el.scrollWidth - 1;
-}
-
-let resizeObserver: ResizeObserver | null = null;
-
 const closeMixSettings = () => {
   if (showMixSettings.value) {
     showMixSettings.value = false;
@@ -128,31 +107,12 @@ const closeMixSettings = () => {
 };
 
 onMounted(() => {
-  resizeObserver = new ResizeObserver(() => {
-    checkAlgScroll();
-    checkMoodsScroll();
-  });
   window.addEventListener('click', closeMixSettings);
 });
 onUnmounted(() => {
-  if (resizeObserver) resizeObserver.disconnect();
   window.removeEventListener('click', closeMixSettings);
 });
 
-watch(algorithmsScroll, (el, oldEl) => {
-  if (oldEl) resizeObserver?.unobserve(oldEl);
-  if (el) {
-    resizeObserver?.observe(el);
-    checkAlgScroll();
-  }
-});
-watch(moodsScroll, (el, oldEl) => {
-  if (oldEl) resizeObserver?.unobserve(oldEl);
-  if (el) {
-    resizeObserver?.observe(el);
-    checkMoodsScroll();
-  }
-});
 const loadingAlbumId = ref<string | null>(null);
 
 // VK Mix state. Buffers live per parameter-combo in useMixCache (module-scoped),
@@ -163,8 +123,7 @@ const mixLoading = ref(false);
 
 onMounted(async () => {
   library.loadFromCache();
-  library.loadAlgorithms(true);
-  library.loadMoods(true);
+  library.loadExplore(true);
   // Начинаем фоновую накачку кэша сразу при загрузке приложения
   ensureCacheBuffer().catch(console.error);
 });
@@ -215,19 +174,7 @@ async function ensureCacheBuffer() {
   }
 }
 
-function scrollMoods(direction: number) {
-  const el = document.querySelector('.home__moods') as HTMLElement;
-  if (el) {
-    el.scrollLeft += direction * 600;
-  }
-}
 
-function scrollAlgorithms(direction: number) {
-  const el = document.querySelector('.home__algorithms') as HTMLElement;
-  if (el) {
-    el.scrollLeft += direction * 600;
-  }
-}
 
 async function playMix() {
   if (mixLoading.value) return;
@@ -248,10 +195,22 @@ async function playMix() {
     );
 
     // 2. Запускаем фоновую докачку остальных треков
-    fillMixBuffer(47).catch(console.error);
-
+    fillMixBuffer(100).catch(console.error);
   } finally {
-    mixLoading.value = false; // UI кнопка отвисает моментально!
+    mixLoading.value = false;
+  }
+}
+
+async function playAction(action: import("@/api/types").ActionItem) {
+  if (mixLoading.value) return;
+  
+  if (action.mix_options) {
+    const opts = action.mix_options;
+    if (opts.vibes) mixMood.value = opts.vibes[0];
+    if (opts.recognitions) mixFamiliarity.value = opts.recognitions[0];
+    if (opts.langs) mixLanguage.value = opts.langs[0];
+    // We can directly call playMix, it will use the updated refs
+    await playMix();
   }
 }
 
@@ -490,55 +449,84 @@ async function playAlbum(album: AlbumSummary) {
       </div>
     </section>
 
-    <div v-if="library.albumsLoading || !library.algorithms" class="home__global-loading">
+    <div v-if="library.homeSectionsLoading || !library.homeSections" class="home__global-loading">
       <Spinner :size="24" /> Загружаем подборки…
     </div>
 
     <Transition name="content-reveal">
-      <div v-if="!library.albumsLoading && library.algorithms" class="home__content-sections">
-        <section class="home__feed">
+      <div v-if="!library.homeSectionsLoading && library.homeSections" class="home__content-sections">
+        
+        <section 
+          class="home__feed" 
+          v-for="section in library.homeSections" 
+          :key="section.id"
+        >
           <div class="home__section-head">
-            <h2>Рекомендации для тебя</h2>
+            <div class="home__section-titles">
+              <h2>{{ section.title }}</h2>
+              <div v-if="section.subtitle" class="home__section-subtitle">{{ section.subtitle }}</div>
+            </div>
           </div>
-          <div v-if="library.algorithms && !library.algorithms.items?.length" class="home__loading home__loading--soft">
-            ВК не вернул карточки алгоритмов сегодня.
+          
+          <div v-if="section.type === 'playlists'" class="home__slider-container">
+            <div class="home__algorithms">
+              <template v-if="section.layout === 'large_slider'">
+                <LargePlaylistCard
+                  v-for="block in section.playlists"
+                  :key="block.id"
+                  :block="block"
+                  :loading="loadingAlbumId === block.id"
+                  @open="playAlbum"
+                  @playTrack="(_, i) => player.playQueue(block.tracks || [], i)"
+                />
+              </template>
+              <template v-else>
+                <RecommendationCard
+                  v-for="(block, index) in section.playlists"
+                  :key="block.id"
+                  :block="block"
+                  :index="index"
+                  :loading="loadingAlbumId === block.id"
+                  @open="playAlbum"
+                />
+              </template>
+            </div>
           </div>
-          <div v-else-if="library.algorithms" class="home__slider-container">
-            <button :class="{ 'home__slider-btn--hidden': algAtStart }" class="home__slider-btn home__slider-btn--prev" @click="scrollAlgorithms(-1)" aria-label="Листать влево">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-            </button>
-            <div class="home__algorithms" ref="algorithmsScroll" @scroll="checkAlgScroll">
-              <RecommendationCard
-                v-for="(block, index) in library.algorithms.items.slice(0, 12)"
-                :key="block.id"
-                :block="block"
-                :index="index"
-                :loading="loadingAlbumId === block.id"
-                @open="playAlbum"
+          
+          <div v-else-if="section.type === 'actions' && section.layout === 'large_slider'" class="home__slider-container">
+            <div class="home__algorithms">
+              <MixCard
+                v-for="action in section.actions"
+                :key="action.id"
+                :action="action"
+                @click="playAction(action)"
               />
             </div>
-            <button :class="{ 'home__slider-btn--hidden': algAtEnd }" class="home__slider-btn home__slider-btn--next" @click="scrollAlgorithms(1)" aria-label="Листать вправо">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-            </button>
           </div>
+
+          <div v-else-if="section.type === 'actions'" class="home__slider-container">
+            <div class="home__algorithms" :class="{ 'home__algorithms--2-rows': section.layout === 'crop_slider' }">
+              <ActionCard
+                v-for="action in section.actions"
+                :key="action.id"
+                :action="action"
+                @click="playAction(action)"
+              />
+            </div>
+          </div>
+          
+          <div v-else-if="section.type === 'audios'" class="home__audios-grid" :class="{ 'home__audios-grid--triple': section.layout === 'triple_stacked_slider' }">
+            <TrackRow
+              v-for="(track, index) in section.audios"
+              :key="track.id"
+              :track="track"
+              :index="index"
+              @play="player.playQueue(section.audios || [], index)"
+            />
+          </div>
+          
         </section>
 
-        <section class="home__section" v-if="library.moods?.items && library.moods.items.length">
-          <div class="home__section-head">
-            <h2>Настроения и занятия</h2>
-          </div>
-          <div class="home__slider-container">
-            <button :class="{ 'home__slider-btn--hidden': moodsAtStart }" class="home__slider-btn home__slider-btn--prev" @click="scrollMoods(-1)" aria-label="Листать влево">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-            </button>
-            <div class="home__moods" ref="moodsScroll" @scroll="checkMoodsScroll">
-              <MoodCard v-for="mood in library.moods.items" :key="mood.id" :mood="mood" :loading="loadingAlbumId === mood.id" @click="playAlbum(mood)" />
-            </div>
-            <button :class="{ 'home__slider-btn--hidden': moodsAtEnd }" class="home__slider-btn home__slider-btn--next" @click="scrollMoods(1)" aria-label="Листать вправо">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-            </button>
-          </div>
-        </section>
       </div>
     </Transition>
   </ScrollArea>
@@ -651,8 +639,37 @@ async function playAlbum(album: AlbumSummary) {
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 .home__mix-settings-inline-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
 }
+
+.home__audios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+.home__audios-grid--triple {
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  overflow-x: auto;
+  gap: 12px 24px;
+  padding-bottom: 16px;
+  scrollbar-width: none;
+}
+.home__audios-grid--triple::-webkit-scrollbar {
+  display: none;
+}
+
+/* For tablets and larger, maybe bigger columns */
+@media (min-width: 768px) {
+  .home__audios-grid {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 16px;
+  }
+}
+
 .home__mix-settings-inline-btn.active {
   background: rgba(255, 255, 255, 0.3);
 }
@@ -771,17 +788,34 @@ async function playAlbum(album: AlbumSummary) {
   display: flex;
   gap: 16px;
   overflow-x: auto;
+  padding-bottom: 24px;
   scrollbar-width: none;
-  padding-bottom: 4px;
+  -ms-overflow-style: none;
   scroll-behavior: smooth;
 }
 .home__algorithms::-webkit-scrollbar {
   display: none;
 }
+.home__algorithms--2-rows {
+  display: grid;
+  grid-template-rows: repeat(2, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 5px;
+}
 .home__section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+.home__section-titles {
+  display: flex;
+  flex-direction: column;
+}
+.home__section-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-top: 4px;
 }
 .home__section-head h2 {
   margin: 0;
