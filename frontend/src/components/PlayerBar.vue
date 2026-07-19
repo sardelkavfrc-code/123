@@ -450,7 +450,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   line-height: 1.3;
 }
 .player__subtitle {
-  color: var(--text-2);
+  color: #828282;
   font-weight: 400;
   font-size: 0.9em;
   margin-left: 4px;

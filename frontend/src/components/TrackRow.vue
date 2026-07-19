@@ -319,7 +319,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 }
 
 .row__subtitle {
-  color: var(--text-secondary);
+  color: #828282;
   font-weight: 400;
   margin-left: 6px;
 }
