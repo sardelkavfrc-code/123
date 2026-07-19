@@ -124,13 +124,15 @@ function toggleTimeMode() {
 // no-ops when the setting is off or when VK already has artwork.
 const trackArtist = computed(() => current.value?.main_artists[0]?.name || current.value?.artist || null);
 const trackTitle = computed(() => current.value?.title || null);
-const hasVkCover = computed(() => !!current.value?.album_cover);
+const hasVkCover = computed(() => !!current.value?.cover_medium);
+
 const { cover: externalCover } = useExternalArt(
   trackArtist,
   trackTitle,
   toRef(() => hasVkCover.value)
 );
-const displayCover = computed(() => current.value?.album_cover || externalCover.value || null);
+
+const displayCover = computed(() => current.value?.cover_medium || externalCover.value || null);
 
 // Logarithmic taper: humans perceive loudness roughly on a log scale, so
 // linearly dragging the slider feels wrong (most usable range crammed into the

@@ -19,7 +19,9 @@ class Track(APIModel):
     artist: str
     duration: int = 0
     url: str = ""
-    album_cover: str | None = None
+    cover_small: str | None = None
+    cover_medium: str | None = None
+    cover_large: str | None = None
     album_title: str | None = None
     main_artists: list[TrackArtist] = Field(default_factory=list)
     featured_artists: list[TrackArtist] = Field(default_factory=list)

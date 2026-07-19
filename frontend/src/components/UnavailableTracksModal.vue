@@ -132,7 +132,7 @@ async function searchWithRetry(q: string, count: number, retries = 2): Promise<T
 // Load external cover art from iTunes/Genius
 async function loadExternalCover(track: Track) {
   const key = getTrackKey(track);
-  if (track.album_cover) return; // Has VK cover
+  if (track.cover_small) return; // Has VK cover
   if (externalCovers.value[key] !== undefined) return; // Already cached or fetching
   
   externalCovers.value[key] = null; // Set placeholder
@@ -545,8 +545,8 @@ onBeforeUnmount(() => {
                     </button>
                     
                     <!-- Cover image -->
-                    <div class="alt-cover" v-lazy-bg="searchResults[getTrackKey(track)][0].album_cover || externalCovers[getTrackKey(searchResults[getTrackKey(track)][0])]">
-                      <span v-if="!searchResults[getTrackKey(track)][0].album_cover && !externalCovers[getTrackKey(searchResults[getTrackKey(track)][0])]" class="alt-cover-fallback">
+                    <div class="alt-cover" v-lazy-bg="searchResults[getTrackKey(track)][0].cover_small || searchResults[getTrackKey(track)][0].cover_medium || externalCovers[getTrackKey(searchResults[getTrackKey(track)][0])]">
+                      <span v-if="!searchResults[getTrackKey(track)][0].cover_small && !externalCovers[getTrackKey(searchResults[getTrackKey(track)][0])]" class="alt-cover-fallback">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <circle cx="12" cy="12" r="3"></circle>
                           <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5z"></path>
@@ -641,8 +641,8 @@ onBeforeUnmount(() => {
                 </button>
                 
                 <!-- Cover image -->
-                <div class="alt-cover" v-lazy-bg="alt.album_cover || externalCovers[getTrackKey(alt)]">
-                  <span v-if="!alt.album_cover && !externalCovers[getTrackKey(alt)]" class="alt-cover-fallback">
+                <div class="alt-cover" v-lazy-bg="alt.cover_small || externalCovers[getTrackKey(alt)]">
+                  <span v-if="!alt.cover_small && !externalCovers[getTrackKey(alt)]" class="alt-cover-fallback">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <circle cx="12" cy="12" r="3"></circle>
                       <path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5z"></path>

@@ -25,16 +25,26 @@ def _artist(raw: dict[str, Any]) -> TrackArtist:
     )
 
 
-def _best_cover(audio: dict[str, Any]) -> str | None:
-    album = audio.get("album") or {}
-    thumb = album.get("thumb") or {}
-    for key in ("photo_1200", "photo_600", "photo_300", "photo_270", "photo_135", "photo_68"):
+def _cover_small(thumb: dict[str, Any]) -> str | None:
+    for key in ("photo_135", "photo_270", "photo_300", "photo_600"):
         if thumb.get(key):
             return str(thumb[key])
     return None
 
+def _cover_medium(thumb: dict[str, Any]) -> str | None:
+    for key in ("photo_300", "photo_600", "photo_1200"):
+        if thumb.get(key):
+            return str(thumb[key])
+    return None
+
+def _cover_large(thumb: dict[str, Any]) -> str | None:
+    for key in ("photo_600", "photo_1200", "photo_300"):
+        if thumb.get(key):
+            return str(thumb[key])
+    return None
 
 def parse_track(audio: dict[str, Any]) -> Track:
+    thumb = (audio.get("album") or {}).get("thumb") or {}
     return Track(
         id=int(audio.get("id", 0)),
         owner_id=int(audio.get("owner_id", 0)),
@@ -43,7 +53,9 @@ def parse_track(audio: dict[str, Any]) -> Track:
         artist=str(audio.get("artist") or "Неизвестный").strip(),
         duration=int(audio.get("duration", 0) or 0),
         url=str(audio.get("url") or ""),
-        album_cover=_best_cover(audio),
+        cover_small=_cover_small(thumb),
+        cover_medium=_cover_medium(thumb),
+        cover_large=_cover_large(thumb),
         album_title=str(((audio.get("album") or {}).get("title") or "") or "") or None,
         main_artists=[_artist(a) for a in (audio.get("main_artists") or [])],
         featured_artists=[_artist(a) for a in (audio.get("featured_artists") or [])],

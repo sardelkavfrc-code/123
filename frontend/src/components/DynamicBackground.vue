@@ -61,11 +61,12 @@ const updateBackground = async () => {
     
     const track = player.current;
     if (track) {
-      if (track.album_cover) {
+      const cover = track.cover_large || track.cover_medium || track.cover_small;
+      if (cover) {
         if (settings.theme === "spotify-cover") {
-          bgStyle = `url("${track.album_cover}")`;
+          bgStyle = `url("${cover}")`;
         } else {
-          const colors = await extractColors(track.album_cover);
+          const colors = await extractColors(cover);
           bgStyle = `
             radial-gradient(circle at 20% 20%, ${colors[0]} 0%, transparent 60%),
             radial-gradient(circle at 80% 80%, ${colors[1]} 0%, transparent 60%),

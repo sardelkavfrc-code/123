@@ -46,13 +46,15 @@ async function toggleLibrary() {
 
 const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
 const trackTitle = computed(() => props.track.title || null);
-const hasVkCover = computed(() => !!props.track.album_cover);
+const hasVkCover = computed(() => !!props.track.cover_small);
+
 const { cover: externalCover } = useExternalArt(
   trackArtist,
   trackTitle,
   toRef(() => hasVkCover.value)
 );
-const displayCover = computed(() => props.track.album_cover || externalCover.value || null);
+
+const displayCover = computed(() => props.track.cover_small || externalCover.value || null);
 
 function gotoSpecificArtist(artistId?: string | null, artistName?: string | null) {
   if (artistId) {

@@ -358,18 +358,7 @@ async function handleLoginSubmit() {
   }
 }
 
-// Request fallback to SMS (Scenario A button)
-async function requestSmsCode() {
-  if (loading.value || !sid.value) return;
-  try {
-    await auth.sendOtpSms({ sid: sid.value, login: loginInput.value });
-    step.value = "sms";
-    codeInput.value = "";
-  } catch (err) {
-    // Error is handled by Pinia store
-  }
-}
-
+// removed requestSmsCode
 async function requestAnotherMethods() {
   if (loading.value || !sid.value) return;
   try {

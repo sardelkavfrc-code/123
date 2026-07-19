@@ -120,9 +120,28 @@ function updateScrollParent() {
   }
 }
 
+let resizeObserver: ResizeObserver | null = null;
+
 onMounted(() => {
   setTimeout(updateScrollParent, 50);
   window.addEventListener("resize", handleResize, { passive: true });
+  
+  // Observe the container so we can recalculate when it becomes visible or resizes
+  // (e.g. on theme changes or tab switches)
+  resizeObserver = new ResizeObserver(() => {
+    if (clientHeight.value === 0 || clientHeight.value === 800) {
+      updateScrollParent();
+    } else {
+      handleResize();
+    }
+  });
+  
+  if (containerRef.value) {
+    resizeObserver.observe(containerRef.value);
+    if (containerRef.value.parentElement) {
+      resizeObserver.observe(containerRef.value.parentElement);
+    }
+  }
 });
 
 onBeforeUnmount(() => {
@@ -130,6 +149,10 @@ onBeforeUnmount(() => {
     scrollParent.removeEventListener("scroll", handleScroll);
   }
   window.removeEventListener("resize", handleResize);
+  
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+  }
 });
 
 watch(() => props.tracks, () => {

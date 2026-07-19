@@ -16,6 +16,7 @@ import { tracksLabel } from "@/composables/useFormat";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
+const ui = useUIStore();
 const router = useRouter();
 
 const showSettings = ref(false);

@@ -6,7 +6,9 @@ export interface Track {
   artist: string;
   duration: number;
   url: string;
-  album_cover: string | null;
+  cover_small?: string;
+  cover_medium?: string;
+  cover_large?: string;
   album_title: string | null;
   main_artists: TrackArtist[];
   featured_artists: TrackArtist[];

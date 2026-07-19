@@ -94,17 +94,18 @@ function addToQueue() {
   ui.notify("Трек будет играть следующим", "success");
 }
 
+const hasVkCover = computed(() => !!props.track.cover_small);
+
 // Cover fallback (iTunes) only when VK doesn't ship a cover and the user
 // hasn't disabled the setting. Composable returns `null` otherwise.
 const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
 const trackTitle = computed(() => props.track.title || null);
-const hasVkCover = computed(() => !!props.track.album_cover);
 const { cover: externalCover } = useExternalArt(
   trackArtist,
   trackTitle,
   toRef(() => hasVkCover.value)
 );
-const displayCover = computed(() => props.track.album_cover || externalCover.value || null);
+const displayCover = computed(() => props.track.cover_small || externalCover.value || null);
 
 async function toggleLibrary() {
   try {

@@ -392,9 +392,9 @@ export const usePlayerStore = defineStore("player", () => {
     const nextTrack = queue.value[nextIdx];
     if (!nextTrack || !nextTrack.url) return;
 
-    if (nextTrack.album_cover) {
+    if (nextTrack.cover_large) {
       const img = new Image();
-      img.src = nextTrack.album_cover;
+      img.src = nextTrack.cover_large;
     } else {
       const artist = nextTrack.main_artists?.[0]?.name || nextTrack.artist;
       if (artist && nextTrack.title) {
@@ -852,7 +852,7 @@ export const usePlayerStore = defineStore("player", () => {
       if (track && rpcShowTrack) {
         payload.title = track.title;
         payload.artist = track.main_artists?.[0]?.name || track.artist || "";
-        payload.cover_url = track.album_cover;
+        payload.cover_url = track.cover_large || track.cover_medium || track.cover_small;
         payload.duration = track.duration;
         payload.position = Math.floor(currentTime.value);
       }

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useRouter } from "vue-router";
 import { useDislikesStore } from "@/stores/dislikes";
 import { usePlayerStore } from "@/stores/player";
 import PageHeader from "@/components/PageHeader.vue";
@@ -9,14 +8,13 @@ import TrackList from "@/components/TrackList.vue";
 import { tracksLabel } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
 
-const router = useRouter();
 const dislikesStore = useDislikesStore();
 const player = usePlayerStore();
 
 const tracks = computed(() => Array.from(dislikesStore.tracks.values()));
 const subtitle = computed(() => tracksLabel(tracks.value.length));
 
-function handlePlay(track: Track, index: number) {
+function handlePlay(_track: Track, index: number) {
   player.playQueue(tracks.value, index, { autoPlay: true });
 }
 
