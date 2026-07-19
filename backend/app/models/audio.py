@@ -15,6 +15,7 @@ class Track(APIModel):
     id: int
     owner_id: int
     title: str
+    subtitle: str | None = None
     artist: str
     duration: int = 0
     url: str = ""

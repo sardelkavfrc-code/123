@@ -158,6 +158,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
     <div class="row__main">
       <div class="row__title" :title="track.title">
         {{ track.title }}
+        <span v-if="track.subtitle" class="row__subtitle">{{ track.subtitle }}</span>
         <span v-if="track.is_explicit" class="row__explicit" title="Explicit">E</span>
       </div>
       <div class="row__artist-wrap" :title="track.artist">
@@ -310,12 +311,17 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 }
 .row__title {
   font-weight: 500;
+  color: var(--text-primary);
+  font-size: calc(14px * var(--font-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+}
+
+.row__subtitle {
+  color: var(--text-secondary);
+  font-weight: 400;
+  margin-left: 6px;
 }
 .row__explicit {
   display: inline-block;

@@ -39,6 +39,7 @@ def parse_track(audio: dict[str, Any]) -> Track:
         id=int(audio.get("id", 0)),
         owner_id=int(audio.get("owner_id", 0)),
         title=str(audio.get("title") or "Без названия").strip(),
+        subtitle=str(audio.get("subtitle")).strip() if audio.get("subtitle") else None,
         artist=str(audio.get("artist") or "Неизвестный").strip(),
         duration=int(audio.get("duration", 0) or 0),
         url=str(audio.get("url") or ""),

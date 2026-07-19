@@ -2,6 +2,7 @@ export interface Track {
   id: number;
   owner_id: number;
   title: string;
+  subtitle?: string;
   artist: string;
   duration: number;
   url: string;

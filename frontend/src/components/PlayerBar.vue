@@ -167,6 +167,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
         <div v-if="current" class="player__info-wrap" :key="current.owner_id + '_' + current.id">
             <div class="player__title" :title="current.title">
               {{ current.title }}
+              <span v-if="current.subtitle" class="player__subtitle">{{ current.subtitle }}</span>
             </div>
             <div class="player__artist-wrap" :title="current.artist">
               <template v-if="current.main_artists?.length">
