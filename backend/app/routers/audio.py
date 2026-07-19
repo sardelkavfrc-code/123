@@ -1062,42 +1062,36 @@ async def artist_info(
     )
 
 
-@router.post("/track-play")
-async def track_play(
+@router.post("/track-event")
+async def track_event(
     vk: VKDep,
     session: SessionDep,
+    event_type: str = Query(..., description="Тип события: start, stop, pause, play"),
     audio_id: int = Query(..., description="ID аудиозаписи"),
     owner_id: int = Query(..., description="ID владельца аудиозаписи"),
-    duration: int = Query(..., description="Длительность в секундах"),
+    uuid: int = Query(..., description="Уникальный ID сессии прослушивания трека"),
+    duration: int = Query(0, description="Сколько секунд прослушано (для stop/pause/play)"),
 ) -> dict[str, bool]:
-    """Регистрирует проигрывание трека в статистике ВК для недавних и рекомендаций."""
+    """Регистрирует события проигрывания трека в статистике ВК для рекомендаций."""
     import time
     import json
     
-    # --- VK API Stats ---
-    import random
-
-    uuid_val = random.randint(1, 2147483647)
     current_time = int(time.time())
+    vk_event_type = f"audio_{event_type}" if event_type in ["start", "stop", "pause", "play"] else "audio_play"
     
-    event_start = {
-        "e": "audio_start",
+    event_payload = {
+        "e": vk_event_type,
         "audio_id": f"{owner_id}_{audio_id}",
         "source": "my",
-        "uuid": uuid_val,
+        "uuid": uuid,
         "start_time": current_time,
     }
-    event_play = {
-        "e": "audio_play",
-        "audio_id": f"{owner_id}_{audio_id}",
-        "source": "my",
-        "uuid": uuid_val,
-        "duration": duration,
-        "start_time": current_time,
-    }
-    events_json = json.dumps([event_start, event_play], separators=(',', ':'))
+    
+    if event_type in ["stop", "pause", "play"]:
+        event_payload["duration"] = duration
+        
+    events_json = json.dumps([event_payload], separators=(',', ':'))
 
-    # Отправляем статистику прослушивания через стандартный клиент
     try:
         response = await _safe_call(
             vk,
@@ -1105,9 +1099,9 @@ async def track_play(
             session.access_token,
             events=events_json,
         )
-        print(f"[track_play] VK stats.trackEvents response: {response}", flush=True)
+        print(f"[track_event] VK stats.trackEvents ({event_type}): {response}", flush=True)
     except Exception as e:
-        print(f"[track_play] VK stats.trackEvents failed: {e}", flush=True)
+        print(f"[track_event] VK stats.trackEvents ({event_type}) failed: {e}", flush=True)
         
     return {"success": True}
 

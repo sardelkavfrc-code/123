@@ -470,9 +470,9 @@ export const api = {
   async clearRpc(): Promise<void> {
     await http.post("/rpc/clear");
   },
-  async trackPlay(audioId: number, ownerId: number, duration: number): Promise<{ ok: boolean }> {
-    const { data } = await http.post<{ ok: boolean }>("/audio/track-play", null, {
-      params: { audio_id: audioId, owner_id: ownerId, duration },
+  async trackEvent(eventType: "start" | "stop" | "pause" | "play", audioId: number, ownerId: number, uuid: number, duration: number = 0): Promise<{ ok: boolean }> {
+    const { data } = await http.post<{ ok: boolean }>("/audio/track-event", null, {
+      params: { event_type: eventType, audio_id: audioId, owner_id: ownerId, uuid, duration },
     });
     return data;
   },

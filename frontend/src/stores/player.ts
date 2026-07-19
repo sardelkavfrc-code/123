@@ -362,7 +362,6 @@ export const usePlayerStore = defineStore("player", () => {
   let prefetchAudio: HTMLAudioElement | null = null;
   let prefetchHls: Hls | null = null;
   let prefetchTimeout: number | null = null;
-  let trackPlayTimeout: number | null = null;
 
   function destroyPrefetch() {
     if (prefetchTimeout) {
@@ -749,10 +748,6 @@ export const usePlayerStore = defineStore("player", () => {
   function clear() {
     destroyBackend();
     destroyPrefetch();
-    if (trackPlayTimeout !== null) {
-      window.clearTimeout(trackPlayTimeout);
-      trackPlayTimeout = null;
-    }
     queue.value = [];
     originalQueue.value = [];
     index.value = -1;
@@ -861,29 +856,46 @@ export const usePlayerStore = defineStore("player", () => {
     }
   );
 
-  // Send track playback statistic (stats.trackEvents) to VK after 2 seconds of playback
+  let playbackUuid: number | null = null;
+  let lastTrackId: number | null = null;
+  let maxListenedDuration: number = 0;
+
+  watch(currentTime, (newTime) => {
+    maxListenedDuration = Math.max(maxListenedDuration, Math.floor(newTime));
+  });
+
   watch(
     [current, isPlaying],
-    ([track, playing]) => {
-      if (trackPlayTimeout !== null) {
-        window.clearTimeout(trackPlayTimeout);
-        trackPlayTimeout = null;
+    ([track, playing], [prevTrack, prevPlaying]) => {
+      // 1. Смена трека (предыдущий трек выключен или проскипан)
+      if (prevTrack && lastTrackId === prevTrack.id && playbackUuid !== null) {
+        if (!track || track.id !== prevTrack.id) {
+          api.trackEvent("stop", prevTrack.id, prevTrack.owner_id, playbackUuid, maxListenedDuration).catch(() => {});
+          playbackUuid = null;
+          maxListenedDuration = 0;
+        }
       }
 
-      if (!playing || !track) {
-        return;
+      if (!track) return;
+      if (track.owner_id === undefined || track.id === undefined || track.id === -1) return;
+
+      // 2. Трек включился с нуля (или переключили на новый)
+      if (playing && playbackUuid === null) {
+        playbackUuid = Math.floor(Math.random() * 2147483647);
+        lastTrackId = track.id;
+        maxListenedDuration = Math.floor(currentTime.value);
+        api.trackEvent("start", track.id, track.owner_id, playbackUuid).catch(() => {});
       }
 
-      // Ignore local files (which do not have owner_id or valid VK ID)
-      if (track.owner_id === undefined || track.id === undefined || track.id === -1) {
-        return;
+      // 3. Трек поставили на паузу
+      if (!playing && prevPlaying && playbackUuid !== null && track.id === prevTrack?.id) {
+        api.trackEvent("pause", track.id, track.owner_id, playbackUuid, maxListenedDuration).catch(() => {});
       }
 
-      trackPlayTimeout = window.setTimeout(() => {
-        api.trackPlay(track.id, track.owner_id, track.duration).catch((err) => {
-          console.error("Failed to report track playback to VK:", err);
-        });
-      }, 2000);
+      // 4. Трек сняли с паузы
+      if (playing && !prevPlaying && playbackUuid !== null && track.id === prevTrack?.id) {
+        api.trackEvent("play", track.id, track.owner_id, playbackUuid, maxListenedDuration).catch(() => {});
+      }
     }
   );
 
