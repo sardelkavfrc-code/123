@@ -12,6 +12,7 @@ export interface Track {
   is_explicit: boolean;
   lyrics_id: number | null;
   date: number;
+  access_key?: string;
 }
 
 export interface TrackArtist {

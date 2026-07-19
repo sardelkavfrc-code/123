@@ -115,7 +115,13 @@ async def _fill_missing_urls(vk: VKDep, session: SessionDep, items: list[dict]):
     chunks = [missing[i:i+100] for i in range(0, len(missing), 100)]
     tasks = []
     for chunk in chunks:
-        audios_param = ",".join(f"{t.get('owner_id')}_{t.get('id')}" for t in chunk)
+        ids = []
+        for t in chunk:
+            key = f"{t.get('owner_id')}_{t.get('id')}"
+            if t.get("access_key"):
+                key += f"_{t['access_key']}"
+            ids.append(key)
+        audios_param = ",".join(ids)
         tasks.append(_safe_call(vk, "audio.getById", session.access_token, audios=audios_param))
         
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -569,13 +575,20 @@ async def add(
     owner_id: int,
     vk: VKDep,
     session: SessionDep,
+    access_key: str | None = None,
 ) -> Track:
+    kwargs = {
+        "audio_id": audio_id,
+        "owner_id": owner_id,
+    }
+    if access_key:
+        kwargs["access_key"] = access_key
+
     new_id = await _safe_call(
         vk,
         "audio.add",
         session.access_token,
-        audio_id=audio_id,
-        owner_id=owner_id,
+        **kwargs
     )
     
     real_id = None

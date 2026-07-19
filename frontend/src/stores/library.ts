@@ -183,7 +183,7 @@ export const useLibraryStore = defineStore("library", () => {
 
   async function addToLibrary(track: Track) {
     const key = `${track.owner_id}_${track.id}`;
-    const added = await api.addTrack(track.id, track.owner_id);
+    const added = await api.addTrack(track.id, track.owner_id, track.access_key);
     myMusic.value = [added, ...myMusic.value];
     if (myMusicAll.value.length > 0) {
       myMusicAll.value = [added, ...myMusicAll.value];

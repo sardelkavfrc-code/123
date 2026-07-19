@@ -25,9 +25,12 @@ class Track(APIModel):
     is_explicit: bool = False
     lyrics_id: int | None = None
     date: int = 0
+    access_key: str | None = None
 
     @property
     def full_id(self) -> str:
+        if self.access_key:
+            return f"{self.owner_id}_{self.id}_{self.access_key}"
         return f"{self.owner_id}_{self.id}"
 
 

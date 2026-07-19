@@ -311,8 +311,10 @@ export const api = {
     const { data } = await http.get<AlbumList>("/audio/moods");
     return data;
   },
-  async addTrack(audio_id: number, owner_id: number): Promise<Track> {
-    const { data } = await http.post<Track>("/audio/add", null, { params: { audio_id, owner_id } });
+  async addTrack(audio_id: number, owner_id: number, access_key?: string): Promise<Track> {
+    const params: Record<string, any> = { audio_id, owner_id };
+    if (access_key) params.access_key = access_key;
+    const { data } = await http.post<Track>("/audio/add", null, { params });
     return data;
   },
   async removeTrack(audio_id: number, owner_id: number): Promise<{ ok: boolean }> {

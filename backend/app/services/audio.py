@@ -49,6 +49,7 @@ def parse_track(audio: dict[str, Any]) -> Track:
         is_explicit=bool(audio.get("is_explicit") or False),
         lyrics_id=int(audio["lyrics_id"]) if audio.get("lyrics_id") else None,
         date=int(audio.get("date", 0) or 0),
+        access_key=str(audio["access_key"]) if audio.get("access_key") else None,
     )
 
 
