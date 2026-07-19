@@ -15,7 +15,7 @@ import RecommendationCard from "@/components/RecommendationCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import Spinner from "@/components/Spinner.vue";
 
-type Scope = "global" | "library";
+import TrackRow from "@/components/TrackRow.vue";
 
 const PAGE_SIZE = 100;
 
@@ -27,7 +27,6 @@ const route = useRoute();
 const { myMusic } = storeToRefs(library);
 
 const query = ref(typeof route.query.q === "string" ? route.query.q : "");
-const scope = ref<Scope>("global");
 const debounceMs = 350;
 
 const results = ref<Track[]>([]);
@@ -159,7 +158,6 @@ async function runGlobal() {
 }
 
 async function loadMore() {
-  if (scope.value !== "global") return;
   if (!hasMore.value || loadingMore.value || loading.value) return;
   const q = query.value.trim();
   if (!q) return;
@@ -271,71 +269,71 @@ async function playAlbum(album: AlbumSummary) {
             autofocus
           />
         </div>
-        <div class="search__segmented" role="tablist">
-          <button
-            class="search__seg"
-            :class="{ 'search__seg--active': scope === 'global' }"
-            @click="scope = 'global'"
-            role="tab"
-            :aria-selected="scope === 'global'"
-          >
-            Везде
-          </button>
-          <button
-            class="search__seg"
-            :class="{ 'search__seg--active': scope === 'library' }"
-            @click="scope = 'library'"
-            role="tab"
-            :aria-selected="scope === 'library'"
-          >
-            В библиотеке
-          </button>
-        </div>
         <button class="btn btn--ghost" @click="router.back()">Назад</button>
       </template>
     </PageHeader>
 
     <section class="search">
-      <template v-if="scope === 'global'">
-        <div v-if="loading" class="search__loading"><Spinner :size="18" /> Ищем «{{ query }}»…</div>
-        <div v-else-if="error" class="search__error">{{ error }}</div>
-        <div v-else-if="!query.trim()">
-          <EmptyState title="Начни печатать" subtitle="Введи название или исполнителя — поиск стартует автоматически" />
-        </div>
-        <div v-else class="search__pane">
-          <div v-if="searchArtists.length" class="search__artists-section">
-            <h3 class="search__section-title">Артисты</h3>
-            <div class="search__slider-container">
-              <button :class="{ 'search__slider-btn--hidden': artistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollArtists(-1)" aria-label="Листать влево">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-              </button>
-              <div class="search__artists" ref="artistsScroll" @scroll="checkArtistsScroll">
-                <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
-              </div>
-              <button :class="{ 'search__slider-btn--hidden': artistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollArtists(1)" aria-label="Листать вправо">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-              </button>
-            </div>
-          </div>
-          
-          <div v-if="searchPlaylists.length" class="search__playlists-section">
-            <h3 class="search__section-title">Альбомы</h3>
-            <div class="search__slider-container">
-              <button :class="{ 'search__slider-btn--hidden': playlistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollPlaylists(-1)" aria-label="Листать влево">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-              </button>
-              <div class="search__playlists" ref="playlistsScroll" @scroll="checkPlaylistsScroll">
-                <RecommendationCard v-for="(p, idx) in searchPlaylists" :key="p.id" :block="p" :index="idx" @open="playAlbum" />
-              </div>
-              <button :class="{ 'search__slider-btn--hidden': playlistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollPlaylists(1)" aria-label="Листать вправо">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
-              </button>
-            </div>
-          </div>
-
+      <div v-if="loading" class="search__loading"><Spinner :size="18" /> Ищем «{{ query }}»…</div>
+      <div v-else-if="error" class="search__error">{{ error }}</div>
+      <div v-else-if="!query.trim()">
+        <EmptyState title="Начни печатать" subtitle="Введи название или исполнителя — поиск стартует автоматически" />
+      </div>
+      <div v-else class="search__pane">
+<div v-if="libraryMatches.length" class="search__library-section">
           <div class="search__head">
-            <span>Найдено треков: {{ total || results.length }}</span>
-            <button class="btn btn--ghost" :disabled="!results.length" @click="playMany(results)">
+            <h3 class="search__section-title">Мои треки</h3>
+            <button class="btn btn--ghost" @click="playMany(libraryMatches)">
+              Показать все >
+            </button>
+          </div>
+          <div class="search__library-slider">
+            <TrackRow 
+              v-for="(t, idx) in libraryMatches" 
+              :key="t.owner_id + '_' + t.id"
+              :track="t"
+              :index="idx + 1"
+              :is-active="player.current?.id === t.id && player.current?.owner_id === t.owner_id"
+              :is-playing="player.isPlaying"
+              @play="player.playQueue(libraryMatches, idx, { autoPlay: true })"
+            />
+          </div>
+        </div>
+
+        <div v-if="searchArtists.length" class="search__artists-section">
+          <h3 class="search__section-title">Исполнители</h3>
+          <div class="search__slider-container">
+            <button :class="{ 'search__slider-btn--hidden': artistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollArtists(-1)" aria-label="Листать влево">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div class="search__artists" ref="artistsScroll" @scroll="checkArtistsScroll">
+              <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
+            </div>
+            <button :class="{ 'search__slider-btn--hidden': artistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollArtists(1)" aria-label="Листать вправо">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+        </div>
+        
+        <div v-if="searchPlaylists.length" class="search__playlists-section">
+          <h3 class="search__section-title">Альбомы</h3>
+          <div class="search__slider-container">
+            <button :class="{ 'search__slider-btn--hidden': playlistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollPlaylists(-1)" aria-label="Листать влево">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div class="search__playlists" ref="playlistsScroll" @scroll="checkPlaylistsScroll">
+              <RecommendationCard v-for="(p, idx) in searchPlaylists" :key="p.id" :block="p" :index="idx" @open="playAlbum" />
+            </div>
+            <button :class="{ 'search__slider-btn--hidden': playlistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollPlaylists(1)" aria-label="Листать вправо">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="results.length" class="search__tracks-section">
+          <div class="search__head">
+            <h3 class="search__section-title">Треки по ВК</h3>
+            <button class="btn btn--ghost" @click="playMany(results)">
               Слушать всё
             </button>
           </div>
@@ -343,38 +341,13 @@ async function playAlbum(album: AlbumSummary) {
             :tracks="results"
             show-index
             manual-play
-            empty-title="Ничего не нашлось"
             @play="handlePlay"
           />
           <div v-if="loadingMore" class="search__loading">
             <Spinner :size="16" /> Подгружаем ещё…
           </div>
         </div>
-      </template>
-
-      <template v-else>
-        <div v-if="!query.trim()">
-          <EmptyState title="Поиск в твоей музыке" subtitle="Введи название — поищем в локально сохранённой библиотеке" />
-        </div>
-        <div v-else class="search__pane">
-          <div class="search__head">
-            <span>Найдено в библиотеке: {{ libraryMatches.length }}</span>
-            <button
-              class="btn btn--ghost"
-              :disabled="!libraryMatches.length"
-              @click="playMany(libraryMatches)"
-            >
-              Слушать всё
-            </button>
-          </div>
-          <TrackList
-            :tracks="libraryMatches"
-            show-index
-            empty-title="Ничего не нашлось"
-            empty-subtitle="Сохрани трек в библиотеку, чтобы он появлялся здесь"
-          />
-        </div>
-      </template>
+      </div>
     </section>
   </ScrollArea>
 </template>
@@ -394,53 +367,40 @@ async function playAlbum(album: AlbumSummary) {
   min-width: 240px;
   height: 42px;
 }
-.search__segmented {
-  display: inline-flex;
-  padding: 4px;
-  background: var(--bg-2);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  gap: 2px;
-}
-.search__seg {
-  padding: 6px 16px;
-  border-radius: 999px;
-  font-size: calc(13px * var(--font-scale, 1));
-  font-weight: 500;
-  color: var(--text-2);
-  transition:
-    background var(--motion-duration-fast) var(--motion-ease-out),
-    color var(--motion-duration-fast) var(--motion-ease-out);
-}
-.search__seg:hover:not(.search__seg--active) {
-  color: var(--text-0);
-}
-.search__seg--active {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
-  color: var(--accent-text, #fff);
-}
 .search__pane {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 32px;
 }
-.search__artists-section {
+.search__library-section,
+.search__artists-section,
+.search__playlists-section,
+.search__tracks-section {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 24px;
-}
-.search__playlists-section {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
 }
 .search__section-title {
   font-size: calc(16px * var(--font-scale, 1));
   font-weight: 700;
   margin: 0;
   color: var(--text-0);
+}
+.search__library-slider {
+  display: grid;
+  grid-template-rows: repeat(3, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: 360px;
+  gap: 8px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 8px;
+  scroll-behavior: smooth;
+  margin: 0 -32px;
+  padding: 0 32px 8px;
+}
+.search__library-slider::-webkit-scrollbar {
+  display: none;
 }
 .search__artists {
   display: flex;

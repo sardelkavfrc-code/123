@@ -27,7 +27,6 @@ function goToDislikes() {
 
 const { myMusic, myMusicLoading, myMusicLoadingMore, myMusicHasMore, myMusicTotal } =
   storeToRefs(library);
-const query = ref("");
 
 const activeTab = ref<"library" | "recent">("library");
 const recentMusic = ref<Track[]>([]);
@@ -101,12 +100,7 @@ const activeFullList = computed(() => {
 });
 
 const filtered = computed(() => {
-  const q = query.value.trim().toLowerCase();
-  const list = activeFullList.value;
-  if (!q) return list;
-  return list.filter(
-    (t: Track) => t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
-  );
+  return activeFullList.value;
 });
 
 const subtitle = computed(() => {
@@ -173,10 +167,7 @@ async function onRecentNearEnd() {
 const isGlobalLoading = ref(false);
 
 async function handlePlay(_track: Track, index: number) {
-  if (query.value.trim().length > 0) {
-    player.playQueue(filtered.value, index);
-    return;
-  }
+
   
   const onNearEnd = activeTab.value === "recent" ? onRecentNearEnd : undefined;
   player.playQueue(activeFullList.value, index, { autoPlay: true }, onNearEnd);
@@ -195,10 +186,7 @@ async function handlePlay(_track: Track, index: number) {
 
 async function playAll() {
   if (!filtered.value.length) return;
-  if (query.value.trim().length > 0) {
-    player.playQueue(filtered.value, 0);
-    return;
-  }
+
   
   const onNearEnd = activeTab.value === "recent" ? onRecentNearEnd : undefined;
   player.playQueue(activeFullList.value, 0, { autoPlay: true }, onNearEnd);
@@ -217,11 +205,7 @@ async function playAll() {
 
 async function shufflePlay() {
   if (!filtered.value.length) return;
-  if (query.value.trim().length > 0) {
-    player.shuffle = true;
-    player.playQueue(filtered.value, -1);
-    return;
-  }
+
   
   player.shuffle = true;
   const onNearEnd = activeTab.value === "recent" ? onRecentNearEnd : undefined;
@@ -296,12 +280,17 @@ async function deleteAllTracks() {
           </svg>
           Перемешать
         </button>
-        <input
-          v-model="query"
-          class="input my-music__filter"
-          placeholder="Поиск в библиотеке"
+        <button 
+          class="btn btn--ghost my-music__search-btn" 
+          @click="router.push('/search')"
           aria-label="Поиск"
-        />
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          Поиск
+        </button>
         <button 
           v-if="unavailableTracks.length > 0"
           class="btn btn--unavailable"
@@ -443,10 +432,6 @@ async function deleteAllTracks() {
   border-radius: 99px;
   transition: left var(--motion-duration-slow) var(--motion-ease-out),
               width var(--motion-duration-slow) var(--motion-ease-out);
-}
-.my-music__filter {
-  width: 280px;
-  height: 38px;
 }
 .my-music__loading {
   display: inline-flex;

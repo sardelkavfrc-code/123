@@ -19,7 +19,6 @@ const ALL_SIDEBAR_ITEMS: Record<string, { to: { name: string }; label: string; i
   home: { to: { name: "home" }, label: "Главная", icon: "home" },
   library: { to: { name: "library" }, label: "Моя музыка", icon: "library" },
   friends: { to: { name: "friends" }, label: "Друзья", icon: "friends" },
-  search: { to: { name: "search" }, label: "Поиск", icon: "search" },
   queue: { to: { name: "queue" }, label: "Очередь", icon: "queue" },
   settings: { to: { name: "settings" }, label: "Настройки", icon: "settings" },
 };
