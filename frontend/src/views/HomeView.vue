@@ -582,7 +582,7 @@ async function playAlbum(album: AlbumSummary) {
             <button v-if="section.layout === 'triple_stacked_slider'" class="home__slider-btn home__slider-btn--prev" @click="scrollLeft">
               <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
             </button>
-            <div class="home__algorithms" @scroll="onSliderScroll" :class="section.layout === 'triple_stacked_slider' ? 'home__audios-grid--triple' : 'home__audios-grid'">
+            <div @scroll="onSliderScroll" :class="section.layout === 'triple_stacked_slider' ? 'home__algorithms home__library-slider' : 'home__audios-grid'">
               <template v-if="section.layout === 'triple_stacked_slider'">
                 <SliderTrackRow
                   v-for="(track, index) in section.audios"
@@ -730,16 +730,28 @@ async function playAlbum(album: AlbumSummary) {
   margin-top: 16px;
   margin-bottom: 24px;
 }
-.home__audios-grid--triple {
+.home__library-slider {
   display: grid;
   grid-template-rows: repeat(3, auto);
   grid-auto-flow: column;
+  grid-auto-columns: calc((100% - 16px) / 2.5);
+  gap: 8px 16px;
   overflow-x: auto;
-  gap: 12px 24px;
-  padding-bottom: 16px;
   scrollbar-width: none;
+  padding-bottom: 8px;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
 }
-.home__audios-grid--triple::-webkit-scrollbar {
+.home__library-slider::after {
+  content: "";
+  display: block;
+  grid-row: 1 / -1;
+  width: 65vw;
+}
+.home__library-slider > * {
+  scroll-snap-align: start;
+}
+.home__library-slider::-webkit-scrollbar {
   display: none;
 }
 
@@ -1236,27 +1248,4 @@ async function playAlbum(album: AlbumSummary) {
   transform: translateY(-8px);
 }
 </style>
-
-<style scoped>
-.home__audios-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.home__audios-grid--triple {
-  display: grid;
-  grid-template-rows: repeat(3, 1fr);
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(300px, 85vw);
-  gap: 8px 24px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  padding-bottom: 16px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  scroll-behavior: smooth;
-}
-.home__audios-grid--triple::-webkit-scrollbar {
-  display: none;
-}
-</style>
+
