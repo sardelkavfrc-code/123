@@ -800,7 +800,7 @@ async function playAlbum(album: AlbumSummary) {
   display: grid;
   grid-template-rows: repeat(2, 1fr);
   grid-auto-flow: column;
-  grid-auto-columns: 1fr;
+  grid-auto-columns: minmax(145px, 1fr);
   gap: 5px;
 }
 .home__section-head {

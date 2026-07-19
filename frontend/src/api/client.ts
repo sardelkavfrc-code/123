@@ -13,6 +13,7 @@ import type {
   VKValidateAccountResponse,
   VKCheckOtpResponse,
   VerificationMethodsResponse,
+  HomeSection,
 } from "./types";
 
 
@@ -369,12 +370,8 @@ export const api = {
     const { data } = await http.get<TrackList>("/audio/mix", { params });
     return data;
   },
-  async algorithms(): Promise<AlbumList> {
-    const { data } = await http.get<AlbumList>("/audio/algorithms");
-    return data;
-  },
-  async moods(): Promise<AlbumList> {
-    const { data } = await http.get<AlbumList>("/audio/moods");
+  async explore(): Promise<HomeSection[]> {
+    const { data } = await http.get<HomeSection[]>("/audio/explore");
     return data;
   },
   async addTrack(audio_id: number, owner_id: number, access_key?: string): Promise<Track> {

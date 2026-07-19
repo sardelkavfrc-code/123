@@ -79,7 +79,7 @@ class AlbumSummary(APIModel):
     track_count: int | None = None
     type: str | None = None
     main_color: str | None = None
-
+    tracks: list["Track"] = Field(default_factory=list)
 
 class AlbumList(APIModel):
     items: list[AlbumSummary] = Field(default_factory=list)
@@ -108,3 +108,25 @@ class CatalogSearchResult(APIModel):
     artists: list[Artist] = Field(default_factory=list)
     playlists: list[AlbumSummary] = Field(default_factory=list)
     tracks: list[Track] = Field(default_factory=list)
+
+
+class ActionItem(APIModel):
+    id: str
+    title: str
+    url: str | None = None
+    color: str | None = None
+    mix_id: str | None = None
+    mix_options: dict | None = None
+
+
+class HomeSection(APIModel):
+    id: str
+    title: str
+    subtitle: str | None = None
+    type: str
+    layout: str | None = None
+    playlists: list[AlbumSummary] = Field(default_factory=list)
+    audios: list[Track] = Field(default_factory=list)
+    actions: list[ActionItem] = Field(default_factory=list)
+    next_from: str | None = None
+

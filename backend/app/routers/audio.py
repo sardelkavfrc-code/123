@@ -5,7 +5,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import AlbumList, AlbumSummary, Artist, CatalogSearchResult, Track, TrackList
+from ..models.audio import AlbumList, AlbumSummary, Artist, CatalogSearchResult, Track, TrackList, HomeSection
 from ..services.audio import (
     parse_albums,
     parse_artist,
@@ -446,12 +446,53 @@ async def recommendations(
         "shuffle": shuffle,
     }
 
-    response = await _safe_call(
-        vk,
-        "audio.getRecommendations",
-        session.access_token,
-        **kwargs
-    )
+    if target_audio:
+        response = await _safe_call(vk, "audio.getRecommendations", session.access_token, **kwargs)
+        return parse_track_list(response)
+
+    try:
+        catalog = await _safe_call(vk, "catalog.getAudio", session.access_token)
+        sections = catalog.get("catalog", {}).get("sections", [])
+        explore_id = None
+        for sec in sections:
+            if "explore" in sec.get("url", ""):
+                explore_id = sec.get("id")
+                break
+
+        if explore_id:
+            sec_resp = await _safe_call(vk, "catalog.getSection", session.access_token, section_id=explore_id, need_blocks=1)
+            blocks = sec_resp.get("section", {}).get("blocks", [])
+            audios_from_section = sec_resp.get("audios", [])
+            audio_map = {f"{a.get('owner_id')}_{a.get('id')}": a for a in audios_from_section}
+
+            recom_audios = []
+            seen = set()
+            for b in blocks:
+                if b.get("data_type") == "music_audios":
+                    for aid in b.get("audios_ids", []):
+                        if aid not in seen and aid in audio_map:
+                            seen.add(aid)
+                            recom_audios.append(audio_map[aid])
+
+            if recom_audios:
+                import random
+                if shuffle:
+                    random.shuffle(recom_audios)
+
+                paginated = recom_audios[offset:offset+count]
+                await _fill_missing_urls(vk, session, paginated)
+                track_list = parse_track_list({"count": len(recom_audios), "items": paginated})
+                if offset + count < len(recom_audios):
+                    track_list.next_from = str(offset + count)
+                track_list.block_id = "explore_fake"
+                return track_list
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to fetch explore recommendations: {e}")
+
+    # Fallback to the old method
+    response = await _safe_call(vk, "audio.getRecommendations", session.access_token, **kwargs)
     return parse_track_list(response)
 
 
@@ -488,129 +529,174 @@ async def mix(
     return parse_track_list({"count": 0, "items": []})
 
 
-@router.get("/algorithms", response_model=AlbumList)
-async def algorithms(vk: VKDep, session: SessionDep) -> AlbumList:
-    # Get Main section
-    catalog = await vk.call("catalog.getAudio", session.access_token)
-    sections = catalog.get("catalog", {}).get("sections", [])
-    
-    main_section_id = None
-    for sec in sections:
-        if sec.get("title") == "Главная":
-            main_section_id = sec.get("id")
-            break
-            
-    if not main_section_id:
-        return AlbumList()
-        
-    section_raw = await vk.call("catalog.getSection", session.access_token, section_id=main_section_id)
-    blocks = section_raw.get("section", {}).get("blocks", [])
-    
-    algo_block = None
-    # We find the header "Собрано алгоритмами", the next block usually contains the playlists
-    found_header = False
-    for b in blocks:
-        if b.get("layout", {}).get("title") == "Собрано алгоритмами":
-            found_header = True
-            continue
-        if found_header and b.get("data_type") == "music_playlists":
-            algo_block = b
-            break
-            
-    if not algo_block:
-        return AlbumList()
-        
-    playlist_ids = algo_block.get("playlists_ids", [])
-    playlists_data = section_raw.get("playlists", [])
-    
-    items = []
-    for pl in playlists_data:
-        pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
-        if pl_id in playlist_ids:
-            items.append(AlbumSummary(
-                id=str(pl.get("id")),
-                owner_id=pl.get("owner_id"),
-                title=pl.get("title", ""),
-                subtitle=pl.get("description") or pl.get("subtitle") or "",
-                cover=_get_playlist_cover(pl),
-                year=pl.get("year"),
-                track_count=pl.get("count", 0),
-                type=pl.get("type"),
-                main_color=pl.get("main_color"),
-            ))
-            
-    return AlbumList(items=items, count=len(items))
-
-@router.get("/moods", response_model=AlbumList)
-async def moods(vk: VKDep, session: SessionDep) -> AlbumList:
-    """Returns moods and activities playlists from VK catalog."""
+@router.get("/explore", response_model=list[HomeSection])
+async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
+    """Returns all dynamic sections from VK catalog (Explore/General)."""
     try:
-        # 1. Fetch catalog root to find "Главная" section id
+        # 1. Fetch catalog root to find "Главная" or "Обзор" section id
         catalog_raw = await vk.call("catalog.getAudio", session.access_token)
         sections = catalog_raw.get("catalog", {}).get("sections", [])
         
-        main_section_id = None
+        target_section_id = None
+        # Prefer 'explore', fallback to 'general' or the first one
         for sec in sections:
-            if sec.get("title") == "Главная":
-                main_section_id = sec.get("id")
+            url = sec.get("url", "")
+            if "explore" in url or "general" in url or sec.get("title") in ["Обзор", "Главная"]:
+                target_section_id = sec.get("id")
                 break
-        
-        if not main_section_id:
-            # Fallback to the first section if "Главная" is missing
-            if sections:
-                main_section_id = sections[0].get("id")
-            else:
-                return AlbumList(items=[], count=0)
-        
-        # 2. Fetch the section
-        section_raw = await vk.call(
-            "catalog.getSection", 
-            session.access_token, 
-            section_id=main_section_id
-        )
-        
-        # 3. Find block with anchor "vibes"
-        blocks = section_raw.get("section", {}).get("blocks", [])
-        
-        vibes_block = None
-        for b in blocks:
-            # Fallback to title matching since anchor can change
-            title = b.get("title", "")
-            if b.get("data_type") == "music_playlists" and ("Настроени" in title or b.get("meta", {}).get("anchor") == "vibes"):
-                vibes_block = b
-                break
-        
-        if not vibes_block:
-            return AlbumList(items=[], count=0)
+                
+        if not target_section_id and sections:
+            target_section_id = sections[0].get("id")
             
-        playlist_ids = vibes_block.get("playlists_ids", [])
+        if not target_section_id:
+            return []
+            
+        # 2. Fetch the target section blocks
+        section_raw = await vk.call("catalog.getSection", session.access_token, section_id=target_section_id, need_blocks=1)
+        blocks = section_raw.get("section", {}).get("blocks", [])
         playlists_data = section_raw.get("playlists", [])
+        audios_data = section_raw.get("audios", [])
         
-        # 4. Map to AlbumSummary
-        items = []
-        for pl in playlists_data:
-            pl_id = f"{pl.get('owner_id')}_{pl.get('id')}"
-            if pl_id in playlist_ids:
-                items.append(
-                    AlbumSummary(
-                        id=str(pl["id"]),
-                        owner_id=pl["owner_id"],
-                        title=pl["title"],
-                        subtitle=pl.get("description") or pl.get("subtitle") or "",
-                        cover=_get_playlist_cover(pl),
-                        track_count=pl.get("count", 0),
-                        type=pl.get("type"),
-                        main_color=pl.get("main_color"),
-                    )
-                )
+        # Build lookup maps
+        pl_map = {f"{p.get('owner_id')}_{p.get('id')}": p for p in playlists_data}
+        audio_map = {f"{a.get('owner_id')}_{a.get('id')}": a for a in audios_data}
         
-        return AlbumList(items=items, count=len(items))
-
-    except VKError:
-        return AlbumList(items=[], count=0)
-
-
-
+        home_sections = []
+        current_title = ""
+        current_subtitle = ""
+        
+        for b in blocks:
+            title = b.get("layout", {}).get("title")
+            subtitle = b.get("layout", {}).get("subtitle")
+            if b.get("data_type") == "none":
+                layout_name = b.get("layout", {}).get("name")
+                if layout_name in ["header", "header_extended"]:
+                    if title:
+                        current_title = title
+                    if subtitle:
+                        current_subtitle = subtitle
+                continue
+                
+            if title:
+                current_title = title
+            if subtitle:
+                current_subtitle = subtitle
+                
+            b_type = b.get("data_type")
+            b_id = b.get("id", "")
+            next_from = b.get("next_from")
+            
+            from ..models.audio import ActionItem
+            if b_type in ["music_playlists", "music_recommended_playlists"]:
+                pl_ids = b.get("playlists_ids", [])
+                
+                # Fetch tracks for this block if present (useful for music_recommended_playlists)
+                b_audios_ids = b.get("audios_ids", [])
+                b_audios_map = {}
+                if b_audios_ids:
+                    items_a = [audio_map[aid] for aid in b_audios_ids if aid in audio_map]
+                    if items_a:
+                        await _fill_missing_urls(vk, session, items_a)
+                        parsed_a = parse_track_list({"count": len(items_a), "items": items_a}).items
+                        b_audios_map = {f"{t.owner_id}_{t.id}": t for t in parsed_a}
+                
+                items = []
+                for i, pid in enumerate(pl_ids):
+                    if pid in pl_map:
+                        pl = pl_map[pid]
+                        # For music_recommended_playlists, tracks are ordered sequentially
+                        # 3 tracks per playlist typically
+                        pl_tracks = []
+                        if b_type == "music_recommended_playlists":
+                            pl_tracks_ids = b_audios_ids[i*3 : (i+1)*3]
+                            pl_tracks = [b_audios_map[aid] for aid in pl_tracks_ids if aid in b_audios_map]
+                        
+                        items.append(AlbumSummary(
+                            id=str(pl.get("id")),
+                            owner_id=pl.get("owner_id"),
+                            title=pl.get("title", ""),
+                            subtitle=pl.get("description") or pl.get("subtitle") or "",
+                            cover=_get_playlist_cover(pl),
+                            year=pl.get("year"),
+                            track_count=pl.get("count", 0),
+                            type=pl.get("type"),
+                            main_color=pl.get("main_color"),
+                            tracks=pl_tracks
+                        ))
+                if items:
+                    home_sections.append(HomeSection(
+                        id=b_id,
+                        title=current_title or "Плейлисты",
+                        subtitle=current_subtitle,
+                        type="playlists",
+                        layout=b.get("layout", {}).get("name"),
+                        playlists=items,
+                        next_from=next_from
+                    ))
+                current_title = ""
+                current_subtitle = ""
+                
+            elif b_type in ["music_audios", "audio_stream_mixes"]:
+                audios_ids = b.get("audios_ids", [])
+                items = []
+                for aid in audios_ids:
+                    if aid in audio_map:
+                        items.append(audio_map[aid])
+                        
+                if items:
+                    await _fill_missing_urls(vk, session, items)
+                    parsed_tracks = parse_track_list({"count": len(items), "items": items}).items
+                    home_sections.append(HomeSection(
+                        id=b_id,
+                        title=current_title or "Аудиозаписи",
+                        subtitle=current_subtitle,
+                        type="audios",
+                        layout=b.get("layout", {}).get("name"),
+                        audios=parsed_tracks,
+                        next_from=next_from
+                    ))
+                current_title = ""
+                current_subtitle = ""
+                
+            elif b_type == "action":
+                if b.get("layout", {}).get("name") == "horizontal_buttons":
+                    current_title = ""
+                    continue
+                actions = b.get("actions", [])
+                parsed_actions = []
+                import json
+                for a in actions:
+                    images = a.get("images", [])
+                    img_url = images[0].get("url") if images else None
+                    mix_options_str = a.get("mix_options", "{}")
+                    try:
+                        mix_options = json.loads(mix_options_str)
+                    except:
+                        mix_options = {}
+                    parsed_actions.append(ActionItem(
+                        id=str(a.get("id")),
+                        title=a.get("title", ""),
+                        url=img_url,
+                        mix_id=a.get("mix_id"),
+                        mix_options=mix_options
+                    ))
+                if parsed_actions:
+                    home_sections.append(HomeSection(
+                        id=b_id,
+                        title=current_title,
+                        type="actions",
+                        layout=b.get("layout", {}).get("name"),
+                        actions=parsed_actions,
+                        next_from=next_from
+                    ))
+                current_title = ""
+                
+        return home_sections
+        
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error fetching home explore sections: {e}")
+        return []
 
 
 @router.post("/add", response_model=Track)

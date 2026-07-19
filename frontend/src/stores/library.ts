@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { api, APIError } from "@/api/client";
-import type { AlbumList, FriendList, Track, TrackList } from "@/api/types";
+import type { FriendList, Track, TrackList, HomeSection } from "@/api/types";
 
 /** VK rejects audio.get requests with count > 200 — keep page size below that. */
 const PAGE_SIZE = 100;
@@ -19,10 +19,8 @@ export const useLibraryStore = defineStore("library", () => {
   const CACHE_KEY = "vkplayer_cache";
   const CACHE_TTL = 24 * 60 * 60 * 1000;
 
-  const algorithms = ref<AlbumList | null>(null);
-  const moods = ref<AlbumList | null>(null);
-  const albumsLoading = ref(false);
-  const moodsLoading = ref(false);
+  const homeSections = ref<HomeSection[] | null>(null);
+  const homeSectionsLoading = ref(false);
 
   const myMusicIdSet = ref<Set<string>>(new Set());
   const addedOriginals = ref<Set<string>>(new Set());
@@ -33,15 +31,14 @@ export const useLibraryStore = defineStore("library", () => {
   );
 
   watch(
-    [algorithms, moods],
+    [homeSections],
     () => {
-      if (algorithms.value || moods.value) {
+      if (homeSections.value) {
         localStorage.setItem(
           CACHE_KEY,
           JSON.stringify({
             timestamp: Date.now(),
-            algorithms: algorithms.value,
-            moods: moods.value,
+            homeSections: homeSections.value,
           })
         );
       }
@@ -58,8 +55,7 @@ export const useLibraryStore = defineStore("library", () => {
         localStorage.removeItem(CACHE_KEY);
         return false;
       }
-      if (parsed.algorithms) algorithms.value = parsed.algorithms;
-      if (parsed.moods) moods.value = parsed.moods;
+      if (parsed.homeSections) homeSections.value = parsed.homeSections;
       return true;
     } catch {
       return false;
@@ -159,25 +155,14 @@ export const useLibraryStore = defineStore("library", () => {
     }
   }
 
-  async function loadAlgorithms(force = false) {
-    if (algorithms.value && !force) return algorithms.value;
-    albumsLoading.value = true;
+  async function loadExplore(force = false) {
+    if (homeSections.value && !force) return homeSections.value;
+    homeSectionsLoading.value = true;
     try {
-      algorithms.value = await api.algorithms();
-      return algorithms.value;
+      homeSections.value = await api.explore();
+      return homeSections.value;
     } finally {
-      albumsLoading.value = false;
-    }
-  }
-
-  async function loadMoods(force = false) {
-    if (moods.value && !force) return moods.value;
-    moodsLoading.value = true;
-    try {
-      moods.value = await api.moods();
-      return moods.value;
-    } finally {
-      moodsLoading.value = false;
+      homeSectionsLoading.value = false;
     }
   }
 
@@ -226,8 +211,7 @@ export const useLibraryStore = defineStore("library", () => {
     addedTracksMap.value = new Map();
     myMusicTotal.value = 0;
     friends.value = null;
-    algorithms.value = null;
-    moods.value = null;
+    homeSections.value = null;
   }
 
   return {
@@ -239,10 +223,8 @@ export const useLibraryStore = defineStore("library", () => {
     myMusicHasMore,
     friends,
     friendsLoading,
-    algorithms,
-    moods,
-    albumsLoading,
-    moodsLoading,
+    homeSections,
+    homeSectionsLoading,
     myMusicAll,
     myMusicIdSet,
     loadFromCache,
@@ -251,8 +233,7 @@ export const useLibraryStore = defineStore("library", () => {
     loadMoreMyMusic,
     loadMyMusicPage,
     loadFriends,
-    loadAlgorithms,
-    loadMoods,
+    loadExplore,
     addToLibrary,
     removeFromLibrary,
     isInLibrary,

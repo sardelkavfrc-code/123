@@ -49,6 +49,27 @@ export interface RecommendationFeed {
   blocks: RecommendationBlock[];
 }
 
+export interface ActionItem {
+  id: string;
+  title: string;
+  url?: string;
+  color?: string;
+  mix_id?: string;
+  mix_options?: Record<string, any>;
+}
+
+export interface HomeSection {
+  id: string;
+  title: string;
+  subtitle?: string;
+  type: string;
+  layout?: string;
+  playlists?: AlbumSummary[];
+  audios?: Track[];
+  actions?: ActionItem[];
+  next_from?: string | null;
+}
+
 export interface Artist {
   id: string;
   name: string;
@@ -68,6 +89,7 @@ export interface AlbumSummary {
   track_count: number | null;
   type?: string | null;
   main_color?: string | null;
+  tracks?: Track[];
 }
 
 export interface ArtistAlbumBlock {
