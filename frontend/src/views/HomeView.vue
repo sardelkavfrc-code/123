@@ -47,8 +47,38 @@ function toggleSettings(event: MouseEvent) {
 
 function toggleMixSettings(event: MouseEvent) {
   event.stopPropagation();
-  showMixSettings.value = !showMixSettings.value;
+  if (showMixSettings.value && mixDropdownStyle.value.position === 'absolute' && mixDropdownStyle.value.left) {
+    showMixSettings.value = true;
+  } else {
+    showMixSettings.value = !showMixSettings.value;
+  }
   showDropdown.value = false;
+  mixDropdownStyle.value = {};
+}
+
+const mixDropdownStyle = ref<Record<string, string>>({});
+
+function openMixContextMenu(event: MouseEvent) {
+  showMixSettings.value = true;
+  showDropdown.value = false;
+  
+  if (!mixSettingsRef.value) return;
+
+  // Keep dropdown inside viewport bounds (approx 280x250)
+  const dropX = Math.min(event.clientX, window.innerWidth - 300);
+  const dropY = Math.min(event.clientY, window.innerHeight - 300);
+  
+  const rect = mixSettingsRef.value.getBoundingClientRect();
+  const localX = dropX - rect.left;
+  const localY = dropY - rect.top;
+  
+  mixDropdownStyle.value = {
+    position: 'absolute',
+    top: `${localY}px`,
+    left: `${localX}px`,
+    right: 'auto',
+    margin: '0'
+  };
 }
 
 function handleWindowClick(event: MouseEvent) {
@@ -379,7 +409,7 @@ async function playAlbum(album: AlbumSummary) {
 
     <section class="home__hero">
       <div class="home__mix-container" @mouseleave="showMixSettings = false">
-        <button class="home__mix" :disabled="mixLoading" @click="playMix" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
+        <button class="home__mix" :disabled="mixLoading" @click="playMix" @contextmenu.prevent="openMixContextMenu" :aria-label="mixTracks.length ? 'Включить VK Микс' : 'Микс загружается'">
           <div class="home__mix-glow" />
           <div class="home__mix-body">
             <div class="home__mix-eyebrow">Персональная подборка</div>
@@ -420,7 +450,7 @@ async function playAlbum(album: AlbumSummary) {
           </button>
 
           <Transition name="dropdown-fade">
-            <div v-if="showMixSettings" class="home__mix-dropdown-floating" @click.stop>
+            <div v-if="showMixSettings" class="home__mix-dropdown-floating" :style="mixDropdownStyle" @click.stop>
               <div class="home__mix-dropdown-header">Настройки ВК Микса</div>
               
               <div class="home__mix-settings-row">
@@ -641,7 +671,7 @@ async function playAlbum(album: AlbumSummary) {
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  min-width: 280px;
+  width: 280px;
   z-index: 100;
   cursor: default;
 }
