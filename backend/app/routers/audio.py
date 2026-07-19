@@ -152,8 +152,8 @@ async def my_music_all(
 ) -> TrackList:
     # First, run a quick call to get the total count
     try:
-        first_resp = await _safe_call(vk, "audio.get", session.access_token, owner_id=session.user_id, count=1)
-        total_count = first_resp.get("count", 0) if first_resp else 0
+        first_resp = await _safe_call(vk, "audio.getCount", session.access_token, owner_id=session.user_id)
+        total_count = int(first_resp) if first_resp is not None else 0
     except Exception:
         total_count = 0
 
@@ -293,73 +293,41 @@ async def search_catalog(
 async def my_catalog(
     vk: VKDep,
     session: SessionDep,
+    offset: int = Query(0, ge=0),
+    count: int = Query(20, ge=1, le=100),
 ) -> TrackList:
-    catalog = await vk.call("catalog.getAudio", session.access_token)
-    sections = catalog.get("catalog", {}).get("sections", [])
-    
-    my_music_sec_id = None
-    for sec in sections:
-        if sec.get("title") == "Моя музыка":
-            my_music_sec_id = sec.get("id")
-            break
+    try:
+        catalog = await _safe_call(vk, "catalog.getAudio", session.access_token, url="https://vk.com/audio?section=recent")
+        sections = catalog.get("catalog", {}).get("sections", [])
+        sec_id = None
+        for sec in sections:
+            if "recent" in sec.get("url", ""):
+                sec_id = sec.get("id")
+                break
+                
+        if not sec_id:
+            return parse_track_list({"count": 0, "items": []})
             
-    if not my_music_sec_id:
-        my_music_sec_id = "PUldVA8FR0RzSVNUWE1JSmRSS0wEGEleZFFcRA0NWVd2U1oL"
+        section_data = await _safe_call(vk, "catalog.getSection", session.access_token, section_id=sec_id, need_blocks=1)
         
-    section_data = await vk.call(
-        "catalog.getSection",
-        session.access_token,
-        section_id=my_music_sec_id,
-        need_blocks=1,
-    )
-    
-    response_obj = section_data.get("section", {})
-    blocks = response_obj.get("blocks", [])
-    
-    recent_block = None
-    for b in blocks:
-        if b.get("data_type") != "music_audios":
-            continue
-        is_recent = False
-        url_val = b.get("url") or ""
-        title_val = b.get("title") or ""
-        layout_title = (b.get("layout") or {}).get("title") or ""
+        audios = section_data.get("audios", [])
         
-        if "block=recent" in url_val:
-            is_recent = True
-        elif title_val == "Недавно прослушанные":
-            is_recent = True
-        elif layout_title == "Недавно прослушанные":
-            is_recent = True
+        total = len(audios)
+        paginated_audios = audios[offset:offset+count]
+        
+        if paginated_audios:
+            await _fill_missing_urls(vk, session, paginated_audios)
             
-        if is_recent:
-            recent_block = b
-            break
-            
-    if not recent_block:
+        next_from = str(offset + count) if offset + count < total else None
+        
+        track_list = parse_track_list({"count": total, "items": paginated_audios})
+        track_list.next_from = next_from
+        track_list.block_id = "recent_fake"
+        return track_list
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Error fetching recent tracks from VK: {e}")
         return parse_track_list({"count": 0, "items": []})
-        
-    audios_ids = recent_block.get("audios_ids") or []
-    raw_audios = section_data.get("audios") or []
-    
-    audios_map = {}
-    for a in raw_audios:
-        if isinstance(a, dict):
-            full_id = f"{a.get('owner_id')}_{a.get('id')}"
-            audios_map[full_id] = a
-            
-    resolved_tracks = []
-    for aid in audios_ids:
-        if aid in audios_map:
-            resolved_tracks.append(audios_map[aid])
-            
-    if resolved_tracks:
-        await _fill_missing_urls(vk, session, resolved_tracks)
-        
-    track_list = parse_track_list({"count": len(resolved_tracks), "items": resolved_tracks})
-    track_list.next_from = recent_block.get("next_from")
-    track_list.block_id = recent_block.get("id")
-    return track_list
 
 
 @router.get("/catalog/block/items", response_model=TrackList)
@@ -370,6 +338,13 @@ async def catalog_block_items(
     start_from: str = Query(..., description="Курсор для следующей порции"),
     count: int = Query(20, ge=1, le=100),
 ) -> TrackList:
+    if block_id == "recent_fake":
+        try:
+            offset = int(start_from)
+        except ValueError:
+            offset = 0
+        return await my_catalog(vk, session, offset=offset, count=count)
+        
     response = await vk.call(
         "catalog.getBlockItems",
         session.access_token,
@@ -1021,26 +996,43 @@ async def track_play(
     duration: int = Query(..., description="Длительность в секундах"),
 ) -> dict[str, bool]:
     """Регистрирует проигрывание трека в статистике ВК для недавних и рекомендаций."""
-    import json
     import time
+    import json
+    
+    # --- VK API Stats ---
     import random
 
-    uuid_val = random.randint(0, 2**63 - 1)
-    event = {
+    uuid_val = random.randint(1, 2147483647)
+    current_time = int(time.time())
+    
+    event_start = {
+        "e": "audio_start",
+        "audio_id": f"{owner_id}_{audio_id}",
+        "source": "my",
+        "uuid": uuid_val,
+        "start_time": current_time,
+    }
+    event_play = {
         "e": "audio_play",
         "audio_id": f"{owner_id}_{audio_id}",
         "source": "my",
         "uuid": uuid_val,
         "duration": duration,
-        "start_time": int(time.time()),
+        "start_time": current_time,
     }
-    events_json = json.dumps([event])
+    events_json = json.dumps([event_start, event_play], separators=(',', ':'))
 
-    await _safe_call(
-        vk,
-        "stats.trackEvents",
-        session.access_token,
-        events=events_json
-    )
-    return {"ok": True}
+    # Отправляем статистику прослушивания через стандартный клиент
+    try:
+        response = await _safe_call(
+            vk,
+            "stats.trackEvents",
+            session.access_token,
+            events=events_json,
+        )
+        print(f"[track_play] VK stats.trackEvents response: {response}", flush=True)
+    except Exception as e:
+        print(f"[track_play] VK stats.trackEvents failed: {e}", flush=True)
+        
+    return {"success": True}
 
