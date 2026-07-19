@@ -32,10 +32,12 @@ export const useUIStore = defineStore("ui", () => {
   const trackContextMenuOpen = ref(false);
   const trackContextMenuPos = ref({ x: 0, y: 0 });
   const hoveredTrackKey = ref<string | null>(null);
-  const activeContextMenuTrackKey = ref<string | null>(null);
+  const activeContextMenuTrack = ref<any>(null); // Store the full track object instead of just key
+  const activeContextMenuType = ref<'full' | 'edit_only'>('full');
 
-  function showTrackContextMenu(event: MouseEvent, key: string) {
-    activeContextMenuTrackKey.value = key;
+  function showTrackContextMenu(event: MouseEvent, track: any, menuType: 'full' | 'edit_only' = 'full') {
+    activeContextMenuTrack.value = track;
+    activeContextMenuType.value = menuType;
     if (trackContextMenuOpen.value) {
       trackContextMenuOpen.value = false;
       window.setTimeout(() => {
@@ -75,7 +77,8 @@ export const useUIStore = defineStore("ui", () => {
     trackContextMenuOpen,
     trackContextMenuPos,
     hoveredTrackKey,
-    activeContextMenuTrackKey,
+    activeContextMenuTrack,
+    activeContextMenuType,
     showTrackContextMenu
   };
 });

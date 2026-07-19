@@ -107,7 +107,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
       'queue__row--current': current,
       'queue__row--playing': current && playing,
     }"
-    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, trackKey)"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'edit_only')"
     @mouseenter="ui.hoveredTrackKey = trackKey"
     @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >

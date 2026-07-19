@@ -134,7 +134,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
     class="row"
     :class="{ 'row--playing': isCurrent, 'row--compact': variant === 'compact', 'row--off': unavailable }"
     @dblclick="playOne"
-    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, trackKey)"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'edit_only')"
     @mouseenter="ui.hoveredTrackKey = trackKey"
     @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >

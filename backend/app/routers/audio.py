@@ -248,6 +248,7 @@ async def search(
     count: int = Query(50, ge=1, le=200),
     auto_complete: bool = Query(True),
     performer_only: bool = Query(False),
+    search_own: bool = Query(False),
     sort: int = Query(2, ge=0, le=2),
     captcha_sid: str | None = Query(None),
     captcha_key: str | None = Query(None),
@@ -255,23 +256,66 @@ async def search(
     captcha_mode: str | None = Query(None),
     vk_cookies: str | None = Query(None),
 ) -> TrackList:
-    response = await _safe_call(
-        vk,
-        "audio.search",
-        session.access_token,
-        q=q,
-        offset=offset,
-        count=count,
-        auto_complete=auto_complete,
-        performer_only=performer_only,
-        sort=sort,
-        captcha_sid=captcha_sid,
-        captcha_key=captcha_key,
-        remixstlid=remixstlid,
-        captcha_mode=captcha_mode,
-        vk_cookies=vk_cookies,
-    )
-    return parse_track_list(response)
+    if search_own:
+        response = await _safe_call(
+            vk,
+            "catalog.getAudioSearch",
+            session.access_token,
+            query=q,
+            need_blocks=1
+        )
+        
+        my_tracks_ids = []
+        catalog = response.get("catalog", {}) if isinstance(response, dict) else {}
+        sections = catalog.get("sections", [])
+        for sec in sections:
+            blocks = sec.get("blocks", [])
+            for i, block in enumerate(blocks):
+                title = block.get("title", "")
+                layout_title = block.get("layout", {}).get("title", "")
+                if title == "Мои треки" or layout_title == "Мои треки":
+                    # Sometimes the title is in the previous 'none' block
+                    pass
+                # The actual music_audios block might have title='Мои треки' or it might be the next block
+                if block.get("data_type") == "music_audios" and (block.get("title") == "Мои треки" or block.get("layout", {}).get("title") == "Мои треки"):
+                    my_tracks_ids = block.get("audios_ids", [])
+                    break
+                elif block.get("data_type") == "none" and (block.get("title") == "Мои треки" or block.get("layout", {}).get("title") == "Мои треки"):
+                    if i + 1 < len(blocks) and blocks[i+1].get("data_type") == "music_audios":
+                        my_tracks_ids = blocks[i+1].get("audios_ids", [])
+                        break
+            if my_tracks_ids:
+                break
+                
+        all_audios = response.get("audios", [])
+        from app.services.audio import parse_track
+        
+        parsed_tracks = []
+        for audio in all_audios:
+            if f"{audio.get('owner_id')}_{audio.get('id')}" in my_tracks_ids:
+                parsed = parse_track(audio)
+                if parsed:
+                    parsed_tracks.append(parsed)
+                    
+        return TrackList(items=parsed_tracks)
+    else:
+        response = await _safe_call(
+            vk,
+            "audio.search",
+            session.access_token,
+            q=q,
+            offset=offset,
+            count=count,
+            auto_complete=auto_complete,
+            performer_only=performer_only,
+            sort=sort,
+            captcha_sid=captcha_sid,
+            captcha_key=captcha_key,
+            remixstlid=remixstlid,
+            captcha_mode=captcha_mode,
+            vk_cookies=vk_cookies,
+        )
+        return parse_track_list(response)
 
 
 @router.get("/search/catalog", response_model=CatalogSearchResult)

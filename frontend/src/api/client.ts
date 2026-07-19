@@ -264,6 +264,7 @@ export const api = {
     offset?: number;
     count?: number;
     performer_only?: boolean;
+    search_own?: boolean;
     captcha_sid?: string;
     captcha_key?: string;
     remixstlid?: string;

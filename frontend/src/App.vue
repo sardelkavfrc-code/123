@@ -8,6 +8,7 @@ import ToastHost from "@/components/ToastHost.vue";
 import UpdateNotification from "@/components/UpdateNotification.vue";
 import DynamicBackground from "@/components/DynamicBackground.vue";
 import TrackSettingsModal from "@/components/TrackSettingsModal.vue";
+import TrackContextMenu from "@/components/TrackContextMenu.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
@@ -45,7 +46,7 @@ let trackLeaveTimeout: number | null = null;
 function checkTrackMouseLeave() {
   if (trackLeaveTimeout) window.clearTimeout(trackLeaveTimeout);
   trackLeaveTimeout = window.setTimeout(() => {
-    const isOverActiveTrack = ui.hoveredTrackKey === ui.activeContextMenuTrackKey;
+    const isOverActiveTrack = ui.activeContextMenuTrack && ui.hoveredTrackKey === `${ui.activeContextMenuTrack.owner_id}_${ui.activeContextMenuTrack.id}`;
     if (!isOverActiveTrack && !isMouseOverTrackContextMenu.value) {
       ui.trackContextMenuOpen = false;
     }
@@ -58,7 +59,7 @@ function handleMouseLeaveTrackContextMenu() {
 }
 
 watch(() => ui.hoveredTrackKey, (newVal) => {
-  if (newVal !== ui.activeContextMenuTrackKey) {
+  if (!ui.activeContextMenuTrack || newVal !== `${ui.activeContextMenuTrack.owner_id}_${ui.activeContextMenuTrack.id}`) {
     checkTrackMouseLeave();
   } else {
     if (trackLeaveTimeout) {
@@ -68,16 +69,17 @@ watch(() => ui.hoveredTrackKey, (newVal) => {
   }
 });
 
-// Sync context menu mouse-hover state on open so that static hover matches cursor
+// We no longer force isMouseOverTrackContextMenu = true here.
+// The actual mouseenter event on the menu element will set it to true.
 watch(() => ui.trackContextMenuOpen, (isOpen) => {
   if (isOpen) {
-    isMouseOverTrackContextMenu.value = true;
     if (trackLeaveTimeout) {
       window.clearTimeout(trackLeaveTimeout);
       trackLeaveTimeout = null;
     }
   } else {
-    ui.activeContextMenuTrackKey = null;
+    ui.activeContextMenuTrack = null;
+    isMouseOverTrackContextMenu.value = false;
   }
 });
 
@@ -88,11 +90,6 @@ function closeTrackContextMenu() {
     window.clearTimeout(trackLeaveTimeout);
     trackLeaveTimeout = null;
   }
-}
-
-function triggerTrackEdit() {
-  closeTrackContextMenu();
-  ui.trackSettingsOpen = true;
 }
 
 onMounted(() => {
@@ -200,24 +197,10 @@ watch(
     <ToastHost />
 
     <!-- Global Track Context Menu -->
-    <Transition name="context-menu-fade">
-      <div 
-        v-if="ui.trackContextMenuOpen" 
-        class="track-context-menu" 
-        :style="{ top: `${ui.trackContextMenuPos.y}px`, left: `${ui.trackContextMenuPos.x}px` }"
-        @click.stop
-        @mouseenter="isMouseOverTrackContextMenu = true"
-        @mouseleave="handleMouseLeaveTrackContextMenu"
-      >
-        <button class="track-context-btn" @click="triggerTrackEdit">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-          </svg>
-          Редактировать кнопки
-        </button>
-      </div>
-    </Transition>
+    <TrackContextMenu 
+      @mouseenter="isMouseOverTrackContextMenu = true"
+      @mouseleave="handleMouseLeaveTrackContextMenu"
+    />
 
     <TrackSettingsModal 
       :show="ui.trackSettingsOpen" 

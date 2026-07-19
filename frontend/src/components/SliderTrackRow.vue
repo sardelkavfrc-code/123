@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, toRef } from "vue";
-import { storeToRefs } from "pinia";
 import { usePlayerStore } from "@/stores/player";
+import { useUIStore } from "@/stores/ui";
 import { useExternalArt } from "@/composables/useExternalArt";
+import { useRouter } from "vue-router";
 import type { Track } from "@/api/types";
 import SvgIcon from "./SvgIcon.vue";
 
@@ -15,17 +16,24 @@ const emit = defineEmits<{
 }>();
 
 const player = usePlayerStore();
-
-const { current, isPlaying } = storeToRefs(player);
+const ui = useUIStore();
+const router = useRouter();
 
 const isCurrent = computed(
-  () => current.value?.id === props.track.id && current.value?.owner_id === props.track.owner_id
+  () => player.current?.id === props.track.id && player.current?.owner_id === props.track.owner_id
 );
 
+const unavailable = computed(() => !props.track.url);
+
 function playOne() {
-  if (!props.track.url) return;
+  if (unavailable.value) {
+    ui.notify("Трек недоступен", "error");
+    return;
+  }
   emit("play");
 }
+
+const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 
 const hasVkCover = computed(() => !!props.track.cover_small);
 
@@ -37,20 +45,37 @@ const { cover: externalCover } = useExternalArt(
   toRef(() => hasVkCover.value)
 );
 const displayCover = computed(() => props.track.cover_small || externalCover.value || null);
+
+function goToArtist() {
+  const artistId = props.track.main_artists?.[0]?.id;
+  const artistName = props.track.main_artists?.[0]?.name || props.track.artist;
+  if (artistId) {
+    router.push({
+      name: "artist",
+      params: { id: artistId },
+      query: artistName ? { name: artistName } : undefined,
+    });
+  } else if (artistName) {
+    router.push({ name: "search", query: { q: artistName } });
+  }
+}
 </script>
 
 <template>
   <button
     class="slider-track"
-    :class="{ 'slider-track--playing': isCurrent, 'slider-track--disabled': !track.url }"
-    @click="playOne"
+    :class="{ 'slider-track--playing': isCurrent, 'slider-track--disabled': unavailable }"
+    @dblclick="playOne"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'edit_only')"
+    @mouseenter="ui.hoveredTrackKey = trackKey"
+    @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >
-    <div class="slider-track__cover-wrap">
+    <div class="slider-track__cover-wrap" @click.stop="isCurrent ? player.togglePlay() : playOne()">
       <div class="slider-track__cover" v-lazy-bg="displayCover">
         <span v-if="!displayCover" class="slider-track__fallback accent-gradient" />
       </div>
       <div class="slider-track__play-icon">
-        <SvgIcon v-if="isCurrent && isPlaying" name="pause" width="16" height="16" />
+        <SvgIcon v-if="isCurrent && player.isPlaying" name="pause" width="16" height="16" />
         <SvgIcon v-else name="play" width="16" height="16" />
       </div>
     </div>
@@ -61,9 +86,23 @@ const displayCover = computed(() => props.track.cover_small || externalCover.val
         <span v-if="track.subtitle" class="slider-track__subtitle">{{ track.subtitle }}</span>
         <span v-if="track.is_explicit" class="slider-track__explicit">E</span>
       </div>
-      <div class="slider-track__artist" :title="track.artist">
+      <div class="slider-track__artist" :title="track.artist" @click.stop="goToArtist">
         {{ trackArtist }}
       </div>
+    </div>
+
+    <div class="slider-track__actions">
+      <button
+        class="slider-track__action"
+        title="Ещё"
+        aria-label="Меню"
+        @dblclick.stop
+        @click.stop="ui.showTrackContextMenu($event, track, 'full')"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+        </svg>
+      </button>
     </div>
   </button>
 </template>
@@ -96,8 +135,8 @@ const displayCover = computed(() => props.track.cover_small || externalCover.val
 
 .slider-track__cover-wrap {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-sm);
   overflow: hidden;
   flex-shrink: 0;
@@ -169,5 +208,36 @@ const displayCover = computed(() => props.track.cover_small || externalCover.val
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.slider-track__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--motion-duration-base) var(--motion-ease-out);
+}
+.slider-track:hover .slider-track__actions {
+  opacity: 1;
+}
+.slider-track__action {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background var(--motion-duration-base) var(--motion-ease-out),
+              color var(--motion-duration-base) var(--motion-ease-out),
+              transform var(--motion-duration-base) var(--motion-ease-out);
+}
+.slider-track__action:hover {
+  background: var(--bg-3);
+  color: var(--text-0);
+  transform: scale(var(--motion-scale-hover));
 }
 </style>
