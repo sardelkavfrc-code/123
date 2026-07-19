@@ -9,13 +9,11 @@ import { useUIStore } from "@/stores/ui";
 import type { Artist, Track, AlbumSummary } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
-import TrackList from "@/components/TrackList.vue";
 import ArtistCard from "@/components/ArtistCard.vue";
 import RecommendationCard from "@/components/RecommendationCard.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import Spinner from "@/components/Spinner.vue";
-
-import TrackRow from "@/components/TrackRow.vue";
+import SliderTrackRow from "@/components/SliderTrackRow.vue";
 
 const PAGE_SIZE = 100;
 
@@ -50,12 +48,20 @@ onMounted(() => {
   resizeObserver = new ResizeObserver(() => {
     checkArtistsScroll();
     checkPlaylistsScroll();
+    checkLibraryScroll();
+    checkVkTracksScroll();
   });
   if (artistsScroll.value) {
     resizeObserver.observe(artistsScroll.value);
   }
   if (playlistsScroll.value) {
     resizeObserver.observe(playlistsScroll.value);
+  }
+  if (libraryScroll.value) {
+    resizeObserver.observe(libraryScroll.value);
+  }
+  if (vkTracksScroll.value) {
+    resizeObserver.observe(vkTracksScroll.value);
   }
 });
 
@@ -121,6 +127,64 @@ watch(playlistsScroll, (el, oldEl) => {
 
 function scrollPlaylists(direction: number) {
   const el = playlistsScroll.value;
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
+}
+
+// Library slider helpers
+const libraryScroll = ref<HTMLElement | null>(null);
+const libraryAtStart = ref(true);
+const libraryAtEnd = ref(false);
+
+function checkLibraryScroll() {
+  const el = libraryScroll.value;
+  if (!el) return;
+  libraryAtStart.value = el.scrollLeft <= 10;
+  libraryAtEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
+}
+
+watch(libraryScroll, (el, oldEl) => {
+  if (oldEl) resizeObserver?.unobserve(oldEl);
+  if (el) {
+    resizeObserver?.observe(el);
+    checkLibraryScroll();
+  }
+});
+
+function scrollLibrary(direction: number) {
+  const el = libraryScroll.value;
+  if (el) {
+    el.scrollLeft += direction * 600;
+  }
+}
+
+// VK Tracks slider helpers
+const vkTracksScroll = ref<HTMLElement | null>(null);
+const vkTracksAtStart = ref(true);
+const vkTracksAtEnd = ref(false);
+
+function checkVkTracksScroll() {
+  const el = vkTracksScroll.value;
+  if (!el) return;
+  vkTracksAtStart.value = el.scrollLeft <= 10;
+  vkTracksAtEnd.value = el.scrollLeft + el.clientWidth >= el.scrollWidth - 10;
+  
+  if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 400) {
+    loadMore();
+  }
+}
+
+watch(vkTracksScroll, (el, oldEl) => {
+  if (oldEl) resizeObserver?.unobserve(oldEl);
+  if (el) {
+    resizeObserver?.observe(el);
+    checkVkTracksScroll();
+  }
+});
+
+function scrollVkTracks(direction: number) {
+  const el = vkTracksScroll.value;
   if (el) {
     el.scrollLeft += direction * 600;
   }
@@ -287,34 +351,52 @@ async function playAlbum(album: AlbumSummary) {
               Показать все >
             </button>
           </div>
-          <div class="search__library-slider">
-            <TrackRow 
-              v-for="(t, idx) in libraryMatches" 
-              :key="t.owner_id + '_' + t.id"
-              :track="t"
-              :index="idx + 1"
-              :is-active="player.current?.id === t.id && player.current?.owner_id === t.owner_id"
-              :is-playing="player.isPlaying"
-              @play="player.playQueue(libraryMatches, idx, { autoPlay: true })"
-            />
-          </div>
-        </div>
-
-        <div v-if="searchArtists.length" class="search__artists-section">
-          <h3 class="search__section-title">Исполнители</h3>
           <div class="search__slider-container">
-            <button :class="{ 'search__slider-btn--hidden': artistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollArtists(-1)" aria-label="Листать влево">
+            <button :class="{ 'search__slider-btn--hidden': libraryAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollLibrary(-1)" aria-label="Листать влево">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
-            <div class="search__artists" ref="artistsScroll" @scroll="checkArtistsScroll">
-              <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
+            <div class="search__library-slider" ref="libraryScroll" @scroll="checkLibraryScroll">
+              <SliderTrackRow 
+                v-for="t in libraryMatches" 
+                :key="t.owner_id + '_' + t.id"
+                :track="t"
+                @play="player.playQueue(libraryMatches, libraryMatches.findIndex(x => x.id === t.id), { autoPlay: true })"
+              />
             </div>
-            <button :class="{ 'search__slider-btn--hidden': artistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollArtists(1)" aria-label="Листать вправо">
+            <button :class="{ 'search__slider-btn--hidden': libraryAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollLibrary(1)" aria-label="Листать вправо">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
             </button>
           </div>
         </div>
-        
+
+        <div v-if="results.length" class="search__tracks-section">
+          <div class="search__head">
+            <h3 class="search__section-title">Все треки</h3>
+            <button class="btn btn--ghost" @click="playMany(results)">
+              Слушать всё
+            </button>
+          </div>
+          <div class="search__slider-container">
+            <button :class="{ 'search__slider-btn--hidden': vkTracksAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollVkTracks(-1)" aria-label="Листать влево">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+            </button>
+            <div class="search__library-slider" ref="vkTracksScroll" @scroll="checkVkTracksScroll">
+              <SliderTrackRow 
+                v-for="(t, idx) in results" 
+                :key="t.owner_id + '_' + t.id + '_' + idx"
+                :track="t"
+                @play="handlePlay(t, idx)"
+              />
+            </div>
+            <button :class="{ 'search__slider-btn--hidden': vkTracksAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollVkTracks(1)" aria-label="Листать вправо">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
+          </div>
+          <div v-if="loadingMore" class="search__loading">
+            <Spinner :size="16" /> Подгружаем ещё…
+          </div>
+        </div>
+
         <div v-if="searchPlaylists.length" class="search__playlists-section">
           <h3 class="search__section-title">Альбомы</h3>
           <div class="search__slider-container">
@@ -330,21 +412,18 @@ async function playAlbum(album: AlbumSummary) {
           </div>
         </div>
 
-        <div v-if="results.length" class="search__tracks-section">
-          <div class="search__head">
-            <h3 class="search__section-title">Треки по ВК</h3>
-            <button class="btn btn--ghost" @click="playMany(results)">
-              Слушать всё
+        <div v-if="searchArtists.length" class="search__artists-section">
+          <h3 class="search__section-title">Исполнители</h3>
+          <div class="search__slider-container">
+            <button :class="{ 'search__slider-btn--hidden': artistsAtStart }" class="search__slider-btn search__slider-btn--prev" @click="scrollArtists(-1)" aria-label="Листать влево">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
             </button>
-          </div>
-          <TrackList
-            :tracks="results"
-            show-index
-            manual-play
-            @play="handlePlay"
-          />
-          <div v-if="loadingMore" class="search__loading">
-            <Spinner :size="16" /> Подгружаем ещё…
+            <div class="search__artists" ref="artistsScroll" @scroll="checkArtistsScroll">
+              <ArtistCard v-for="(a, idx) in searchArtists" :key="a.id" :artist="a" :index="idx" />
+            </div>
+            <button :class="{ 'search__slider-btn--hidden': artistsAtEnd }" class="search__slider-btn search__slider-btn--next" @click="scrollArtists(1)" aria-label="Листать вправо">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+            </button>
           </div>
         </div>
       </div>
