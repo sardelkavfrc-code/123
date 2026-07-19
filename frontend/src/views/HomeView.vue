@@ -124,9 +124,52 @@ const mixLoading = ref(false);
 onMounted(async () => {
   library.loadFromCache();
   library.loadExplore(true);
-  // Начинаем фоновую накачку кэша сразу при загрузке приложения
   ensureCacheBuffer().catch(console.error);
 });
+
+function updateSliderButtons(container: HTMLElement) {
+  const parent = container.parentElement;
+  if (!parent) return;
+  const btnPrev = parent.querySelector('.home__slider-btn--prev');
+  const btnNext = parent.querySelector('.home__slider-btn--next');
+  if (btnPrev && btnNext) {
+    const canScrollLeft = container.scrollLeft > 0;
+    const canScrollRight = Math.ceil(container.scrollLeft + container.clientWidth) < container.scrollWidth;
+    
+    if (container.scrollWidth <= container.clientWidth) {
+      btnPrev.classList.add('home__slider-btn--hidden');
+      btnNext.classList.add('home__slider-btn--hidden');
+    } else {
+      btnPrev.classList.toggle('home__slider-btn--hidden', !canScrollLeft);
+      btnNext.classList.toggle('home__slider-btn--hidden', !canScrollRight);
+    }
+  }
+}
+
+function onSliderHover(e: Event) {
+  const container = (e.currentTarget as HTMLElement).querySelector('.home__algorithms') as HTMLElement;
+  if (container) updateSliderButtons(container);
+}
+
+function onSliderScroll(e: Event) {
+  updateSliderButtons(e.currentTarget as HTMLElement);
+}
+
+const scrollAmount = 600;
+function scrollLeft(e: Event) {
+  const target = e.currentTarget as HTMLElement;
+  const container = target.parentElement?.querySelector('.home__algorithms');
+  if (container) {
+    container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+  }
+}
+function scrollRight(e: Event) {
+  const target = e.currentTarget as HTMLElement;
+  const container = target.parentElement?.querySelector('.home__algorithms');
+  if (container) {
+    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+  }
+}
 
 // Пре-нагрев буфера при смене параметров: буферы других комбинаций остаются
 // в памяти, а для только что выбранной начинаем подкачку заранее.
@@ -468,8 +511,11 @@ async function playAlbum(album: AlbumSummary) {
             </div>
           </div>
           
-          <div v-if="section.type === 'playlists'" class="home__slider-container">
-            <div class="home__algorithms">
+          <div v-if="section.type === 'playlists'" class="home__slider-container" @mouseenter="onSliderHover">
+            <button class="home__slider-btn home__slider-btn--prev" @click="scrollLeft">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            </button>
+            <div class="home__algorithms" @scroll="onSliderScroll">
               <template v-if="section.layout === 'large_slider'">
                 <LargePlaylistCard
                   v-for="block in section.playlists"
@@ -491,10 +537,16 @@ async function playAlbum(album: AlbumSummary) {
                 />
               </template>
             </div>
+            <button class="home__slider-btn home__slider-btn--next" @click="scrollRight">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </button>
           </div>
           
-          <div v-else-if="section.type === 'actions' && section.layout === 'large_slider'" class="home__slider-container">
-            <div class="home__algorithms">
+          <div v-else-if="section.type === 'actions' && section.layout === 'large_slider'" class="home__slider-container" @mouseenter="onSliderHover">
+            <button class="home__slider-btn home__slider-btn--prev" @click="scrollLeft">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            </button>
+            <div class="home__algorithms" @scroll="onSliderScroll">
               <MixCard
                 v-for="action in section.actions"
                 :key="action.id"
@@ -502,10 +554,16 @@ async function playAlbum(album: AlbumSummary) {
                 @click="playAction(action)"
               />
             </div>
+            <button class="home__slider-btn home__slider-btn--next" @click="scrollRight">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </button>
           </div>
 
-          <div v-else-if="section.type === 'actions'" class="home__slider-container">
-            <div class="home__algorithms" :class="{ 'home__algorithms--2-rows': section.layout === 'crop_slider' }">
+          <div v-else-if="section.type === 'actions'" class="home__slider-container" @mouseenter="onSliderHover">
+            <button class="home__slider-btn home__slider-btn--prev" @click="scrollLeft">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            </button>
+            <div class="home__algorithms" @scroll="onSliderScroll" :class="{ 'home__algorithms--2-rows': section.layout === 'crop_slider' }">
               <ActionCard
                 v-for="action in section.actions"
                 :key="action.id"
@@ -513,6 +571,9 @@ async function playAlbum(album: AlbumSummary) {
                 @click="playAction(action)"
               />
             </div>
+            <button class="home__slider-btn home__slider-btn--next" @click="scrollRight">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </button>
           </div>
           
           <div v-else-if="section.type === 'audios'" class="home__audios-grid" :class="{ 'home__audios-grid--triple': section.layout === 'triple_stacked_slider' }">
