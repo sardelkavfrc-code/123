@@ -7,9 +7,11 @@ import type { AlbumSummary, Track } from "@/api/types";
 import { useSettingsStore } from "@/stores/settings";
 import { storeToRefs } from "pinia";
 import RecommendationCard from "@/components/RecommendationCard.vue";
-import ActionCard from "@/components/ActionCard.vue";
+import TitleBar from '@/components/TitleBar.vue';
+import ActionCard from '@/components/ActionCard.vue';
 import LargePlaylistCard from "@/components/LargePlaylistCard.vue";
 import MixCard from "@/components/MixCard.vue";
+import SliderTrackRow from '@/components/SliderTrackRow.vue';
 import TrackRow from "@/components/TrackRow.vue";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
@@ -576,14 +578,32 @@ async function playAlbum(album: AlbumSummary) {
             </button>
           </div>
           
-          <div v-else-if="section.type === 'audios'" class="home__audios-grid" :class="{ 'home__audios-grid--triple': section.layout === 'triple_stacked_slider' }">
-            <TrackRow
-              v-for="(track, index) in section.audios"
-              :key="track.id"
-              :track="track"
-              :index="index"
-              @play="player.playQueue(section.audios || [], index)"
-            />
+          <div v-else-if="section.type === 'audios'" class="home__slider-container" @mouseenter="onSliderHover">
+            <button v-if="section.layout === 'triple_stacked_slider'" class="home__slider-btn home__slider-btn--prev" @click="scrollLeft">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+            </button>
+            <div class="home__algorithms" @scroll="onSliderScroll" :class="section.layout === 'triple_stacked_slider' ? 'home__audios-grid--triple' : 'home__audios-grid'">
+              <template v-if="section.layout === 'triple_stacked_slider'">
+                <SliderTrackRow
+                  v-for="(track, index) in section.audios"
+                  :key="track.id"
+                  :track="track"
+                  @play="player.playQueue(section.audios || [], index)"
+                />
+              </template>
+              <template v-else>
+                <TrackRow
+                  v-for="(track, index) in section.audios"
+                  :key="track.id"
+                  :track="track"
+                  :index="index"
+                  @play="player.playQueue(section.audios || [], index)"
+                />
+              </template>
+            </div>
+            <button v-if="section.layout === 'triple_stacked_slider'" class="home__slider-btn home__slider-btn--next" @click="scrollRight">
+              <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+            </button>
           </div>
           
         </section>
@@ -1214,5 +1234,29 @@ async function playAlbum(album: AlbumSummary) {
 .slide-up-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+</style>
+
+<style scoped>
+.home__audios-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.home__audios-grid--triple {
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(300px, 85vw);
+  gap: 8px 24px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 16px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+}
+.home__audios-grid--triple::-webkit-scrollbar {
+  display: none;
 }
 </style>
