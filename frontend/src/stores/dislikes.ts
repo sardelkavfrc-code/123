@@ -49,8 +49,8 @@ export const useDislikesStore = defineStore("dislikes", () => {
   function dislike(track: Track) {
     const key = trackKey(track);
     if (tracks.value.has(key)) return;
-    const newMap = new Map(tracks.value);
-    newMap.set(key, track);
+    // Prepend the new track so it appears at the top of the list
+    const newMap = new Map<string, Track>([[key, track], ...tracks.value.entries()]);
     tracks.value = newMap;
     persist();
     void api.dislikeTrack(track.id, track.owner_id).catch(() => {});
