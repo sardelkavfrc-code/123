@@ -97,16 +97,19 @@ function addToQueue() {
 const isDisliked = computed(() => (current.value ? dislikes.isDisliked(current.value) : false));
 
 function dislikeTrack() {
-  if (!current.value || isDisliked.value) return; // одностороннее действие
+  if (!current.value) return;
   const track = current.value;
-  // Как в офиц. ВК: «не нравится» переключает на следующий трек и убирает
-  // текущий из очереди (и из будущих миксов) навсегда.
-  dislikes.dislike(track);
-  if (player.hasNext) {
-    player.next();
+  if (isDisliked.value) {
+    dislikes.undislike(track);
+    ui.notify("Дизлайк отменен", "success");
+  } else {
+    dislikes.dislike(track);
+    if (player.hasNext) {
+      player.next();
+    }
+    player.removeTrack(track);
+    ui.notify("Больше не будет попадаться", "success");
   }
-  player.removeTrack(track);
-  ui.notify("Больше не будет попадаться", "success");
 }
 
 const showEqModal = ref(false);
@@ -258,8 +261,8 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <button
             class="player__icon-btn"
             :class="{ 'player__icon-btn--disliked': isDisliked }"
-            :disabled="!current || isDisliked"
-            :title="isDisliked ? 'Не нравится' : 'Не нравится (больше не показывать)'"
+            :disabled="!current"
+            :title="isDisliked ? 'Отменить дизлайк' : 'Не нравится (больше не показывать)'"
             aria-label="Не нравится"
             @click="dislikeTrack"
           >

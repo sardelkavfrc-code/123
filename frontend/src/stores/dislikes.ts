@@ -4,10 +4,9 @@ import { api } from "@/api/client";
 import type { Track } from "@/api/types";
 
 /**
- * "Не нравится" — like the official VK player. Disliking is a one-way action:
- * a disliked track is gone for good — removed from the play queue and excluded
- * from VK Mix, and there is no way to un-dislike it. The set is remembered
- * across restarts (localStorage).
+ * "Не нравится" — like the official VK player. Disliked tracks are hidden from 
+ * the play queue and excluded from VK Mix. The set is remembered across restarts 
+ * (localStorage). You can also undo a dislike.
  */
 const STORAGE_KEY = "vkmp:dislikes";
 
@@ -15,45 +14,57 @@ function trackKey(track: Pick<Track, "owner_id" | "id">): string {
   return `${track.owner_id}_${track.id}`;
 }
 
-function load(): Set<string> {
+function load(): Map<string, Track> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return new Set();
+    if (!raw) return new Map();
     const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) return new Set(parsed.map(String));
+    if (Array.isArray(parsed)) {
+      if (typeof parsed[0] === "string") {
+        return new Map(); // clear old format
+      }
+      return new Map(parsed);
+    }
   } catch {
     // ignore malformed storage
   }
-  return new Set();
+  return new Map();
 }
 
 export const useDislikesStore = defineStore("dislikes", () => {
-  // Reassigned (not mutated) on every change so computed()s that read it re-run.
-  const keys = ref<Set<string>>(load());
+  const tracks = ref<Map<string, Track>>(load());
 
   function persist() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...keys.value]));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...tracks.value.entries()]));
     } catch {
       // ignore quota errors
     }
   }
 
   function isDisliked(track: Pick<Track, "owner_id" | "id">): boolean {
-    return keys.value.has(trackKey(track));
+    return tracks.value.has(trackKey(track));
   }
 
-  /** One-way: mark a track as disliked forever. No-op if already disliked. */
-  function dislike(track: Pick<Track, "owner_id" | "id">) {
+  function dislike(track: Track) {
     const key = trackKey(track);
-    if (keys.value.has(key)) return;
-    keys.value = new Set(keys.value).add(key);
+    if (tracks.value.has(key)) return;
+    const newMap = new Map(tracks.value);
+    newMap.set(key, track);
+    tracks.value = newMap;
     persist();
-    // Tell VK (audio.addDislike) so its algorithm hides this track and similar
-    // ones from recommendations / the mix. Best-effort: local filtering already
-    // applies even if the request fails (offline, rate limit, etc.).
     void api.dislikeTrack(track.id, track.owner_id).catch(() => {});
   }
 
-  return { keys, isDisliked, dislike };
+  function undislike(track: Pick<Track, "owner_id" | "id">) {
+    const key = trackKey(track);
+    if (!tracks.value.has(key)) return;
+    const newMap = new Map(tracks.value);
+    newMap.delete(key);
+    tracks.value = newMap;
+    persist();
+    void api.undislikeTrack(track.id, track.owner_id).catch(() => {});
+  }
+
+  return { tracks, isDisliked, dislike, undislike };
 });

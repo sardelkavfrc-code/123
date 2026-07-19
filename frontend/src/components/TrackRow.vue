@@ -37,11 +37,14 @@ const inLibrary = computed(() => library.isInLibrary(props.track));
 const isDisliked = computed(() => dislikes.isDisliked(props.track));
 
 function dislikeTrack() {
-  if (isDisliked.value) return; // одностороннее действие — отменить нельзя
-  // Как в офиц. ВК: «не нравится» убирает трек из очереди и из будущих миксов навсегда.
-  dislikes.dislike(props.track);
-  player.removeTrack(props.track);
-  ui.notify("Больше не будет попадаться", "success");
+  if (isDisliked.value) {
+    dislikes.undislike(props.track);
+    ui.notify("Дизлайк отменен", "success");
+  } else {
+    dislikes.dislike(props.track);
+    player.removeTrack(props.track);
+    ui.notify("Больше не будет попадаться", "success");
+  }
 }
 const unavailable = computed(() => !props.track.url);
 
@@ -197,8 +200,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
           v-else-if="item.id === 'dislike'"
           class="row__action row__action--dislike"
           :class="{ 'row__action--disliked': isDisliked }"
-          :disabled="isDisliked"
-          :title="isDisliked ? 'Не нравится' : 'Не нравится (больше не показывать)'"
+          :title="isDisliked ? 'Отменить дизлайк' : 'Не нравится (больше не показывать)'"
           aria-label="Не нравится"
           @click.stop="dislikeTrack"
         >

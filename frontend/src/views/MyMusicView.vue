@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, nextTick, onBeforeUnmount } from "vue";
+import { useRouter } from "vue-router";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -15,7 +16,13 @@ import { tracksLabel } from "@/composables/useFormat";
 
 const library = useLibraryStore();
 const player = usePlayerStore();
-const ui = useUIStore();
+const router = useRouter();
+
+const showSettings = ref(false);
+function goToDislikes() {
+  showSettings.value = false;
+  router.push("/library/dislikes");
+}
 
 const { myMusic, myMusicLoading, myMusicLoadingMore, myMusicHasMore, myMusicTotal } =
   storeToRefs(library);
@@ -302,6 +309,21 @@ async function deleteAllTracks() {
         >
           <img src="/unavailable-icon.png" alt="error" />
         </button>
+        <div class="my-music__settings-wrapper" @mouseleave="showSettings = false">
+          <button class="btn btn--ghost my-music__settings-btn" @click="showSettings = !showSettings" aria-label="Настройки">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" /></svg>
+          </button>
+          <Transition name="dropdown-fade">
+            <div v-if="showSettings" class="my-music__dropdown" @click.stop>
+              <div class="my-music__dropdown-item" @click="goToDislikes">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+                </svg>
+                Дизлайкнутые треки
+              </div>
+            </div>
+          </Transition>
+        </div>
       </template>
     </PageHeader>
 
@@ -456,5 +478,88 @@ async function deleteAllTracks() {
   width: 24px;
   height: 24px;
   object-fit: contain;
+}
+
+.my-music__settings-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.my-music__settings-btn {
+  padding: 8px;
+  min-width: 0;
+  border-radius: 50%;
+  color: var(--text-secondary);
+}
+
+.my-music__settings-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.my-music__dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  background: var(--bg-elev);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg, 12px);
+  padding: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  z-index: 101;
+  transform-origin: top right;
+}
+
+.my-music__dropdown::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 0;
+  right: 0;
+  height: 12px;
+}
+
+.my-music__dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px; /* Уменьшил gap (было 12px) */
+  padding: 8px 12px; /* Уменьшил отступы (было 10px 16px) */
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.my-music__dropdown-item:hover {
+  background: var(--surface-hover);
+  color: var(--primary);
+}
+
+.my-music__dropdown-item svg {
+  color: var(--text-secondary);
+  transition: color 0.2s;
+}
+
+.my-music__dropdown-item:hover svg {
+  color: var(--primary);
+}
+
+.dropdown-fade-enter-active,
+.dropdown-fade-leave-active {
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-fade-enter-from,
+.dropdown-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(-5px);
 }
 </style>
