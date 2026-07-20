@@ -119,7 +119,7 @@ const background = computed(() => {
   padding: 10px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   color: #fff;
   z-index: 1;
 }
