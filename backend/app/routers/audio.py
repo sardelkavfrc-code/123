@@ -692,7 +692,8 @@ async def explore(
                             main_color=pl.get("main_color"),
                             tracks=pl_tracks,
                             owner_name=owner_name,
-                            owner_photo=owner_photo
+                            owner_photo=owner_photo,
+                            access_key=pl.get("access_key")
                         ))
                 if items:
                     home_sections.append(HomeSection(
@@ -866,6 +867,162 @@ async def delete(
         owner_id=owner_id,
     )
     return {"ok": bool(result)}
+
+
+@router.post("/playlist/follow")
+async def follow_playlist(
+    playlist_id: int,
+    owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+    access_key: str | None = None,
+) -> dict[str, bool]:
+    kwargs = {
+        "playlist_id": playlist_id,
+        "owner_id": owner_id,
+    }
+    if access_key:
+        kwargs["access_key"] = access_key
+    result = await _safe_call(
+        vk,
+        "audio.followPlaylist",
+        session.access_token,
+        **kwargs
+    )
+    return {"ok": bool(result)}
+
+
+@router.post("/playlist/delete")
+async def delete_playlist(
+    playlist_id: int,
+    owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+) -> dict[str, bool]:
+    result = await _safe_call(
+        vk,
+        "audio.deletePlaylist",
+        session.access_token,
+        playlist_id=playlist_id,
+        owner_id=owner_id,
+    )
+    return {"ok": bool(result)}
+
+
+@router.post("/playlist/create", response_model=AlbumSummary)
+async def create_playlist(
+    title: str,
+    vk: VKDep,
+    session: SessionDep,
+    description: str | None = None,
+) -> AlbumSummary:
+    result = await _safe_call(
+        vk,
+        "audio.createPlaylist",
+        session.access_token,
+        owner_id=session.user_id,
+        title=title,
+        description=description or "",
+    )
+    parsed = parse_albums([result])
+    if not parsed.items:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to parse created playlist",
+        )
+    return parsed.items[0]
+
+
+@router.post("/playlist/add_track")
+async def add_track_to_playlist(
+    playlist_id: int,
+    playlist_owner_id: int,
+    audio_id: int,
+    audio_owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+    access_key: str | None = None,
+) -> dict[str, bool]:
+    audio_id_str = f"{audio_owner_id}_{audio_id}"
+    if access_key:
+        audio_id_str += f"_{access_key}"
+    result = await _safe_call(
+        vk,
+        "audio.addToPlaylist",
+        session.access_token,
+        owner_id=playlist_owner_id,
+        playlist_id=playlist_id,
+        audio_ids=audio_id_str,
+    )
+    return {"ok": bool(result)}
+
+
+from pydantic import BaseModel
+
+class AddTracksRequest(BaseModel):
+    playlist_id: int
+    playlist_owner_id: int
+    audio_ids: list[str]
+
+
+@router.post("/playlist/add_tracks")
+async def add_tracks_to_playlist(
+    req: AddTracksRequest,
+    vk: VKDep,
+    session: SessionDep,
+) -> dict[str, bool]:
+    result = await _safe_call(
+        vk,
+        "audio.addToPlaylist",
+        session.access_token,
+        owner_id=req.playlist_owner_id,
+        playlist_id=req.playlist_id,
+        audio_ids=",".join(req.audio_ids),
+    )
+    return {"ok": bool(result)}
+
+
+class RemoveTrackRequest(BaseModel):
+    playlist_id: int
+    playlist_owner_id: int
+    audio_id: int
+    audio_owner_id: int
+
+
+@router.post("/playlist/remove_track")
+async def remove_track_from_playlist(
+    req: RemoveTrackRequest,
+    vk: VKDep,
+    session: SessionDep,
+) -> dict[str, bool]:
+    audio_id_str = f"{req.audio_owner_id}_{req.audio_id}"
+    try:
+        result = await vk.call(
+            "execute.removeAudioFromPlaylist",
+            session.access_token,
+            owner_id=req.playlist_owner_id,
+            playlist_id=req.playlist_id,
+            audio_ids=audio_id_str,
+        )
+        return {"ok": bool(result)}
+    except Exception as exc:
+        logger.info("execute.removeAudioFromPlaylist failed (%s), trying audio.removeFromPlaylist...", exc)
+    
+    try:
+        result = await vk.call(
+            "audio.removeFromPlaylist",
+            session.access_token,
+            owner_id=req.playlist_owner_id,
+            playlist_id=req.playlist_id,
+            audio_ids=audio_id_str,
+        )
+        return {"ok": bool(result)}
+    except Exception as exc2:
+        logger.error("Failed to remove track from playlist: %s", exc2)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Не удалось удалить трек из плейлиста: {exc2}",
+        ) from exc2
 
 
 @router.post("/dislike")

@@ -223,6 +223,8 @@ function goToArtist() {
   text-overflow: ellipsis;
   cursor: pointer;
   transition: color 0.15s ease;
+  align-self: flex-start;
+  max-width: 100%;
 }
 .slider-track__artist:hover {
   color: var(--text-0);

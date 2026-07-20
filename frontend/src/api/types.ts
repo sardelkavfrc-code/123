@@ -94,6 +94,7 @@ export interface AlbumSummary {
   tracks?: Track[];
   owner_name?: string | null;
   owner_photo?: string | null;
+  access_key?: string | null;
 }
 
 export interface ArtistAlbumBlock {

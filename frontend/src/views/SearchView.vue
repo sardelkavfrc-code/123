@@ -344,7 +344,7 @@ async function playAlbum(album: AlbumSummary) {
   try {
     const res = await api.playlistTracks(album.owner_id, parseInt(album.id), { count: 200 });
     if (res.items && res.items.length > 0) {
-      player.playQueue(res.items, 0);
+      player.playQueue(res.items, 0, { autoPlay: true }, undefined, album);
     } else {
       ui.notify("Плейлист пуст", "error");
     }

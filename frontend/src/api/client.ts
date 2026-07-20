@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosInstance } from "axios";
 import type {
   AlbumList,
+  AlbumSummary,
   Artist,
   AuthStatus,
   CatalogSearchResult,
@@ -439,6 +440,67 @@ export const api = {
   ): Promise<TrackList> {
     const { data } = await http.get<TrackList>(`/audio/playlist/${ownerId}_${playlistId}`, {
       params,
+    });
+    return data;
+  },
+  async followPlaylist(playlistId: number, ownerId: number, accessKey?: string): Promise<{ ok: boolean }> {
+    const params: Record<string, any> = { playlist_id: playlistId, owner_id: ownerId };
+    if (accessKey) params.access_key = accessKey;
+    const { data } = await http.post<{ ok: boolean }>("/audio/playlist/follow", null, { params });
+    return data;
+  },
+  async deletePlaylist(playlistId: number, ownerId: number): Promise<{ ok: boolean }> {
+    const { data } = await http.post<{ ok: boolean }>("/audio/playlist/delete", null, {
+      params: { playlist_id: playlistId, owner_id: ownerId },
+    });
+    return data;
+  },
+  async createPlaylist(title: string, description?: string): Promise<AlbumSummary> {
+    const params: Record<string, any> = { title };
+    if (description) params.description = description;
+    const { data } = await http.post<AlbumSummary>("/audio/playlist/create", null, { params });
+    return data;
+  },
+  async addTrackToPlaylist(
+    playlistId: number,
+    playlistOwnerId: number,
+    audioId: number,
+    audioOwnerId: number,
+    accessKey?: string
+  ): Promise<{ ok: boolean }> {
+    const params: Record<string, any> = {
+      playlist_id: playlistId,
+      playlist_owner_id: playlistOwnerId,
+      audio_id: audioId,
+      audio_owner_id: audioOwnerId,
+    };
+    if (accessKey) params.access_key = accessKey;
+    const { data } = await http.post<{ ok: boolean }>("/audio/playlist/add_track", null, { params });
+    return data;
+  },
+  async addTracksToPlaylist(
+    playlistId: number,
+    playlistOwnerId: number,
+    audioIds: string[]
+  ): Promise<{ ok: boolean }> {
+    const { data } = await http.post<{ ok: boolean }>("/audio/playlist/add_tracks", {
+      playlist_id: playlistId,
+      playlist_owner_id: playlistOwnerId,
+      audio_ids: audioIds,
+    });
+    return data;
+  },
+  async removeTrackFromPlaylist(
+    playlistId: number,
+    playlistOwnerId: number,
+    audioId: number,
+    audioOwnerId: number
+  ): Promise<{ ok: boolean }> {
+    const { data } = await http.post<{ ok: boolean }>("/audio/playlist/remove_track", {
+      playlist_id: playlistId,
+      playlist_owner_id: playlistOwnerId,
+      audio_id: audioId,
+      audio_owner_id: audioOwnerId,
     });
     return data;
   },

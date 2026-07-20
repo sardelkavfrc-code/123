@@ -1,8 +1,9 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { api, APIError } from "@/api/client";
-import type { FriendList, Track, TrackList, HomeSection } from "@/api/types";
+import type { FriendList, Track, TrackList, HomeSection, AlbumSummary } from "@/api/types";
 import { useSettingsStore } from "./settings";
+import { useAuthStore } from "./auth";
 
 /** VK rejects audio.get requests with count > 200 — keep page size below that. */
 const PAGE_SIZE = 100;
@@ -13,6 +14,12 @@ export const useLibraryStore = defineStore("library", () => {
   const myMusicLoadingMore = ref(false);
   const myMusicError = ref<string | null>(null);
   const myMusicTotal = ref(0);
+
+  const myPlaylists = ref<AlbumSummary[]>([]);
+  const myPlaylistsLoading = ref(false);
+  const myPlaylistsError = ref<string | null>(null);
+  const activePlaylist = ref<AlbumSummary | null>(null);
+  const currentPlaylistTracks = ref<Track[]>([]);
 
   const friends = ref<FriendList | null>(null);
   const friendsLoading = ref(false);
@@ -213,6 +220,103 @@ export const useLibraryStore = defineStore("library", () => {
     return myMusicIdSet.value.has(key) || addedOriginals.value.has(key);
   }
 
+  async function loadMyPlaylists(force = false): Promise<AlbumSummary[]> {
+    if (myPlaylists.value.length && !force) return myPlaylists.value;
+    myPlaylistsLoading.value = true;
+    myPlaylistsError.value = null;
+    try {
+      const auth = useAuthStore();
+      if (!auth.status.user_id) return [];
+      const list = await api.albums(auth.status.user_id);
+      myPlaylists.value = list.items;
+      return list.items;
+    } catch (err) {
+      myPlaylistsError.value = err instanceof APIError ? err.message : (err as Error).message;
+      return [];
+    } finally {
+      myPlaylistsLoading.value = false;
+    }
+  }
+
+  async function followPlaylist(playlist: AlbumSummary) {
+    await api.followPlaylist(Number(playlist.id), playlist.owner_id || 0, playlist.access_key || undefined);
+    await loadMyPlaylists(true);
+  }
+
+  async function unfollowPlaylist(playlist: AlbumSummary) {
+    await api.deletePlaylist(Number(playlist.id), playlist.owner_id || 0);
+    myPlaylists.value = myPlaylists.value.filter((p) => p.id !== playlist.id);
+  }
+
+  function isPlaylistFollowed(playlist: AlbumSummary): boolean {
+    return myPlaylists.value.some((p) => p.id === playlist.id);
+  }
+
+  async function createPlaylist(title: string, description?: string): Promise<AlbumSummary> {
+    const newPlaylist = await api.createPlaylist(title, description);
+    myPlaylists.value = [newPlaylist, ...myPlaylists.value];
+    return newPlaylist;
+  }
+
+  async function addTrackToPlaylist(playlist: AlbumSummary, track: Track) {
+    await api.addTrackToPlaylist(
+      Number(playlist.id),
+      playlist.owner_id || 0,
+      track.id,
+      track.owner_id,
+      track.access_key
+    );
+    const localPl = myPlaylists.value.find((p) => p.id === playlist.id);
+    if (localPl) {
+      if (localPl.track_count != null) {
+        localPl.track_count++;
+      }
+      if (!localPl.cover) {
+        localPl.cover = track.cover_medium || track.cover_small || track.cover_large || null;
+      }
+    }
+  }
+
+  async function addTracksToPlaylist(playlist: AlbumSummary, tracks: Track[]) {
+    const audioIds = tracks.map((t) => {
+      let idStr = `${t.owner_id}_${t.id}`;
+      if (t.access_key) idStr += `_${t.access_key}`;
+      return idStr;
+    });
+    await api.addTracksToPlaylist(
+      Number(playlist.id),
+      playlist.owner_id || 0,
+      audioIds
+    );
+    const localPl = myPlaylists.value.find((p) => p.id === playlist.id);
+    if (localPl) {
+      if (localPl.track_count != null) {
+        localPl.track_count += tracks.length;
+      }
+      if (!localPl.cover && tracks.length > 0) {
+        localPl.cover = tracks[0].cover_medium || tracks[0].cover_small || tracks[0].cover_large || null;
+      }
+    }
+  }
+
+  async function removeTrackFromPlaylist(playlist: AlbumSummary, track: Track) {
+    await api.removeTrackFromPlaylist(
+      Number(playlist.id),
+      playlist.owner_id || 0,
+      track.id,
+      track.owner_id
+    );
+    const localPl = myPlaylists.value.find((p) => p.id === playlist.id);
+    if (localPl) {
+      if (localPl.track_count != null && localPl.track_count > 0) {
+        localPl.track_count--;
+      }
+    }
+    currentPlaylistTracks.value = currentPlaylistTracks.value.filter(
+      (t) => !(t.id === track.id && t.owner_id === track.owner_id)
+    );
+  }
+
   function reset() {
     myMusic.value = [];
     myMusicAll.value = [];
@@ -220,6 +324,11 @@ export const useLibraryStore = defineStore("library", () => {
     addedOriginals.value = new Set();
     addedTracksMap.value = new Map();
     myMusicTotal.value = 0;
+    myPlaylists.value = [];
+    myPlaylistsLoading.value = false;
+    myPlaylistsError.value = null;
+    activePlaylist.value = null;
+    currentPlaylistTracks.value = [];
     friends.value = null;
     homeSections.value = null;
   }
@@ -231,6 +340,11 @@ export const useLibraryStore = defineStore("library", () => {
     myMusicError,
     myMusicTotal,
     myMusicHasMore,
+    myPlaylists,
+    myPlaylistsLoading,
+    myPlaylistsError,
+    activePlaylist,
+    currentPlaylistTracks,
     friends,
     friendsLoading,
     homeSections,
@@ -247,6 +361,14 @@ export const useLibraryStore = defineStore("library", () => {
     addToLibrary,
     removeFromLibrary,
     isInLibrary,
+    loadMyPlaylists,
+    followPlaylist,
+    unfollowPlaylist,
+    isPlaylistFollowed,
+    createPlaylist,
+    addTrackToPlaylist,
+    addTracksToPlaylist,
+    removeTrackFromPlaylist,
     reset,
   };
 });

@@ -6,12 +6,15 @@ import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { useUIStore } from "@/stores/ui";
 import { api, APIError } from "@/api/client";
-import type { Track } from "@/api/types";
+import type { Track, AlbumSummary } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
 import TrackList from "@/components/TrackList.vue";
+import PlaylistRow from "@/components/PlaylistRow.vue";
 import Spinner from "@/components/Spinner.vue";
+import EmptyState from "@/components/EmptyState.vue";
 import UnavailableTracksModal from "@/components/UnavailableTracksModal.vue";
+import CreatePlaylistWizardModal from "@/components/CreatePlaylistWizardModal.vue";
 import { tracksLabel } from "@/composables/useFormat";
 
 const library = useLibraryStore();
@@ -25,10 +28,20 @@ function goToDislikes() {
   router.push("/library/dislikes");
 }
 
-const { myMusic, myMusicLoading, myMusicLoadingMore, myMusicHasMore, myMusicTotal } =
-  storeToRefs(library);
+const {
+  myMusic,
+  myMusicLoading,
+  myMusicLoadingMore,
+  myMusicHasMore,
+  myMusicTotal,
+  myPlaylists,
+  myPlaylistsLoading,
+  myPlaylistsError,
+  activePlaylist,
+  currentPlaylistTracks,
+} = storeToRefs(library);
 
-const activeTab = ref<"library" | "recent">("library");
+const activeTab = ref<"library" | "recent" | "playlists">("library");
 const recentMusic = ref<Track[]>([]);
 const recentMusicLoading = ref(false);
 const recentMusicLoadingMore = ref(false);
@@ -38,13 +51,19 @@ const recentBlockId = ref<string | null>(null);
 
 const tabLibrary = ref<HTMLElement | null>(null);
 const tabRecent = ref<HTMLElement | null>(null);
+const tabPlaylists = ref<HTMLElement | null>(null);
 const indicatorStyle = ref({
   left: "0px",
   width: "0px",
 });
 
 function updateIndicator() {
-  const activeEl = activeTab.value === "library" ? tabLibrary.value : tabRecent.value;
+  const activeEl =
+    activeTab.value === "library"
+      ? tabLibrary.value
+      : activeTab.value === "recent"
+        ? tabRecent.value
+        : tabPlaylists.value;
   if (activeEl) {
     indicatorStyle.value = {
       left: `${activeEl.offsetLeft}px`,
@@ -87,7 +106,11 @@ async function loadRecent() {
 watch(activeTab, (tab) => {
   if (tab === "recent") {
     void loadRecent();
+  } else if (tab === "playlists") {
+    void library.loadMyPlaylists();
   }
+  library.activePlaylist = null;
+  library.currentPlaylistTracks = [];
   nextTick(() => {
     updateIndicator();
   });
@@ -103,7 +126,18 @@ const filtered = computed(() => {
   return activeFullList.value;
 });
 
+const playlistsLabel = (count: number) => {
+  let label = "плейлистов";
+  if (count % 10 === 1 && count % 100 !== 11) label = "плейлист";
+  else if (count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 10 || count % 100 >= 20)) label = "плейлиста";
+  return `${count} ${label}`;
+};
+
 const subtitle = computed(() => {
+  if (activeTab.value === "playlists") {
+    if (myPlaylistsLoading.value) return "Загружаем плейлисты…";
+    return playlistsLabel(myPlaylists.value.length);
+  }
   if (activeTab.value === "recent") {
     if (recentMusicLoading.value) return "Загружаем недавние треки…";
     return tracksLabel(recentMusic.value.length);
@@ -232,6 +266,16 @@ async function deleteTrack(track: Track) {
   }
 }
 
+
+async function deletePlaylist(playlist: AlbumSummary) {
+  try {
+    await library.unfollowPlaylist(playlist);
+    ui.notify(`Плейлист удален: ${playlist.title}`, "success");
+  } catch (err: any) {
+    ui.notify(`Ошибка удаления: ${err.message}`, "error");
+  }
+}
+
 async function replaceTrack(oldTrack: Track, newTrack: Track) {
   try {
     await library.addToLibrary(newTrack);
@@ -260,6 +304,44 @@ async function deleteAllTracks() {
     showUnavailableModal.value = false;
   }
 }
+
+const showCreateWizard = ref(false);
+
+function triggerCreatePlaylist() {
+  showSettings.value = false;
+  showCreateWizard.value = true;
+}
+
+const playlistTracksLoading = ref(false);
+
+async function openPlaylist(playlist: AlbumSummary) {
+  library.activePlaylist = playlist;
+  library.currentPlaylistTracks = [];
+  playlistTracksLoading.value = true;
+  try {
+    const numericId = Number(playlist.id.split("_").pop() || playlist.id);
+    const res = await api.playlistTracks(playlist.owner_id || 0, numericId, { count: 200 });
+    library.currentPlaylistTracks = res.items || [];
+  } catch (e) {
+    ui.notify("Не удалось загрузить треки плейлиста", "error");
+  } finally {
+    playlistTracksLoading.value = false;
+  }
+}
+
+function closePlaylist() {
+  library.activePlaylist = null;
+  library.currentPlaylistTracks = [];
+}
+
+function playPlaylistTrack(_track: Track, index: number) {
+  player.playQueue(library.currentPlaylistTracks, index, { autoPlay: true }, undefined, library.activePlaylist!);
+}
+
+function playActivePlaylist() {
+  if (!library.currentPlaylistTracks.length) return;
+  player.playQueue(library.currentPlaylistTracks, 0, { autoPlay: true }, undefined, library.activePlaylist!);
+}
 </script>
 
 <template>
@@ -269,17 +351,19 @@ async function deleteAllTracks() {
       :subtitle="subtitle"
     >
       <template #actions>
-        <button class="btn btn--primary" :disabled="!filtered.length || isGlobalLoading" @click="playAll">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          <span v-if="isGlobalLoading">Загрузка...</span>
-          <span v-else>Слушать</span>
-        </button>
-        <button class="btn btn--ghost" :disabled="!filtered.length || isGlobalLoading" @click="shufflePlay">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M16 3h5v5" /><path d="M4 20 21 3" /><path d="M21 16v5h-5" /><path d="m15 15 6 6" /><path d="M4 4l5 5" />
-          </svg>
-          Перемешать
-        </button>
+        <template v-if="activeTab !== 'playlists'">
+          <button class="btn btn--primary" :disabled="!filtered.length || isGlobalLoading" @click="playAll">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            <span v-if="isGlobalLoading">Загрузка...</span>
+            <span v-else>Слушать</span>
+          </button>
+          <button class="btn btn--ghost" :disabled="!filtered.length || isGlobalLoading" @click="shufflePlay">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 3h5v5" /><path d="M4 20 21 3" /><path d="M21 16v5h-5" /><path d="m15 15 6 6" /><path d="M4 4l5 5" />
+            </svg>
+            Перемешать
+          </button>
+        </template>
         <button 
           class="btn btn--ghost my-music__search-btn" 
           @click="router.push('/search')"
@@ -305,6 +389,13 @@ async function deleteAllTracks() {
           </button>
           <Transition name="dropdown-fade">
             <div v-if="showSettings" class="my-music__dropdown" @click.stop>
+              <div class="my-music__dropdown-item" @click="triggerCreatePlaylist">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                Создать плейлист
+              </div>
               <div class="my-music__dropdown-item" @click="goToDislikes">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
@@ -339,6 +430,16 @@ async function deleteAllTracks() {
         >
           Недавние
         </button>
+        <button
+          ref="tabPlaylists"
+          class="my-music__tab"
+          :class="{ 'my-music__tab--active': activeTab === 'playlists' }"
+          @click="activeTab = 'playlists'"
+          role="tab"
+          :aria-selected="activeTab === 'playlists'"
+        >
+          Плейлисты
+        </button>
         <div class="my-music__tab-indicator" :style="indicatorStyle" />
       </div>
 
@@ -361,7 +462,7 @@ async function deleteAllTracks() {
         </template>
       </template>
 
-      <template v-else>
+      <template v-else-if="activeTab === 'recent'">
         <div v-if="recentMusicLoading" class="my-music__loading">
           <Spinner :size="20" /> Загружаем недавние треки…
         </div>
@@ -382,6 +483,79 @@ async function deleteAllTracks() {
           </div>
         </template>
       </template>
+
+      <template v-else>
+        <div v-if="activePlaylist" class="my-music__playlist-details">
+          <div class="playlist-details__header">
+            <button class="btn btn--ghost playlist-details__back-btn" @click="closePlaylist">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+              </svg>
+              Назад к плейлистам
+            </button>
+            
+            <div class="playlist-details__info-block">
+              <div class="playlist-details__cover-wrap">
+                <img v-if="activePlaylist.cover" :src="activePlaylist.cover" class="playlist-details__cover" alt="Cover" />
+                <div v-else class="playlist-details__fallback accent-gradient"></div>
+              </div>
+              
+              <div class="playlist-details__meta">
+                <h2 class="playlist-details__title">{{ activePlaylist.title }}</h2>
+                <div class="playlist-details__subtitle" v-if="activePlaylist.subtitle || activePlaylist.track_count">
+                  {{ activePlaylist.subtitle || `${activePlaylist.track_count} треков` }}
+                </div>
+                
+                <div class="playlist-details__actions">
+                  <button class="btn btn--primary" :disabled="playlistTracksLoading || !currentPlaylistTracks.length" @click="playActivePlaylist">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    Слушать
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div v-if="playlistTracksLoading" class="my-music__loading">
+            <Spinner :size="20" /> Загружаем песни…
+          </div>
+          <TrackList
+            v-else
+            :tracks="currentPlaylistTracks"
+            show-index
+            manual-play
+            empty-title="В плейлисте нет треков"
+            empty-subtitle="Вы можете добавить треки в этот плейлист через контекстное меню любой песни"
+            @play="playPlaylistTrack"
+          />
+        </div>
+        
+        <div v-else>
+          <div v-if="myPlaylistsLoading" class="my-music__loading">
+            <Spinner :size="20" /> Загружаем плейлисты…
+          </div>
+          <div v-else-if="myPlaylistsError" class="my-music__error">
+            {{ myPlaylistsError }}
+          </div>
+          <template v-else>
+            <div v-if="myPlaylists.length" class="my-music__playlists-list">
+              <PlaylistRow
+                v-for="pl in myPlaylists"
+                :key="pl.id"
+                :playlist="pl"
+                @play="openPlaylist"
+                @delete="deletePlaylist"
+              />
+            </div>
+            <EmptyState
+              v-else
+              title="У вас нет сохраненных плейлистов"
+              subtitle="Вы можете добавить их на главной странице или в поиске"
+            />
+          </template>
+        </div>
+      </template>
     </section>
 
     <UnavailableTracksModal
@@ -391,6 +565,11 @@ async function deleteAllTracks() {
       @delete="deleteTrack"
       @delete-all="deleteAllTracks"
       @replace="replaceTrack"
+    />
+
+    <CreatePlaylistWizardModal
+      :show="showCreateWizard"
+      @close="showCreateWizard = false"
     />
   </ScrollArea>
 </template>
@@ -487,7 +666,8 @@ async function deleteAllTracks() {
 .my-music__dropdown {
   position: absolute;
   top: calc(100% + 8px);
-  right: 0;
+  left: 0;
+  right: auto;
   width: 240px;
   background: var(--bg-elev);
   backdrop-filter: blur(20px);
@@ -499,7 +679,7 @@ async function deleteAllTracks() {
   display: flex;
   flex-direction: column;
   z-index: 101;
-  transform-origin: top right;
+  transform-origin: top left;
 }
 
 .my-music__dropdown::before {
@@ -547,5 +727,217 @@ async function deleteAllTracks() {
 .dropdown-fade-leave-to {
   opacity: 0;
   transform: scale(0.95) translateY(-5px);
+}
+.my-music__playlists-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.my-music__playlists-header {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 16px;
+  padding: 0 12px;
+}
+
+.playlist-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.playlist-modal {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-1);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  animation: modalSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.playlist-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-2);
+}
+
+.playlist-modal__header h3 {
+  margin: 0;
+  font-size: calc(18px * var(--font-scale, 1));
+  font-weight: 700;
+}
+
+.playlist-modal__close {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s, color 0.2s;
+}
+
+.playlist-modal__close:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+}
+
+.playlist-modal__form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.playlist-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.playlist-modal__field label {
+  font-size: calc(13px * var(--font-scale, 1));
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.playlist-modal__field input,
+.playlist-modal__field textarea {
+  background: var(--bg-3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-md, 8px);
+  color: var(--text-0);
+  padding: 10px 14px;
+  font-size: calc(14px * var(--font-scale, 1));
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.playlist-modal__field input:focus,
+.playlist-modal__field textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(var(--primary-rgb, 100, 100, 255), 0.2);
+}
+
+.playlist-modal__field textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+}
+
+.playlist-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+
+/* Playlist details page styles */
+.my-music__playlist-details {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.playlist-details__header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-weak, var(--border-2));
+  padding-bottom: 20px;
+}
+
+.playlist-details__back-btn {
+  align-self: flex-start;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.playlist-details__info-block {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.playlist-details__cover-wrap {
+  width: 140px;
+  height: 140px;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.playlist-details__cover {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-details__fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+}
+
+.playlist-details__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.playlist-details__title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-0);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.playlist-details__subtitle {
+  font-size: 14px;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.playlist-details__actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
 }
 </style>

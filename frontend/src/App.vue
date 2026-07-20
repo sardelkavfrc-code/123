@@ -10,6 +10,7 @@ import DynamicBackground from "@/components/DynamicBackground.vue";
 import TrackSettingsModal from "@/components/TrackSettingsModal.vue";
 import TrackContextMenu from "@/components/TrackContextMenu.vue";
 import CaptchaModal from "@/components/CaptchaModal.vue";
+import AddToPlaylistModal from "@/components/AddToPlaylistModal.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
@@ -209,6 +210,8 @@ watch(
     />
 
     <CaptchaModal />
+
+    <AddToPlaylistModal />
   </div>
 </template>
 

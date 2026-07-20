@@ -82,6 +82,7 @@ class AlbumSummary(APIModel):
     tracks: list["Track"] = Field(default_factory=list)
     owner_name: str | None = None
     owner_photo: str | None = None
+    access_key: str | None = None
 
 class AlbumList(APIModel):
     items: list[AlbumSummary] = Field(default_factory=list)

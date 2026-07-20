@@ -34,6 +34,10 @@ export const useUIStore = defineStore("ui", () => {
   const hoveredTrackKey = ref<string | null>(null);
   const activeContextMenuTrack = ref<any>(null); // Store the full track object instead of just key
   const activeContextMenuType = ref<'full' | 'edit_only'>('full');
+  
+  // Add to playlist modal state
+  const addToPlaylistModalOpen = ref(false);
+  const activePlaylistTrack = ref<any | null>(null);
 
   // Captcha State
   const captchaImg = ref<string | null>(null);
@@ -111,6 +115,8 @@ export const useUIStore = defineStore("ui", () => {
     activeContextMenuTrack,
     activeContextMenuType,
     showTrackContextMenu,
+    addToPlaylistModalOpen,
+    activePlaylistTrack,
     captchaImg,
     captchaSid,
     requestCaptcha,

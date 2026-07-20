@@ -3,6 +3,10 @@ import { computed } from "vue";
 import { useMotion } from "@/composables/useSpring";
 import type { AlbumSummary } from "@/api/types";
 import { tracksLabel } from "@/composables/useFormat";
+import Spinner from "@/components/Spinner.vue";
+import SvgIcon from "@/components/SvgIcon.vue";
+import { useLibraryStore } from "@/stores/library";
+import { useUIStore } from "@/stores/ui";
 
 const props = defineProps<{
   block: AlbumSummary;
@@ -11,9 +15,26 @@ const props = defineProps<{
   showHoverMeta?: boolean;
 }>();
 
-import Spinner from "@/components/Spinner.vue";
-
 defineEmits<{ open: [block: AlbumSummary] }>();
+
+const library = useLibraryStore();
+const ui = useUIStore();
+
+const isFollowed = computed(() => library.isPlaylistFollowed(props.block));
+
+async function toggleFollow() {
+  try {
+    if (isFollowed.value) {
+      await library.unfollowPlaylist(props.block);
+      ui.notify("Плейлист удален из моей музыки", "success");
+    } else {
+      await library.followPlaylist(props.block);
+      ui.notify("Плейлист добавлен в мою музыку", "success");
+    }
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось изменить статус плейлиста", "error");
+  }
+}
 
 const motion = useMotion();
 const variants = computed(() =>
@@ -35,6 +56,14 @@ const background = computed(() => {
 <template>
   <button v-motion="variants" class="rec-card" :class="{'rec-card--hover-meta': showHoverMeta}" :style="{ background }" @click="$emit('open', block)">
     <div class="rec-card__overlay"></div>
+    <button
+      class="rec-card__add"
+      :class="{ 'rec-card__add--active': isFollowed }"
+      :title="isFollowed ? 'Удалить из моей музыки' : 'Добавить в мою музыку'"
+      @click.stop="toggleFollow"
+    >
+      <SvgIcon :name="isFollowed ? 'check' : 'plus'" width="16" height="16" />
+    </button>
     <div class="rec-card__play" :class="{ 'rec-card__play--loading': loading }">
       <Spinner v-if="loading" :size="32" color="#fff" />
       <svg v-else viewBox="0 0 24 24" width="32" height="32" fill="currentColor">
@@ -205,5 +234,35 @@ const background = computed(() => {
   color: #fff;
   opacity: 0.9;
   display: flex;
+}
+.rec-card__add {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.2s, transform 0.2s, background 0.2s;
+  z-index: 10;
+  cursor: pointer;
+}
+.rec-card:hover .rec-card__add,
+.rec-card__add--active {
+  opacity: 1;
+  transform: scale(1);
+}
+.rec-card__add:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.08);
 }
 </style>

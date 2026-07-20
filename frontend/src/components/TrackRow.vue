@@ -6,6 +6,7 @@ import { usePlayerStore } from "@/stores/player";
 import { useLibraryStore } from "@/stores/library";
 import { useDislikesStore } from "@/stores/dislikes";
 import { useUIStore } from "@/stores/ui";
+import { useAuthStore } from "@/stores/auth";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
@@ -27,6 +28,22 @@ const library = useLibraryStore();
 const dislikes = useDislikesStore();
 const ui = useUIStore();
 const router = useRouter();
+const auth = useAuthStore();
+
+const isMyPlaylistMember = computed(() => {
+  return library.activePlaylist && library.activePlaylist.owner_id === auth.status.user_id;
+});
+
+async function removeFromPlaylist() {
+  if (!library.activePlaylist) return;
+  try {
+    await library.removeTrackFromPlaylist(library.activePlaylist, props.track);
+    player.removeTrack(props.track);
+    ui.notify("Трек удален из плейлиста", "success");
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось удалить трек", "error");
+  }
+}
 
 const { current, isPlaying } = storeToRefs(player);
 
@@ -175,6 +192,16 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
     </div>
 
     <div class="row__actions">
+      <button
+        v-if="isMyPlaylistMember"
+        class="row__action row__action--remove-playlist"
+        title="Удалить из плейлиста"
+        aria-label="Удалить из плейлиста"
+        @click.stop="removeFromPlaylist"
+      >
+        <SvgIcon name="cross" width="16" height="16" />
+      </button>
+
       <template v-for="item in trackItems" :key="item.id">
         <button
           v-if="item.id === 'library'"
@@ -402,6 +429,10 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   color: var(--danger);
 }
 .row__action--disliked:hover {
+  background: rgba(255, 94, 126, 0.12);
+  color: var(--danger);
+}
+.row__action--remove-playlist:hover {
   background: rgba(255, 94, 126, 0.12);
   color: var(--danger);
 }

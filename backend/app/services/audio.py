@@ -387,6 +387,7 @@ def parse_albums(response: Any) -> AlbumList:
                 track_count=track_count,
                 type=raw.get("type"),
                 main_color=raw.get("main_color"),
+                access_key=raw.get("access_key"),
             )
         )
     return AlbumList(items=albums, count=count or len(albums))

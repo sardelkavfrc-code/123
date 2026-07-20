@@ -178,7 +178,7 @@ async function playAlbum(album: AlbumSummary) {
     const numericId = Number(album.id.split("_").pop() || album.id);
     const list = await api.playlistTracks(album.owner_id, numericId, { count: 200 });
     if (list.items && list.items.length > 0) {
-      player.playQueue(list.items, 0);
+      player.playQueue(list.items, 0, { autoPlay: true }, undefined, album);
     } else {
       ui.notify("Альбом пуст", "error");
     }

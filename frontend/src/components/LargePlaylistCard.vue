@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { AlbumSummary, Track } from "@/api/types";
 import SliderTrackRow from "./SliderTrackRow.vue";
 import SvgIcon from "./SvgIcon.vue";
 import Spinner from "./Spinner.vue";
 import { useUIStore } from "@/stores/ui";
+import { useLibraryStore } from "@/stores/library";
 
 const props = defineProps<{
   block: AlbumSummary;
@@ -20,7 +21,9 @@ const emit = defineEmits<{
 }>();
 
 const ui = useUIStore();
-const isAdded = ref(false);
+const library = useLibraryStore();
+
+const isAdded = computed(() => library.isPlaylistFollowed(props.block));
 
 const background = computed(() => {
   if (props.block.cover) {
@@ -29,12 +32,17 @@ const background = computed(() => {
   return "linear-gradient(135deg, var(--accent-1), var(--accent-3))";
 });
 
-function onAddClick() {
-  isAdded.value = !isAdded.value;
-  if (isAdded.value) {
-    ui.notify("Плейлист добавлен в мою музыку", "success");
-  } else {
-    ui.notify("Плейлист удален из моей музыки", "success");
+async function onAddClick() {
+  try {
+    if (isAdded.value) {
+      await library.unfollowPlaylist(props.block);
+      ui.notify("Плейлист удален из моей музыки", "success");
+    } else {
+      await library.followPlaylist(props.block);
+      ui.notify("Плейлист добавлен в мою музыку", "success");
+    }
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось изменить статус плейлиста", "error");
   }
   emit("add", props.block);
 }

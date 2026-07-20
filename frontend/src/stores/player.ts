@@ -1,7 +1,7 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import Hls from "hls.js";
-import type { Track } from "@/api/types";
+import type { Track, AlbumSummary } from "@/api/types";
 import { api } from "@/api/client";
 import { useSettingsStore } from "./settings";
 import { useEqualizerStore } from "./equalizer";
@@ -349,6 +349,7 @@ export const usePlayerStore = defineStore("player", () => {
   const repeat = ref<RepeatMode>("off");
   const shuffle = ref(false);
   const hasRepeatedOnce = ref(false);
+  const currentPlaylist = ref<AlbumSummary | null>(null);
   // Volume is initialised from the user-configured startup volume on every
   // session. Runtime adjustments live only in this store — we don't write
   // back to settings.startupVolume so a quick tweak doesn't override the
@@ -612,8 +613,10 @@ export const usePlayerStore = defineStore("player", () => {
     tracks: Track[],
     startIndex = 0,
     options: { autoPlay?: boolean; startTime?: number } = { autoPlay: true },
-    onNearEnd?: () => Promise<void> | void
+    onNearEnd?: () => Promise<void> | void,
+    playlist?: AlbumSummary
   ) {
+    currentPlaylist.value = playlist || null;
     const filtered = tracks.filter((t) => t.url);
     originalQueue.value = [...filtered];
     queue.value = shuffle.value ? shuffleArray(filtered, startIndex) : [...filtered];
@@ -755,6 +758,7 @@ export const usePlayerStore = defineStore("player", () => {
     currentTime.value = 0;
     isPlaying.value = false;
     nearEndCallback = null;
+    currentPlaylist.value = null;
   }
 
   function removeFromQueue(target: number) {
@@ -913,6 +917,7 @@ export const usePlayerStore = defineStore("player", () => {
     loadingMore,
     isShuffled: shuffle,
     current,
+    currentPlaylist,
     hasNext,
     hasPrev,
     playQueue,

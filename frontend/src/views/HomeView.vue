@@ -162,6 +162,103 @@ const visibleHomeSections = computed(() => {
   return library.homeSections.filter(isSectionVisible);
 });
 
+function animateDisintegration(el: Element, done: () => void) {
+  const htmlEl = el as HTMLElement;
+  const rect = htmlEl.getBoundingClientRect();
+  const parent = htmlEl.parentElement;
+  if (!parent) {
+    done();
+    return;
+  }
+
+  const originalPosition = window.getComputedStyle(htmlEl).position;
+  if (originalPosition === "static") {
+    htmlEl.style.position = "relative";
+  }
+
+  const container = document.createElement("div");
+  container.style.position = "absolute";
+  container.style.left = `${htmlEl.offsetLeft}px`;
+  container.style.top = `${htmlEl.offsetTop}px`;
+  container.style.width = `${rect.width}px`;
+  container.style.height = `${rect.height}px`;
+  container.style.pointerEvents = "none";
+  container.style.zIndex = "1000";
+  parent.appendChild(container);
+
+  htmlEl.style.transition = "opacity 0.4s ease-out, transform 0.4s ease-out, filter 0.4s ease-out";
+  htmlEl.style.transformOrigin = "center";
+  htmlEl.style.opacity = "0";
+  htmlEl.style.transform = "scale(0.9) translateY(-12px)";
+  htmlEl.style.filter = "blur(6px)";
+
+  const particleCount = 70;
+  const colors = [
+    "var(--accent-1, #4E65FF)",
+    "var(--accent-2, #92EFFD)",
+    "var(--text-1, #ffffff)",
+    "var(--text-2, #888888)",
+  ];
+
+  for (let i = 0; i < particleCount; i++) {
+    const p = document.createElement("div");
+    p.style.position = "absolute";
+    
+    const x = Math.random() * rect.width;
+    const y = Math.random() * rect.height;
+    p.style.left = `${x}px`;
+    p.style.top = `${y}px`;
+    
+    const size = 3 + Math.random() * 4;
+    p.style.width = `${size}px`;
+    p.style.height = `${size}px`;
+    p.style.borderRadius = "50%";
+    p.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    p.style.opacity = "0.9";
+    p.style.pointerEvents = "none";
+    
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * (Math.PI / 1.6);
+    const speed = 1.5 + Math.random() * 4.5;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    
+    container.appendChild(p);
+    
+    let px = x;
+    let py = y;
+    let alpha = 0.9;
+    let scale = 1.0;
+    
+    const startTime = performance.now();
+    const duration = 400 + Math.random() * 350;
+    
+    const update = (timestamp: number) => {
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      px += vx;
+      py += vy + 0.04;
+      alpha = 0.9 * (1 - progress);
+      scale = 1.0 - progress;
+      
+      p.style.transform = `translate(${px - x}px, ${py - y}px) scale(${scale})`;
+      p.style.opacity = `${alpha}`;
+      
+      if (progress < 1) {
+        requestAnimationFrame(update);
+      } else {
+        p.remove();
+      }
+    };
+    requestAnimationFrame(update);
+  }
+
+  setTimeout(() => {
+    container.remove();
+    done();
+  }, 750);
+}
+
 function updateSliderButtons(container: HTMLElement) {
   const parent = container.parentElement;
   if (!parent) return;
@@ -374,7 +471,7 @@ async function playAlbum(album: AlbumSummary) {
   try {
     const res = await api.playlistTracks(album.owner_id, parseInt(album.id), { count: 200 });
     if (res.items && res.items.length > 0) {
-      player.playQueue(res.items, 0);
+      player.playQueue(res.items, 0, { autoPlay: true }, undefined, album);
     } else {
       ui.notify("Плейлист пуст", "error");
     }
@@ -606,7 +703,13 @@ async function playAlbum(album: AlbumSummary) {
     </div>
 
     <Transition name="content-reveal">
-      <div v-if="!library.homeSectionsLoading && visibleHomeSections.length" class="home__content-sections">
+      <TransitionGroup 
+        v-if="!library.homeSectionsLoading && visibleHomeSections.length" 
+        name="feed-list" 
+        tag="div"
+        class="home__content-sections"
+        @leave="animateDisintegration"
+      >
         <section 
           class="home__feed" 
           v-for="section in visibleHomeSections" 
@@ -712,8 +815,8 @@ async function playAlbum(album: AlbumSummary) {
               <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
             </button>
           </div>
-</section>
-</div>
+        </section>
+      </TransitionGroup>
     </Transition>
   </ScrollArea>
 </template>

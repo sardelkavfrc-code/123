@@ -4,6 +4,7 @@ import { useUIStore } from "@/stores/ui";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { useDislikesStore } from "@/stores/dislikes";
+import { useAuthStore } from "@/stores/auth";
 import { useRouter } from "vue-router";
 import SvgIcon from "@/components/SvgIcon.vue";
 
@@ -11,7 +12,27 @@ const ui = useUIStore();
 const library = useLibraryStore();
 const player = usePlayerStore();
 const dislikes = useDislikesStore();
+const auth = useAuthStore();
 const router = useRouter();
+
+const canRemoveFromPlaylist = computed(() => {
+  if (!player.currentPlaylist || !track.value) return false;
+  return player.currentPlaylist.owner_id === auth.status.user_id;
+});
+
+async function removeFromPlaylist() {
+  if (!track.value || !player.currentPlaylist) return;
+  const t = track.value;
+  const pl = player.currentPlaylist;
+  ui.trackContextMenuOpen = false;
+  try {
+    await library.removeTrackFromPlaylist(pl, t);
+    player.removeTrack(t);
+    ui.notify("Трек удален из плейлиста", "success");
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось удалить трек", "error");
+  }
+}
 
 defineEmits(['mouseenter', 'mouseleave']);
 
@@ -90,6 +111,14 @@ function toggleDislike() {
     ui.notify("Трек больше не будет попадаться", "info");
   }
 }
+
+function showAddToPlaylistModal() {
+  if (!track.value) return;
+  ui.trackContextMenuOpen = false;
+  ui.activePlaylistTrack = track.value;
+  ui.addToPlaylistModalOpen = true;
+  void library.loadMyPlaylists();
+}
 </script>
 
 <template>
@@ -110,6 +139,14 @@ function toggleDislike() {
         <button class="track-context-btn" @click="addToQueue">
           <SvgIcon name="queue_add" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Слушать далее
+        </button>
+        <button class="track-context-btn" @click="showAddToPlaylistModal">
+          <SvgIcon name="plus" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Добавить в плейлист...
+        </button>
+        <button v-if="canRemoveFromPlaylist" class="track-context-btn" @click="removeFromPlaylist">
+          <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Удалить из плейлиста
         </button>
         <button class="track-context-btn" @click="openSimilar">
           <SvgIcon name="similar" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />

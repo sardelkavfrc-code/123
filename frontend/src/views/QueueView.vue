@@ -122,7 +122,7 @@ function scrollToCurrent() {
   return false;
 }
 
-const total = computed(() => queue.value.reduce((acc, t) => acc + (t.duration || 0), 0));
+const total = computed(() => queue.value.reduce((acc: number, t: Track) => acc + (t.duration || 0), 0));
 
 function initScroll() {
   if (!settings.autoScrollQueue) return;
