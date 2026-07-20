@@ -533,11 +533,13 @@ async def mix(
 async def explore(
     vk: VKDep,
     session: SessionDep,
-    show_mixes: bool = True,
-    show_playlists: bool = True,
-    show_moods: bool = True,
+    show_stream_mixes: bool = True,
     show_recomms: bool = True,
-    show_audios: bool = True
+    show_genres: bool = True,
+    show_audios: bool = True,
+    show_moods: bool = True,
+    show_playlists: bool = True,
+    show_mixes: bool = True
 ) -> list[HomeSection]:
     """Returns all dynamic sections from VK catalog (Explore/General)."""
     try:
@@ -609,13 +611,20 @@ async def explore(
                 if not show_playlists:
                     skip = True
             elif b_type == "action" and layout_name == "crop_slider":
-                if not show_moods:
+                is_genre = "жанр" in (current_title or "").lower()
+                is_mood = "настроен" in (current_title or "").lower()
+                if is_genre and not show_genres:
+                    skip = True
+                elif is_mood and not show_moods:
                     skip = True
             elif b_type == "music_playlists":
                 if not show_recomms:
                     skip = True
-            elif b_type in ["music_audios", "audio_stream_mixes"]:
+            elif b_type == "music_audios":
                 if not show_audios:
+                    skip = True
+            elif b_type == "audio_stream_mixes":
+                if not show_stream_mixes:
                     skip = True
                     
             if skip:

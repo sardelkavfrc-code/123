@@ -144,11 +144,13 @@ interface PersistedSettings {
   mixMood: string;
   mixFamiliarity: string;
   mixLanguage: string;
-  homeShowMixes: boolean;
-  homeShowPlaylists: boolean;
-  homeShowMoods: boolean;
+  homeShowStreamMixes: boolean;
   homeShowRecomms: boolean;
+  homeShowGenres: boolean;
   homeShowAudios: boolean;
+  homeShowMoods: boolean;
+  homeShowPlaylists: boolean;
+  homeShowMixes: boolean;
   iconSet: "line" | "flat" | "rounded";
 }
 
@@ -219,11 +221,13 @@ const defaults: PersistedSettings = {
   mixMood: "any",
   mixFamiliarity: "any",
   mixLanguage: "any",
-  homeShowMixes: true,
-  homeShowPlaylists: true,
-  homeShowMoods: true,
+  homeShowStreamMixes: true,
   homeShowRecomms: true,
+  homeShowGenres: true,
   homeShowAudios: true,
+  homeShowMoods: true,
+  homeShowPlaylists: true,
+  homeShowMixes: true,
 };
 
 function load(): PersistedSettings {
@@ -341,11 +345,13 @@ export const useSettingsStore = defineStore("settings", () => {
   const homeCardsBrightnessTimeStart = ref(initial.homeCardsBrightnessTimeStart ?? "22:00");
   const homeCardsBrightnessTimeEnd = ref(initial.homeCardsBrightnessTimeEnd ?? "06:00");
 
-  const homeShowMixes = ref(initial.homeShowMixes ?? true);
-  const homeShowPlaylists = ref(initial.homeShowPlaylists ?? true);
-  const homeShowMoods = ref(initial.homeShowMoods ?? true);
+  const homeShowStreamMixes = ref(initial.homeShowStreamMixes ?? true);
   const homeShowRecomms = ref(initial.homeShowRecomms ?? true);
+  const homeShowGenres = ref(initial.homeShowGenres ?? true);
   const homeShowAudios = ref(initial.homeShowAudios ?? true);
+  const homeShowMoods = ref(initial.homeShowMoods ?? true);
+  const homeShowPlaylists = ref(initial.homeShowPlaylists ?? true);
+  const homeShowMixes = ref(initial.homeShowMixes ?? true);
 
   const currentHomeCardsBrightness = ref(100);
 
@@ -565,11 +571,13 @@ export const useSettingsStore = defineStore("settings", () => {
       mixMood: mixMood.value,
       mixFamiliarity: mixFamiliarity.value,
       mixLanguage: mixLanguage.value,
-      homeShowMixes: homeShowMixes.value,
-      homeShowPlaylists: homeShowPlaylists.value,
-      homeShowMoods: homeShowMoods.value,
+      homeShowStreamMixes: homeShowStreamMixes.value,
       homeShowRecomms: homeShowRecomms.value,
+      homeShowGenres: homeShowGenres.value,
       homeShowAudios: homeShowAudios.value,
+      homeShowMoods: homeShowMoods.value,
+      homeShowPlaylists: homeShowPlaylists.value,
+      homeShowMixes: homeShowMixes.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -630,11 +638,13 @@ export const useSettingsStore = defineStore("settings", () => {
       mixMood,
       mixFamiliarity,
       mixLanguage,
-      homeShowMixes,
-      homeShowPlaylists,
-      homeShowMoods,
+      homeShowStreamMixes,
       homeShowRecomms,
+      homeShowGenres,
       homeShowAudios,
+      homeShowMoods,
+      homeShowPlaylists,
+      homeShowMixes,
     ],
     () => {
       applyToDocument();
@@ -712,11 +722,13 @@ export const useSettingsStore = defineStore("settings", () => {
     mixMood.value = defaults.mixMood;
     mixFamiliarity.value = defaults.mixFamiliarity;
     mixLanguage.value = defaults.mixLanguage;
-    homeShowMixes.value = defaults.homeShowMixes;
-    homeShowPlaylists.value = defaults.homeShowPlaylists;
-    homeShowMoods.value = defaults.homeShowMoods;
+    homeShowStreamMixes.value = defaults.homeShowStreamMixes;
     homeShowRecomms.value = defaults.homeShowRecomms;
+    homeShowGenres.value = defaults.homeShowGenres;
     homeShowAudios.value = defaults.homeShowAudios;
+    homeShowMoods.value = defaults.homeShowMoods;
+    homeShowPlaylists.value = defaults.homeShowPlaylists;
+    homeShowMixes.value = defaults.homeShowMixes;
   }
 
   return {
@@ -781,10 +793,12 @@ export const useSettingsStore = defineStore("settings", () => {
     mixMood,
     mixFamiliarity,
     mixLanguage,
-    homeShowMixes,
-    homeShowPlaylists,
-    homeShowMoods,
+    homeShowStreamMixes,
     homeShowRecomms,
+    homeShowGenres,
     homeShowAudios,
+    homeShowMoods,
+    homeShowPlaylists,
+    homeShowMixes,
   };
 });

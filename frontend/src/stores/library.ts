@@ -162,11 +162,13 @@ export const useLibraryStore = defineStore("library", () => {
     try {
       const settings = useSettingsStore();
       homeSections.value = await api.explore({
-        show_mixes: settings.homeShowMixes,
-        show_playlists: settings.homeShowPlaylists,
-        show_moods: settings.homeShowMoods,
+        show_stream_mixes: settings.homeShowStreamMixes,
         show_recomms: settings.homeShowRecomms,
+        show_genres: settings.homeShowGenres,
         show_audios: settings.homeShowAudios,
+        show_moods: settings.homeShowMoods,
+        show_playlists: settings.homeShowPlaylists,
+        show_mixes: settings.homeShowMixes,
       });
       return homeSections.value;
     } finally {

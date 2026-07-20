@@ -36,11 +36,13 @@ const {
   mixMood,
   mixFamiliarity,
   mixLanguage,
-  homeShowMixes,
-  homeShowPlaylists,
-  homeShowMoods,
+  homeShowStreamMixes,
   homeShowRecomms,
+  homeShowGenres,
   homeShowAudios,
+  homeShowMoods,
+  homeShowPlaylists,
+  homeShowMixes,
 } = storeToRefs(settings);
 
 const showDropdown = ref(false);
@@ -135,20 +137,26 @@ onMounted(async () => {
 });
 
 function isSectionVisible(section: HomeSection): boolean {
-  if (section.type === 'actions' && section.layout === 'large_slider') {
-    return homeShowMixes.value;
+  if (section.type === 'audios' && section.layout === 'audio_stream_mix_interactive') {
+    return homeShowStreamMixes.value;
+  }
+  if (section.type === 'playlists' && section.layout === 'recomms_slider') {
+    return homeShowRecomms.value;
+  }
+  if (section.type === 'actions' && section.layout === 'crop_slider') {
+    const isGenre = section.title?.toLowerCase().includes('жанр');
+    const isMood = section.title?.toLowerCase().includes('настроен');
+    if (isGenre) return homeShowGenres.value;
+    if (isMood) return homeShowMoods.value;
+  }
+  if (section.type === 'audios' && section.layout === 'triple_stacked_slider') {
+    return homeShowAudios.value;
   }
   if (section.type === 'playlists' && section.layout === 'large_slider') {
     return homeShowPlaylists.value;
   }
-  if (section.type === 'actions' && section.layout === 'crop_slider') {
-    return homeShowMoods.value;
-  }
-  if (section.type === 'playlists' && section.layout !== 'large_slider') {
-    return homeShowRecomms.value;
-  }
-  if (section.type === 'audios') {
-    return homeShowAudios.value;
+  if (section.type === 'actions' && section.layout === 'large_slider') {
+    return homeShowMixes.value;
   }
   return true;
 }
@@ -470,23 +478,9 @@ async function playAlbum(album: AlbumSummary) {
 
             <div class="home__dropdown-row">
               <div class="home__dropdown-label">
-                <span class="home__dropdown-label-main">Микс по артистам</span>
+                <span class="home__dropdown-label-main">Собрано алгоритмами</span>
               </div>
-              <input v-model="homeShowMixes" type="checkbox" class="settings__switch" />
-            </div>
-
-            <div class="home__dropdown-row">
-              <div class="home__dropdown-label">
-                <span class="home__dropdown-label-main">Слушайте друг друга</span>
-              </div>
-              <input v-model="homeShowPlaylists" type="checkbox" class="settings__switch" />
-            </div>
-
-            <div class="home__dropdown-row">
-              <div class="home__dropdown-label">
-                <span class="home__dropdown-label-main">Настроения и занятия</span>
-              </div>
-              <input v-model="homeShowMoods" type="checkbox" class="settings__switch" />
+              <input v-model="homeShowStreamMixes" type="checkbox" class="settings__switch" />
             </div>
 
             <div class="home__dropdown-row">
@@ -498,9 +492,37 @@ async function playAlbum(album: AlbumSummary) {
 
             <div class="home__dropdown-row">
               <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Жанры</span>
+              </div>
+              <input v-model="homeShowGenres" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
                 <span class="home__dropdown-label-main">Рекомендованные треки</span>
               </div>
               <input v-model="homeShowAudios" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Настроения и занятия</span>
+              </div>
+              <input v-model="homeShowMoods" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Слушайте друг друга</span>
+              </div>
+              <input v-model="homeShowPlaylists" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Микс по артистам</span>
+              </div>
+              <input v-model="homeShowMixes" type="checkbox" class="settings__switch" />
             </div>
           </div>
         </Transition>

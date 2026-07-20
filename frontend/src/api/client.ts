@@ -371,11 +371,13 @@ export const api = {
     return data;
   },
   async explore(params?: {
-    show_mixes?: boolean;
-    show_playlists?: boolean;
-    show_moods?: boolean;
+    show_stream_mixes?: boolean;
     show_recomms?: boolean;
+    show_genres?: boolean;
     show_audios?: boolean;
+    show_moods?: boolean;
+    show_playlists?: boolean;
+    show_mixes?: boolean;
   }): Promise<HomeSection[]> {
     const { data } = await http.get<HomeSection[]>("/audio/explore", { params });
     return data;
