@@ -561,6 +561,12 @@ async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
         pl_map = {f"{p.get('owner_id')}_{p.get('id')}": p for p in playlists_data}
         audio_map = {f"{a.get('owner_id')}_{a.get('id')}": a for a in audios_data}
         
+        profiles_data = section_raw.get("profiles", [])
+        profile_map = {p.get("id"): p for p in profiles_data}
+        
+        rec_pl_data = section_raw.get("recommended_playlists", [])
+        rec_pl_map = {f"{r.get('owner_id')}_{r.get('id')}": r for r in rec_pl_data}
+        
         home_sections = []
         current_title = ""
         current_subtitle = ""
@@ -607,21 +613,45 @@ async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
                         # For music_recommended_playlists, tracks are ordered sequentially
                         # 3 tracks per playlist typically
                         pl_tracks = []
+                        pl_cover = _get_playlist_cover(pl)
+                        pl_subtitle = pl.get("description") or pl.get("subtitle") or ""
+                        owner_name = None
+                        owner_photo = None
+                        
                         if b_type == "music_recommended_playlists":
                             pl_tracks_ids = b_audios_ids[i*3 : (i+1)*3]
                             pl_tracks = [b_audios_map[aid] for aid in pl_tracks_ids if aid in b_audios_map]
+                            
+                            pl_key = f"{pl.get('owner_id')}_{pl.get('id')}"
+                            rec_pl = rec_pl_map.get(pl_key) or {}
+                            
+                            percentage = rec_pl.get("percentage")
+                            if percentage is not None:
+                                pl_subtitle = f"{int(percentage*100)}% · {rec_pl.get('percentage_title', 'совпадение с вашим вкусом')}"
+                            elif rec_pl.get("percentage_title"):
+                                pl_subtitle = rec_pl.get("percentage_title")
+                                
+                            if rec_pl.get("cover"):
+                                pl_cover = rec_pl.get("cover")
+                                
+                            profile = profile_map.get(pl.get("owner_id"))
+                            if profile:
+                                owner_name = f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+                                owner_photo = profile.get("photo_base") or profile.get("photo_100") or profile.get("photo_50")
                         
                         items.append(AlbumSummary(
                             id=str(pl.get("id")),
                             owner_id=pl.get("owner_id"),
                             title=pl.get("title", ""),
-                            subtitle=pl.get("description") or pl.get("subtitle") or "",
-                            cover=_get_playlist_cover(pl),
+                            subtitle=pl_subtitle,
+                            cover=pl_cover,
                             year=pl.get("year"),
                             track_count=pl.get("count", 0),
                             type=pl.get("type"),
                             main_color=pl.get("main_color"),
-                            tracks=pl_tracks
+                            tracks=pl_tracks,
+                            owner_name=owner_name,
+                            owner_photo=owner_photo
                         ))
                 if items:
                     home_sections.append(HomeSection(

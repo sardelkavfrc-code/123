@@ -90,6 +90,8 @@ export interface AlbumSummary {
   type?: string | null;
   main_color?: string | null;
   tracks?: Track[];
+  owner_name?: string | null;
+  owner_photo?: string | null;
 }
 
 export interface ArtistAlbumBlock {

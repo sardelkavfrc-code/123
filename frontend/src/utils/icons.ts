@@ -35,7 +35,8 @@ export type IconName =
   | "edit"
   | "drag_handle"
   | "chevron_left"
-  | "chevron_right";
+  | "chevron_right"
+  | "share";
 
 export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef>> = {
   line: {
@@ -203,6 +204,15 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       strokeLinecap: "round",
       content: `<path d="M12 5v14M5 12h14" />`,
     },
+    share: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />`,
+    },
     check: {
       viewBox: "0 0 24 24",
       fill: "currentColor",
@@ -356,6 +366,15 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       viewBox: "0 0 24 24",
       fill: "currentColor",
       content: `<path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />`,
+    },
+    share: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2.2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />`,
     },
     check: {
       viewBox: "0 0 24 24",
@@ -545,6 +564,15 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       strokeWidth: 2.2,
       strokeLinecap: "round",
       content: `<path d="M12 5v14M5 12h14" />`,
+    },
+    share: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2.2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" /><polyline points="16 6 12 2 8 6" /><line x1="12" y1="2" x2="12" y2="15" />`,
     },
     check: {
       viewBox: "0 0 24 24",

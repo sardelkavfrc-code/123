@@ -539,6 +539,7 @@ async function playAlbum(album: AlbumSummary) {
                   :block="block"
                   :loading="loadingAlbumId === block.id"
                   @open="playAlbum"
+                  @play="(b) => b.tracks?.length && player.playQueue(b.tracks, 0)"
                   @play-track="(_, i) => player.playQueue(block.tracks || [], i)"
                 />
               </template>

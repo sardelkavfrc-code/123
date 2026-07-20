@@ -44,7 +44,7 @@ def _cover_large(thumb: dict[str, Any]) -> str | None:
     return None
 
 def parse_track(audio: dict[str, Any]) -> Track:
-    thumb = (audio.get("album") or {}).get("thumb") or {}
+    thumb = audio.get("thumb") or (audio.get("album") or {}).get("thumb") or {}
     return Track(
         id=int(audio.get("id", 0)),
         owner_id=int(audio.get("owner_id", 0)),
