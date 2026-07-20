@@ -81,8 +81,8 @@ function goToArtist() {
     </div>
 
     <div class="slider-track__info">
-      <div class="slider-track__title" :title="track.title">
-        {{ track.title }}
+      <div class="slider-track__title" :title="track.title + (track.subtitle ? ' (' + track.subtitle + ')' : '')">
+        <span class="slider-track__title-text">{{ track.title }}</span>
         <span v-if="track.subtitle" class="slider-track__subtitle">{{ track.subtitle }}</span>
         <span v-if="track.is_explicit" class="slider-track__explicit">E</span>
       </div>
@@ -181,15 +181,27 @@ function goToArtist() {
   font-weight: 500;
   color: var(--text-0);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
 }
 .slider-track--playing .slider-track__title {
   color: var(--accent-text, var(--primary));
 }
+.slider-track__title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
+}
 .slider-track__subtitle {
   color: var(--text-2);
   margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 2;
 }
 .slider-track__explicit {
   display: inline-block;
@@ -201,6 +213,7 @@ function goToArtist() {
   margin-left: 6px;
   color: var(--text-2);
   transform: translateY(-1px);
+  flex-shrink: 0;
 }
 .slider-track__artist {
   font-size: calc(13px * var(--font-scale, 1));
@@ -208,6 +221,11 @@ function goToArtist() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+.slider-track__artist:hover {
+  color: var(--text-0);
 }
 
 .slider-track__actions {

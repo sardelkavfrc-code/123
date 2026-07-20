@@ -78,17 +78,8 @@ function onShareClick() {
             <img v-if="block.owner_photo" :src="block.owner_photo" class="lpc-header__owner-avatar" alt="Avatar" />
             <span class="lpc-header__owner-name">{{ block.owner_name }}</span>
           </div>
-          <div class="lpc-header__play-wrapper">
-            <Spinner v-if="loading" :size="24" color="#fff" />
-            <svg v-else width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <clipPath id="vk-round-corners-lpc">
-                  <rect x="1.1" y="1.1" width="21.8" height="21.8" rx="6.4"/>
-                </clipPath>
-              </defs>
-              <rect width="24" height="24" rx="7.5" fill="white" fill-opacity="0.2"/>
-              <path d="M7 6v12l10-6z" fill="white" clip-path="url(#vk-round-corners-lpc)"/>
-            </svg>
+          <div class="lpc-header__play-wrapper" v-if="loading">
+            <Spinner :size="24" color="#fff" />
           </div>
         </div>
       </div>

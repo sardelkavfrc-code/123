@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, onActivated } from "vue";
 
 const emit = defineEmits<{
   reachEnd: [];
@@ -11,6 +11,7 @@ const props = defineProps<{
 }>();
 
 const root = ref<HTMLDivElement | null>(null);
+const savedScrollTop = ref(0);
 
 // Throttle reach-end emissions so we don't spam the parent on every scroll
 // tick — once per animation frame is plenty.
@@ -18,6 +19,7 @@ let rafHandle: number | null = null;
 
 function onScroll() {
   if (!root.value) return;
+  savedScrollTop.value = root.value.scrollTop;
   if (rafHandle !== null) return;
   rafHandle = window.requestAnimationFrame(() => {
     rafHandle = null;
@@ -36,6 +38,12 @@ onMounted(() => {
 onBeforeUnmount(() => {
   root.value?.removeEventListener("scroll", onScroll);
   if (rafHandle !== null) window.cancelAnimationFrame(rafHandle);
+});
+
+onActivated(() => {
+  if (root.value && savedScrollTop.value > 0) {
+    root.value.scrollTop = savedScrollTop.value;
+  }
 });
 </script>
 

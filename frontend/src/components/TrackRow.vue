@@ -157,8 +157,8 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
     </div>
 
     <div class="row__main">
-      <div class="row__title" :title="track.title">
-        {{ track.title }}
+      <div class="row__title" :title="track.title + (track.subtitle ? ' (' + track.subtitle + ')' : '')">
+        <span class="row__title-text">{{ track.title }}</span>
         <span v-if="track.subtitle" class="row__subtitle">{{ track.subtitle }}</span>
         <span v-if="track.is_explicit" class="row__explicit" title="Explicit">E</span>
       </div>
@@ -315,14 +315,25 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   color: var(--text-primary);
   font-size: calc(14px * var(--font-scale, 1));
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+.row__title-text {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1;
 }
-
 .row__subtitle {
   color: #828282;
   font-weight: 400;
   margin-left: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 2;
 }
 .row__explicit {
   display: inline-block;
@@ -333,6 +344,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   border-radius: 3px;
   font-weight: 700;
   letter-spacing: calc(0.04em + var(--letter-spacing, 0px));
+  flex-shrink: 0;
 }
 .row__artist-wrap {
   white-space: nowrap;
