@@ -66,7 +66,7 @@ function goToArtist() {
     class="slider-track"
     :class="{ 'slider-track--playing': isCurrent, 'slider-track--disabled': unavailable }"
     @dblclick="playOne"
-    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'edit_only')"
+    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'full')"
     @mouseenter="ui.hoveredTrackKey = trackKey"
     @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >

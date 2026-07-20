@@ -7,7 +7,6 @@ import type { AlbumSummary, Track } from "@/api/types";
 import { useSettingsStore } from "@/stores/settings";
 import { storeToRefs } from "pinia";
 import RecommendationCard from "@/components/RecommendationCard.vue";
-import TitleBar from '@/components/TitleBar.vue';
 import ActionCard from '@/components/ActionCard.vue';
 import LargePlaylistCard from "@/components/LargePlaylistCard.vue";
 import MixCard from "@/components/MixCard.vue";
@@ -135,10 +134,27 @@ function updateSliderButtons(container: HTMLElement) {
   const btnPrev = parent.querySelector('.home__slider-btn--prev');
   const btnNext = parent.querySelector('.home__slider-btn--next');
   if (btnPrev && btnNext) {
-    const canScrollLeft = container.scrollLeft > 0;
-    const canScrollRight = Math.ceil(container.scrollLeft + container.clientWidth) < container.scrollWidth;
+    const canScrollLeft = container.scrollLeft > 5;
     
-    if (container.scrollWidth <= container.clientWidth) {
+    let canScrollRight = false;
+    let allContentFits = false;
+    
+    const children = container.children;
+    if (children.length > 0) {
+      const lastChild = children[children.length - 1] as HTMLElement;
+      const lastChildRect = lastChild.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      
+      canScrollRight = lastChildRect.right > containerRect.right + 2;
+      
+      const actualContentWidth = container.scrollLeft + (lastChildRect.right - containerRect.left);
+      allContentFits = actualContentWidth <= container.clientWidth + 2;
+    } else {
+      canScrollRight = Math.ceil(container.scrollLeft + container.clientWidth) < container.scrollWidth;
+      allContentFits = container.scrollWidth <= container.clientWidth;
+    }
+    
+    if (allContentFits) {
       btnPrev.classList.add('home__slider-btn--hidden');
       btnNext.classList.add('home__slider-btn--hidden');
     } else {
@@ -157,19 +173,18 @@ function onSliderScroll(e: Event) {
   updateSliderButtons(e.currentTarget as HTMLElement);
 }
 
-const scrollAmount = 600;
 function scrollLeft(e: Event) {
   const target = e.currentTarget as HTMLElement;
-  const container = target.parentElement?.querySelector('.home__algorithms');
+  const container = target.parentElement?.querySelector('.home__algorithms') as HTMLElement;
   if (container) {
-    container.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+    container.scrollBy({ left: -container.clientWidth * 0.85, behavior: 'smooth' });
   }
 }
 function scrollRight(e: Event) {
   const target = e.currentTarget as HTMLElement;
-  const container = target.parentElement?.querySelector('.home__algorithms');
+  const container = target.parentElement?.querySelector('.home__algorithms') as HTMLElement;
   if (container) {
-    container.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    container.scrollBy({ left: container.clientWidth * 0.85, behavior: 'smooth' });
   }
 }
 
@@ -500,8 +515,7 @@ async function playAlbum(album: AlbumSummary) {
 
     <Transition name="content-reveal">
       <div v-if="!library.homeSectionsLoading && library.homeSections" class="home__content-sections">
-        
-        <section 
+<section 
           class="home__feed" 
           v-for="section in library.homeSections" 
           :key="section.id"
@@ -525,7 +539,7 @@ async function playAlbum(album: AlbumSummary) {
                   :block="block"
                   :loading="loadingAlbumId === block.id"
                   @open="playAlbum"
-                  @playTrack="(_, i) => player.playQueue(block.tracks || [], i)"
+                  @play-track="(_, i) => player.playQueue(block.tracks || [], i)"
                 />
               </template>
               <template v-else>
@@ -605,10 +619,8 @@ async function playAlbum(album: AlbumSummary) {
               <svg width="24" height="24" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
             </button>
           </div>
-          
-        </section>
-
-      </div>
+</section>
+</div>
     </Transition>
   </ScrollArea>
 </template>
@@ -731,11 +743,11 @@ async function playAlbum(album: AlbumSummary) {
   margin-bottom: 24px;
 }
 .home__library-slider {
-  display: grid;
-  grid-template-rows: repeat(3, auto);
-  grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 16px) / 2.5);
-  gap: 8px 16px;
+  display: grid !important;
+  grid-template-rows: repeat(3, auto) !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: calc((100% - 16px) / 2.5) !important;
+  gap: 8px 16px !important;
   overflow-x: auto;
   scrollbar-width: none;
   padding-bottom: 8px;
@@ -1248,4 +1260,35 @@ async function playAlbum(album: AlbumSummary) {
   transform: translateY(-8px);
 }
 </style>
-
+
+<style scoped>
+.home__audios-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.home__library-slider {
+  display: grid !important;
+  grid-template-rows: repeat(3, auto) !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: calc((100% - 16px) / 2.5) !important;
+  gap: 8px 16px !important;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 8px;
+  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+}
+.home__library-slider::after {
+  content: "";
+  display: block;
+  grid-row: 1 / -1;
+  width: 65vw;
+}
+.home__library-slider > * {
+  scroll-snap-align: start;
+}
+.home__library-slider::-webkit-scrollbar {
+  display: none;
+}
+</style>

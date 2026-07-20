@@ -82,7 +82,7 @@ const processQueue = (error: Error | null) => {
 
 // Global Captcha Queue
 let isCaptchaModalActive = false;
-let captchaQueue: Array<{
+const captchaQueue: Array<{
   sid: string;
   img: string;
   resolve: (key: string | null) => void;

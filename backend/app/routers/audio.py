@@ -643,6 +643,33 @@ async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
                     if aid in audio_map:
                         items.append(audio_map[aid])
                         
+                if next_from:
+                    try:
+                        more_resp = await vk.call(
+                            "catalog.getBlockItems",
+                            session.access_token,
+                            block_id=b_id,
+                            start_from=next_from,
+                            count=100,
+                        )
+                        more_block = more_resp.get("block") or {}
+                        more_next_from = more_block.get("next_from")
+                        more_audios_ids = more_block.get("audios_ids") or []
+                        more_raw_audios = more_resp.get("audios") or []
+                        
+                        more_audios_map = {}
+                        for a in more_raw_audios:
+                            if isinstance(a, dict):
+                                more_audios_map[f"{a.get('owner_id')}_{a.get('id')}"] = a
+                                
+                        for aid in more_audios_ids:
+                            if aid in more_audios_map:
+                                if not any(existing.get("id") == more_audios_map[aid].get("id") and existing.get("owner_id") == more_audios_map[aid].get("owner_id") for existing in items):
+                                    items.append(more_audios_map[aid])
+                        next_from = more_next_from
+                    except Exception as e:
+                        logging.getLogger(__name__).error(f"Failed to fetch more block items for explore block {b_id}: {e}")
+                        
                 if items:
                     await _fill_missing_urls(vk, session, items)
                     parsed_tracks = parse_track_list({"count": len(items), "items": items}).items

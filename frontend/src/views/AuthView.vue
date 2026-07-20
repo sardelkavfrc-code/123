@@ -492,7 +492,7 @@ async function handle2faSubmit() {
     }
   } catch (err) {
     if (err instanceof APIError) {
-      
+      // Ignored
     }
   }
 }
