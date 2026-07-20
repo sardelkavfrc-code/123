@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, onMounted, onUnmounted, watch, computed } from "vue";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
 import { api } from "@/api/client";
-import type { AlbumSummary, Track } from "@/api/types";
+import type { AlbumSummary, Track, HomeSection } from "@/api/types";
 import { useSettingsStore } from "@/stores/settings";
 import { storeToRefs } from "pinia";
 import RecommendationCard from "@/components/RecommendationCard.vue";
@@ -133,18 +133,29 @@ onMounted(async () => {
   ensureCacheBuffer().catch(console.error);
 });
 
-watch(
-  [
-    homeShowMixes,
-    homeShowPlaylists,
-    homeShowMoods,
-    homeShowRecomms,
-    homeShowAudios,
-  ],
-  () => {
-    library.loadExplore(true);
+function isSectionVisible(section: HomeSection): boolean {
+  if (section.type === 'actions' && section.layout === 'large_slider') {
+    return homeShowMixes.value;
   }
-);
+  if (section.type === 'playlists' && section.layout === 'large_slider') {
+    return homeShowPlaylists.value;
+  }
+  if (section.type === 'actions' && section.layout === 'crop_slider') {
+    return homeShowMoods.value;
+  }
+  if (section.type === 'playlists' && section.layout !== 'large_slider') {
+    return homeShowRecomms.value;
+  }
+  if (section.type === 'audios') {
+    return homeShowAudios.value;
+  }
+  return true;
+}
+
+const visibleHomeSections = computed(() => {
+  if (!library.homeSections) return [];
+  return library.homeSections.filter(isSectionVisible);
+});
 
 function updateSliderButtons(container: HTMLElement) {
   const parent = container.parentElement;
@@ -569,10 +580,10 @@ async function playAlbum(album: AlbumSummary) {
     </div>
 
     <Transition name="content-reveal">
-      <div v-if="!library.homeSectionsLoading && library.homeSections" class="home__content-sections">
-<section 
+      <div v-if="!library.homeSectionsLoading && visibleHomeSections.length" class="home__content-sections">
+        <section 
           class="home__feed" 
-          v-for="section in library.homeSections" 
+          v-for="section in visibleHomeSections" 
           :key="section.id"
         >
           <div class="home__section-head">
