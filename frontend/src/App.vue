@@ -11,6 +11,7 @@ import TrackSettingsModal from "@/components/TrackSettingsModal.vue";
 import TrackContextMenu from "@/components/TrackContextMenu.vue";
 import CaptchaModal from "@/components/CaptchaModal.vue";
 import AddToPlaylistModal from "@/components/AddToPlaylistModal.vue";
+import ShareModal from "@/components/ShareModal.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
@@ -212,6 +213,8 @@ watch(
     <CaptchaModal />
 
     <AddToPlaylistModal />
+
+    <ShareModal />
   </div>
 </template>
 

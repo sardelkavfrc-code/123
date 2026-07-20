@@ -15,6 +15,7 @@ import Spinner from "@/components/Spinner.vue";
 import EmptyState from "@/components/EmptyState.vue";
 import UnavailableTracksModal from "@/components/UnavailableTracksModal.vue";
 import CreatePlaylistWizardModal from "@/components/CreatePlaylistWizardModal.vue";
+import SvgIcon from "@/components/SvgIcon.vue";
 import { tracksLabel } from "@/composables/useFormat";
 
 const library = useLibraryStore();
@@ -342,6 +343,12 @@ function playActivePlaylist() {
   if (!library.currentPlaylistTracks.length) return;
   player.playQueue(library.currentPlaylistTracks, 0, { autoPlay: true }, undefined, library.activePlaylist!);
 }
+
+function shareActivePlaylist() {
+  if (!library.activePlaylist) return;
+  ui.activeSharePlaylist = library.activePlaylist;
+  ui.shareModalOpen = true;
+}
 </script>
 
 <template>
@@ -511,6 +518,10 @@ function playActivePlaylist() {
                   <button class="btn btn--primary" :disabled="playlistTracksLoading || !currentPlaylistTracks.length" @click="playActivePlaylist">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                     Слушать
+                  </button>
+                  <button class="btn btn--ghost" @click="shareActivePlaylist">
+                    <SvgIcon name="share" width="16" height="16" style="margin-right: 8px;" />
+                    Поделиться
                   </button>
                 </div>
               </div>

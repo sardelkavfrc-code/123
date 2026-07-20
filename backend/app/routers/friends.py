@@ -60,5 +60,43 @@ async def get_user(user_id: int, vk: VKDep, session: SessionDep) -> User:
         ) from exc
     user = parse_user(response)
     if user is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
+      raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Пользователь не найден")
     return user
+
+
+from pydantic import BaseModel
+import random
+
+class ShareRequest(BaseModel):
+    peer_id: int
+    message: str | None = None
+    attachment: str | None = None
+
+@router.post("/share")
+async def share_to_peer(
+    req: ShareRequest,
+    vk: VKDep,
+    session: SessionDep,
+) -> dict[str, bool]:
+    params = {
+        "peer_id": req.peer_id,
+        "random_id": random.randint(-2147483648, 2147483647),
+    }
+    if req.message:
+        params["message"] = req.message
+    if req.attachment:
+        params["attachment"] = req.attachment
+
+    try:
+        await vk.call(
+            "messages.send",
+            session.access_token,
+            **params
+        )
+        return {"ok": True}
+    except VKError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            detail={"kind": "vk_error", "code": exc.code, "message": exc.message},
+        ) from exc
+

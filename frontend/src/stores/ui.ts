@@ -35,9 +35,13 @@ export const useUIStore = defineStore("ui", () => {
   const activeContextMenuTrack = ref<any>(null); // Store the full track object instead of just key
   const activeContextMenuType = ref<'full' | 'edit_only'>('full');
   
-  // Add to playlist modal state
   const addToPlaylistModalOpen = ref(false);
   const activePlaylistTrack = ref<any | null>(null);
+
+  // Share modal state
+  const shareModalOpen = ref(false);
+  const activeShareTrack = ref<any | null>(null);
+  const activeSharePlaylist = ref<any | null>(null);
 
   // Captcha State
   const captchaImg = ref<string | null>(null);
@@ -117,6 +121,9 @@ export const useUIStore = defineStore("ui", () => {
     showTrackContextMenu,
     addToPlaylistModalOpen,
     activePlaylistTrack,
+    shareModalOpen,
+    activeShareTrack,
+    activeSharePlaylist,
     captchaImg,
     captchaSid,
     requestCaptcha,

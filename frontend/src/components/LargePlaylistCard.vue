@@ -52,6 +52,8 @@ function onPlayClick() {
 }
 
 function onShareClick() {
+  ui.activeSharePlaylist = props.block;
+  ui.shareModalOpen = true;
   emit("share", props.block);
 }
 </script>

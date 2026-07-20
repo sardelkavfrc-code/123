@@ -517,6 +517,14 @@ export const api = {
     const { data } = await http.get<FriendList>("/friends", { params });
     return data;
   },
+  async shareToPeer(peer_id: number, message?: string, attachment?: string): Promise<{ ok: boolean }> {
+    const { data } = await http.post<{ ok: boolean }>("/friends/share", {
+      peer_id,
+      message,
+      attachment,
+    });
+    return data;
+  },
   async user(userId: number): Promise<User> {
     const { data } = await http.get<User>(`/friends/${userId}`);
     return data;

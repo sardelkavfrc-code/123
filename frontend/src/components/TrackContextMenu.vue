@@ -119,6 +119,13 @@ function showAddToPlaylistModal() {
   ui.addToPlaylistModalOpen = true;
   void library.loadMyPlaylists();
 }
+
+function shareTrack() {
+  if (!track.value) return;
+  ui.trackContextMenuOpen = false;
+  ui.activeShareTrack = track.value;
+  ui.shareModalOpen = true;
+}
 </script>
 
 <template>
@@ -147,6 +154,10 @@ function showAddToPlaylistModal() {
         <button v-if="canRemoveFromPlaylist" class="track-context-btn" @click="removeFromPlaylist">
           <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Удалить из плейлиста
+        </button>
+        <button class="track-context-btn" @click="shareTrack">
+          <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Поделиться...
         </button>
         <button class="track-context-btn" @click="openSimilar">
           <SvgIcon name="similar" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
