@@ -725,6 +725,10 @@ async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
                 for a in actions:
                     images = a.get("images", [])
                     img_url = images[0].get("url") if images else None
+                    
+                    fg_images = a.get("foreground_images", [])
+                    fg_url = fg_images[0].get("url") if fg_images else None
+                    
                     mix_options_str = a.get("mix_options", "{}")
                     try:
                         mix_options = json.loads(mix_options_str)
@@ -735,7 +739,9 @@ async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
                         title=a.get("title", ""),
                         url=img_url,
                         mix_id=a.get("mix_id"),
-                        mix_options=mix_options
+                        mix_options=mix_options,
+                        description=a.get("description"),
+                        foreground_url=fg_url
                     ))
                 if parsed_actions:
                     home_sections.append(HomeSection(

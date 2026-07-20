@@ -56,6 +56,8 @@ export interface ActionItem {
   color?: string;
   mix_id?: string;
   mix_options?: Record<string, any>;
+  description?: string;
+  foreground_url?: string;
 }
 
 export interface HomeSection {

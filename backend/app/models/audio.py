@@ -119,6 +119,8 @@ class ActionItem(APIModel):
     color: str | None = None
     mix_id: str | None = None
     mix_options: dict | None = None
+    description: str | None = None
+    foreground_url: str | None = None
 
 
 class HomeSection(APIModel):
