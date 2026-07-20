@@ -34,7 +34,7 @@ const { toasts } = storeToRefs(ui);
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 1000;
+  z-index: 20000;
   pointer-events: none;
 }
 .toast {

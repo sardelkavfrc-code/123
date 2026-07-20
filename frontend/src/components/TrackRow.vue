@@ -45,11 +45,6 @@ async function removeFromPlaylist() {
   }
 }
 
-function shareTrack() {
-  ui.activeShareTrack = props.track;
-  ui.shareModalOpen = true;
-}
-
 const { current, isPlaying } = storeToRefs(player);
 
 const isCurrent = computed(
@@ -205,15 +200,6 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
         @click.stop="removeFromPlaylist"
       >
         <SvgIcon name="cross" width="16" height="16" />
-      </button>
-
-      <button
-        class="row__action"
-        title="Поделиться"
-        aria-label="Поделиться"
-        @click.stop="shareTrack"
-      >
-        <SvgIcon name="share" width="16" height="16" />
       </button>
 
       <template v-for="item in trackItems" :key="item.id">

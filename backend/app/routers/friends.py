@@ -26,7 +26,7 @@ async def list_friends(
             order=order,
             count=count,
             offset=offset,
-            fields="photo_200,can_see_audio",
+            fields="photo_200,photo_base,can_see_audio",
         )
     except VKError as exc:
         raise HTTPException(
@@ -51,7 +51,7 @@ async def get_user(user_id: int, vk: VKDep, session: SessionDep) -> User:
             "users.get",
             session.access_token,
             user_ids=user_id,
-            fields="photo_200",
+            fields="photo_200,photo_base",
         )
     except VKError as exc:
         raise HTTPException(

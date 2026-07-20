@@ -8,7 +8,7 @@ from ..models.user import FriendList, User
 
 
 def _photo(raw: dict[str, Any]) -> str | None:
-    for key in ("photo_200", "photo_100", "photo_50"):
+    for key in ("photo_base", "photo_200", "photo_100", "photo_50"):
         if raw.get(key):
             return str(raw[key])
     return None

@@ -104,13 +104,7 @@ async function sendToFriend(friend: User) {
   if (sendingShare.value !== null) return;
   sendingShare.value = friend.id;
   try {
-    let messageText = "";
-    if (isPlaylist.value) {
-      messageText = `Отправляю плейлист: ${itemTitle.value}\n${shareLink.value}`;
-    } else {
-      messageText = `Отправляю трек: ${track.value.artist} — ${itemTitle.value}\n${shareLink.value}`;
-    }
-    await api.shareToPeer(friend.id, messageText, shareAttachment.value);
+    await api.shareToPeer(friend.id, undefined, shareAttachment.value);
     ui.notify(`Отправлено другу ${friend.first_name} ${friend.last_name}`, "success");
   } catch (err: any) {
     ui.notify(err.message || "Не удалось отправить", "error");

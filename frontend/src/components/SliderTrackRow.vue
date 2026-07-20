@@ -59,11 +59,6 @@ function goToArtist() {
     router.push({ name: "search", query: { q: artistName } });
   }
 }
-
-function shareTrack() {
-  ui.activeShareTrack = props.track;
-  ui.shareModalOpen = true;
-}
 </script>
 
 <template>
@@ -97,15 +92,6 @@ function shareTrack() {
     </div>
 
     <div class="slider-track__actions">
-      <button
-        class="slider-track__action"
-        title="Поделиться"
-        aria-label="Поделиться"
-        @dblclick.stop
-        @click.stop="shareTrack"
-      >
-        <SvgIcon name="share" width="16" height="16" />
-      </button>
       <button
         class="slider-track__action"
         title="Ещё"
