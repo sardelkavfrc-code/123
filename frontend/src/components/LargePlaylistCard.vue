@@ -44,13 +44,6 @@ function onPlayClick() {
 }
 
 function onShareClick() {
-  try {
-    const shareUrl = `https://vk.com/music/playlist/${props.block.owner_id}_${props.block.id}`;
-    navigator.clipboard.writeText(shareUrl);
-    ui.notify("Ссылка на плейлист скопирована", "success");
-  } catch {
-    ui.notify("Не удалось скопировать ссылку", "error");
-  }
   emit("share", props.block);
 }
 </script>
@@ -113,7 +106,8 @@ function onShareClick() {
 
 <style scoped>
 .large-playlist-card {
-  width: 320px;
+  width: min-content;
+  min-width: 270px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -150,6 +144,7 @@ function onShareClick() {
   flex-direction: column;
   justify-content: space-between;
   transition: opacity 0.2s ease;
+  min-width: 0;
 }
 .lpc-header:hover .lpc-header__content {
   opacity: 0.15;
@@ -205,23 +200,35 @@ function onShareClick() {
   color: #fff;
   cursor: default;
 }
+.lpc-header__top {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+}
 .lpc-header__subtitle {
   font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.8);
   margin-bottom: 4px;
+  white-space: nowrap;
 }
 .lpc-header__title {
   font-size: 18px;
   font-weight: 700;
   color: #fff;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .lpc-header__bottom {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  min-width: 0;
 }
 .lpc-header__owner {
   display: flex;
@@ -246,6 +253,7 @@ function onShareClick() {
   overflow: hidden;
   text-overflow: ellipsis;
   opacity: 0.95;
+  min-width: 0;
 }
 .lpc-header__play-wrapper {
   display: flex;
@@ -255,5 +263,7 @@ function onShareClick() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  width: 100%;
+  min-width: 0;
 }
 </style>
