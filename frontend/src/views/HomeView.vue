@@ -35,6 +35,11 @@ const {
   mixMood,
   mixFamiliarity,
   mixLanguage,
+  homeShowMixes,
+  homeShowPlaylists,
+  homeShowMoods,
+  homeShowRecomms,
+  homeShowAudios,
 } = storeToRefs(settings);
 
 const showDropdown = ref(false);
@@ -127,6 +132,19 @@ onMounted(async () => {
   library.loadExplore(true);
   ensureCacheBuffer().catch(console.error);
 });
+
+watch(
+  [
+    homeShowMixes,
+    homeShowPlaylists,
+    homeShowMoods,
+    homeShowRecomms,
+    homeShowAudios,
+  ],
+  () => {
+    library.loadExplore(true);
+  }
+);
 
 function updateSliderButtons(container: HTMLElement) {
   const parent = container.parentElement;
@@ -421,6 +439,43 @@ async function playAlbum(album: AlbumSummary) {
                 </div>
               </div>
             </Transition>
+
+            <div class="home__dropdown-title" style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-weak);">Отображение блоков</div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Микс по артистам</span>
+              </div>
+              <input v-model="homeShowMixes" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Слушайте друг друга</span>
+              </div>
+              <input v-model="homeShowPlaylists" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Настроения и занятия</span>
+              </div>
+              <input v-model="homeShowMoods" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Похоже на прослушанное</span>
+              </div>
+              <input v-model="homeShowRecomms" type="checkbox" class="settings__switch" />
+            </div>
+
+            <div class="home__dropdown-row">
+              <div class="home__dropdown-label">
+                <span class="home__dropdown-label-main">Рекомендованные треки</span>
+              </div>
+              <input v-model="homeShowAudios" type="checkbox" class="settings__switch" />
+            </div>
           </div>
         </Transition>
       </div>
@@ -941,7 +996,7 @@ async function playAlbum(album: AlbumSummary) {
 }
 .home__slider-btn {
   position: absolute;
-  top: 50%;
+  top: calc(50% - 12px);
   transform: translateY(-50%);
   width: 40px;
   height: 40px;
@@ -1033,7 +1088,12 @@ async function playAlbum(album: AlbumSummary) {
 /* Card brightness control styles */
 .home__mix,
 :deep(.rec-card),
-:deep(.mood-card) {
+:deep(.mood-card),
+:deep(.large-playlist-card),
+:deep(.mix-card),
+:deep(.slider-track),
+:deep(.row),
+:deep(.action-card) {
   filter: brightness(var(--home-cards-brightness, 1));
   transition: transform var(--motion-duration-fast) var(--motion-ease-out), filter 0.5s ease-out;
 }

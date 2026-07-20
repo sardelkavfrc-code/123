@@ -530,7 +530,15 @@ async def mix(
 
 
 @router.get("/explore", response_model=list[HomeSection])
-async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
+async def explore(
+    vk: VKDep,
+    session: SessionDep,
+    show_mixes: bool = True,
+    show_playlists: bool = True,
+    show_moods: bool = True,
+    show_recomms: bool = True,
+    show_audios: bool = True
+) -> list[HomeSection]:
     """Returns all dynamic sections from VK catalog (Explore/General)."""
     try:
         # 1. Fetch catalog root to find "Главная" or "Обзор" section id
@@ -590,6 +598,30 @@ async def explore(vk: VKDep, session: SessionDep) -> list[HomeSection]:
                 
             b_type = b.get("data_type")
             b_id = b.get("id", "")
+            
+            skip = False
+            layout_style = b.get("layout", {}).get("style")
+            layout_name = b.get("layout", {}).get("name")
+            if b_type == "action" and layout_style == "artist_mix":
+                if not show_mixes:
+                    skip = True
+            elif b_type == "music_recommended_playlists":
+                if not show_playlists:
+                    skip = True
+            elif b_type == "action" and layout_name == "crop_slider":
+                if not show_moods:
+                    skip = True
+            elif b_type == "music_playlists":
+                if not show_recomms:
+                    skip = True
+            elif b_type in ["music_audios", "audio_stream_mixes"]:
+                if not show_audios:
+                    skip = True
+                    
+            if skip:
+                current_title = ""
+                current_subtitle = ""
+                continue
             next_from = b.get("next_from")
             
             from ..models.audio import ActionItem

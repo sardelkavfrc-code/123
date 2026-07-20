@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { api, APIError } from "@/api/client";
 import type { FriendList, Track, TrackList, HomeSection } from "@/api/types";
+import { useSettingsStore } from "./settings";
 
 /** VK rejects audio.get requests with count > 200 — keep page size below that. */
 const PAGE_SIZE = 100;
@@ -159,7 +160,14 @@ export const useLibraryStore = defineStore("library", () => {
     if (homeSections.value && !force) return homeSections.value;
     homeSectionsLoading.value = true;
     try {
-      homeSections.value = await api.explore();
+      const settings = useSettingsStore();
+      homeSections.value = await api.explore({
+        show_mixes: settings.homeShowMixes,
+        show_playlists: settings.homeShowPlaylists,
+        show_moods: settings.homeShowMoods,
+        show_recomms: settings.homeShowRecomms,
+        show_audios: settings.homeShowAudios,
+      });
       return homeSections.value;
     } finally {
       homeSectionsLoading.value = false;

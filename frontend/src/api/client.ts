@@ -370,8 +370,14 @@ export const api = {
     const { data } = await http.get<TrackList>("/audio/mix", { params });
     return data;
   },
-  async explore(): Promise<HomeSection[]> {
-    const { data } = await http.get<HomeSection[]>("/audio/explore");
+  async explore(params?: {
+    show_mixes?: boolean;
+    show_playlists?: boolean;
+    show_moods?: boolean;
+    show_recomms?: boolean;
+    show_audios?: boolean;
+  }): Promise<HomeSection[]> {
+    const { data } = await http.get<HomeSection[]>("/audio/explore", { params });
     return data;
   },
   async addTrack(audio_id: number, owner_id: number, access_key?: string): Promise<Track> {

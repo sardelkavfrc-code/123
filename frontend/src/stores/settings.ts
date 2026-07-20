@@ -141,10 +141,15 @@ interface PersistedSettings {
   homeCardsBrightnessTimeEnd: string;
   sidebarItems: SidebarItemSetting[];
   trackItems: SidebarItemSetting[];
-  iconSet: "line" | "flat" | "rounded";
   mixMood: string;
   mixFamiliarity: string;
   mixLanguage: string;
+  homeShowMixes: boolean;
+  homeShowPlaylists: boolean;
+  homeShowMoods: boolean;
+  homeShowRecomms: boolean;
+  homeShowAudios: boolean;
+  iconSet: "line" | "flat" | "rounded";
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -214,6 +219,11 @@ const defaults: PersistedSettings = {
   mixMood: "any",
   mixFamiliarity: "any",
   mixLanguage: "any",
+  homeShowMixes: true,
+  homeShowPlaylists: true,
+  homeShowMoods: true,
+  homeShowRecomms: true,
+  homeShowAudios: true,
 };
 
 function load(): PersistedSettings {
@@ -330,6 +340,12 @@ export const useSettingsStore = defineStore("settings", () => {
   const homeCardsBrightnessDimmed = ref(initial.homeCardsBrightnessDimmed ?? 50);
   const homeCardsBrightnessTimeStart = ref(initial.homeCardsBrightnessTimeStart ?? "22:00");
   const homeCardsBrightnessTimeEnd = ref(initial.homeCardsBrightnessTimeEnd ?? "06:00");
+
+  const homeShowMixes = ref(initial.homeShowMixes ?? true);
+  const homeShowPlaylists = ref(initial.homeShowPlaylists ?? true);
+  const homeShowMoods = ref(initial.homeShowMoods ?? true);
+  const homeShowRecomms = ref(initial.homeShowRecomms ?? true);
+  const homeShowAudios = ref(initial.homeShowAudios ?? true);
 
   const currentHomeCardsBrightness = ref(100);
 
@@ -549,6 +565,11 @@ export const useSettingsStore = defineStore("settings", () => {
       mixMood: mixMood.value,
       mixFamiliarity: mixFamiliarity.value,
       mixLanguage: mixLanguage.value,
+      homeShowMixes: homeShowMixes.value,
+      homeShowPlaylists: homeShowPlaylists.value,
+      homeShowMoods: homeShowMoods.value,
+      homeShowRecomms: homeShowRecomms.value,
+      homeShowAudios: homeShowAudios.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -609,6 +630,11 @@ export const useSettingsStore = defineStore("settings", () => {
       mixMood,
       mixFamiliarity,
       mixLanguage,
+      homeShowMixes,
+      homeShowPlaylists,
+      homeShowMoods,
+      homeShowRecomms,
+      homeShowAudios,
     ],
     () => {
       applyToDocument();
@@ -686,6 +712,11 @@ export const useSettingsStore = defineStore("settings", () => {
     mixMood.value = defaults.mixMood;
     mixFamiliarity.value = defaults.mixFamiliarity;
     mixLanguage.value = defaults.mixLanguage;
+    homeShowMixes.value = defaults.homeShowMixes;
+    homeShowPlaylists.value = defaults.homeShowPlaylists;
+    homeShowMoods.value = defaults.homeShowMoods;
+    homeShowRecomms.value = defaults.homeShowRecomms;
+    homeShowAudios.value = defaults.homeShowAudios;
   }
 
   return {
@@ -750,5 +781,10 @@ export const useSettingsStore = defineStore("settings", () => {
     mixMood,
     mixFamiliarity,
     mixLanguage,
+    homeShowMixes,
+    homeShowPlaylists,
+    homeShowMoods,
+    homeShowRecomms,
+    homeShowAudios,
   };
 });
