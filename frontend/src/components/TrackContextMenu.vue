@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch, nextTick } from "vue";
 import { useUIStore } from "@/stores/ui";
 import { useLibraryStore } from "@/stores/library";
 import { usePlayerStore } from "@/stores/player";
@@ -126,14 +126,68 @@ function shareTrack() {
   ui.activeShareTrack = track.value;
   ui.shareModalOpen = true;
 }
+
+const menuRef = ref<HTMLElement | null>(null);
+
+const stylePosition = ref({
+  top: "0px",
+  left: "0px",
+  transformOrigin: "top left",
+});
+
+watch(
+  () => [ui.trackContextMenuOpen, ui.trackContextMenuPos.x, ui.trackContextMenuPos.y] as const,
+  async ([open, x, y]) => {
+    if (!open) return;
+    
+    // Set initial position
+    stylePosition.value = {
+      top: `${y}px`,
+      left: `${x}px`,
+      transformOrigin: "top left",
+    };
+    
+    await nextTick();
+    if (!menuRef.value) return;
+    
+    const menuEl = menuRef.value;
+    const rect = menuEl.getBoundingClientRect();
+    const winWidth = window.innerWidth;
+    const winHeight = window.innerHeight;
+    
+    let adjustedX = x;
+    let adjustedY = y;
+    let originX = "left";
+    let originY = "top";
+    
+    if (x + rect.width > winWidth) {
+      adjustedX = x - rect.width;
+      originX = "right";
+    }
+    if (y + rect.height > winHeight) {
+      adjustedY = y - rect.height;
+      originY = "bottom";
+    }
+    
+    if (adjustedX < 0) adjustedX = 0;
+    if (adjustedY < 0) adjustedY = 0;
+    
+    stylePosition.value = {
+      top: `${adjustedY}px`,
+      left: `${adjustedX}px`,
+      transformOrigin: `${originY} ${originX}`,
+    };
+  }
+);
 </script>
 
 <template>
   <Transition name="context-menu-fade">
     <div 
       v-if="ui.trackContextMenuOpen && track" 
+      ref="menuRef"
       class="track-context-menu" 
-      :style="{ top: `${ui.trackContextMenuPos.y}px`, left: `${ui.trackContextMenuPos.x}px` }"
+      :style="stylePosition"
       @click.stop
       @mouseenter="$emit('mouseenter', $event)"
       @mouseleave="$emit('mouseleave', $event)"
@@ -181,6 +235,10 @@ function shareTrack() {
           </svg>
           Редактировать кнопки
         </button>
+        <button class="track-context-btn" @click="shareTrack">
+          <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Поделиться...
+        </button>
       </template>
     </div>
   </Transition>
@@ -227,7 +285,6 @@ function shareTrack() {
 .context-menu-fade-enter-active,
 .context-menu-fade-leave-active {
   transition: opacity 0.15s ease, transform 0.15s ease;
-  transform-origin: top left;
 }
 .context-menu-fade-enter-from,
 .context-menu-fade-leave-to {
