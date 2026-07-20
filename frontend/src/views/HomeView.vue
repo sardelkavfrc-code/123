@@ -39,7 +39,6 @@ const {
   homeShowStreamMixes,
   homeShowRecomms,
   homeShowGenres,
-  homeShowAudios,
   homeShowMoods,
   homeShowPlaylists,
   homeShowMixes,
@@ -137,11 +136,8 @@ onMounted(async () => {
 });
 
 function isSectionVisible(section: HomeSection): boolean {
-  if (section.type === 'audios' && section.layout === 'audio_stream_mix_interactive') {
-    return homeShowStreamMixes.value;
-  }
   if (section.type === 'playlists' && section.layout === 'recomms_slider') {
-    return homeShowRecomms.value;
+    return homeShowStreamMixes.value;
   }
   if (section.type === 'actions' && section.layout === 'crop_slider') {
     const isGenre = section.title?.toLowerCase().includes('жанр');
@@ -150,7 +146,7 @@ function isSectionVisible(section: HomeSection): boolean {
     if (isMood) return homeShowMoods.value;
   }
   if (section.type === 'audios' && section.layout === 'triple_stacked_slider') {
-    return homeShowAudios.value;
+    return homeShowRecomms.value;
   }
   if (section.type === 'playlists' && section.layout === 'large_slider') {
     return homeShowPlaylists.value;
@@ -485,13 +481,6 @@ async function playAlbum(album: AlbumSummary) {
 
             <div class="home__dropdown-row">
               <div class="home__dropdown-label">
-                <span class="home__dropdown-label-main">Похоже на прослушанное</span>
-              </div>
-              <input v-model="homeShowRecomms" type="checkbox" class="settings__switch" />
-            </div>
-
-            <div class="home__dropdown-row">
-              <div class="home__dropdown-label">
                 <span class="home__dropdown-label-main">Жанры</span>
               </div>
               <input v-model="homeShowGenres" type="checkbox" class="settings__switch" />
@@ -499,9 +488,9 @@ async function playAlbum(album: AlbumSummary) {
 
             <div class="home__dropdown-row">
               <div class="home__dropdown-label">
-                <span class="home__dropdown-label-main">Рекомендованные треки</span>
+                <span class="home__dropdown-label-main">Похоже на прослушанное</span>
               </div>
-              <input v-model="homeShowAudios" type="checkbox" class="settings__switch" />
+              <input v-model="homeShowRecomms" type="checkbox" class="settings__switch" />
             </div>
 
             <div class="home__dropdown-row">
