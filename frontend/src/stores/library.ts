@@ -224,6 +224,25 @@ export const useLibraryStore = defineStore("library", () => {
     return myMusicIdSet.value.has(key) || addedOriginals.value.has(key);
   }
 
+  const LOCAL_MIXES_KEY = "vkmp_followed_mixes";
+
+  function getLocalFollowedMixes(): AlbumSummary[] {
+    try {
+      const stored = localStorage.getItem(LOCAL_MIXES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveLocalFollowedMixes(mixes: AlbumSummary[]) {
+    try {
+      localStorage.setItem(LOCAL_MIXES_KEY, JSON.stringify(mixes));
+    } catch (e) {
+      console.error("Failed to save local followed mixes", e);
+    }
+  }
+
   async function loadMyPlaylists(force = false): Promise<AlbumSummary[]> {
     if (myPlaylists.value.length && !force) return myPlaylists.value;
     myPlaylistsLoading.value = true;
@@ -232,22 +251,46 @@ export const useLibraryStore = defineStore("library", () => {
       const auth = useAuthStore();
       if (!auth.status.user_id) return [];
       const list = await api.albums(auth.status.user_id);
-      myPlaylists.value = list.items;
-      return list.items;
+      
+      const localMixes = getLocalFollowedMixes();
+      // Remove any local mixes that are somehow already present in the server list
+      const serverIds = new Set(list.items.map((p) => p.id));
+      const filteredLocal = localMixes.filter((p) => !serverIds.has(p.id));
+      
+      myPlaylists.value = [...filteredLocal, ...list.items];
+      return myPlaylists.value;
     } catch (err) {
       myPlaylistsError.value = err instanceof APIError ? err.message : (err as Error).message;
-      return [];
+      const localMixes = getLocalFollowedMixes();
+      myPlaylists.value = localMixes;
+      return localMixes;
     } finally {
       myPlaylistsLoading.value = false;
     }
   }
 
   async function followPlaylist(playlist: AlbumSummary) {
+    if (Number(playlist.id) < 0) {
+      const followed = getLocalFollowedMixes();
+      if (!followed.some((p) => p.id === playlist.id)) {
+        followed.push(playlist);
+        saveLocalFollowedMixes(followed);
+      }
+      await loadMyPlaylists(true);
+      return;
+    }
     await api.followPlaylist(Number(playlist.id), playlist.owner_id || 0, playlist.access_key || undefined);
     await loadMyPlaylists(true);
   }
 
   async function unfollowPlaylist(playlist: AlbumSummary) {
+    if (Number(playlist.id) < 0) {
+      const followed = getLocalFollowedMixes();
+      const filtered = followed.filter((p) => p.id !== playlist.id);
+      saveLocalFollowedMixes(filtered);
+      myPlaylists.value = myPlaylists.value.filter((p) => p.id !== playlist.id);
+      return;
+    }
     await api.deletePlaylist(Number(playlist.id), playlist.owner_id || 0);
     myPlaylists.value = myPlaylists.value.filter((p) => p.id !== playlist.id);
   }
