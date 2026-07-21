@@ -54,7 +54,7 @@ const background = computed(() => {
 </script>
 
 <template>
-  <button v-motion="variants" class="rec-card" :class="{'rec-card--hover-meta': showHoverMeta}" :style="{ background }" @click="$emit('open', block)">
+  <div v-motion="variants" class="rec-card" :class="{'rec-card--hover-meta': showHoverMeta}" :style="{ background }" @click="$emit('open', block)" role="button">
     <div class="rec-card__overlay"></div>
     <button
       class="rec-card__add"
@@ -104,7 +104,7 @@ const background = computed(() => {
         </div>
       </div>
     </div>
-  </button>
+  </div>
 </template>
 
 <style scoped>
