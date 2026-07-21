@@ -45,6 +45,11 @@ async function removeFromPlaylist() {
   }
 }
 
+function shareTrack() {
+  ui.activeShareTrack = props.track;
+  ui.shareModalOpen = true;
+}
+
 const { current, isPlaying } = storeToRefs(player);
 
 const isCurrent = computed(
@@ -224,6 +229,9 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
         </button>
         <button v-else-if="item.id === 'queue'" class="row__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
           <SvgIcon name="queue_add" width="18" height="18" />
+        </button>
+        <button v-else-if="item.id === 'share'" class="row__action" title="Поделиться" aria-label="Поделиться" @click.stop="shareTrack">
+          <SvgIcon name="share" width="16" height="16" />
         </button>
         <button
           v-else-if="item.id === 'dislike'"

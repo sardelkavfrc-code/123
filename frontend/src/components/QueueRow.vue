@@ -94,6 +94,11 @@ function addToQueue() {
   ui.notify("Трек будет играть следующим", "success");
 }
 
+function shareTrack() {
+  ui.activeShareTrack = props.track;
+  ui.shareModalOpen = true;
+}
+
 const trackItems = computed(() => {
   return settings.trackItems.filter((item) => item.visible);
 });
@@ -178,6 +183,9 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
         </button>
         <button v-else-if="item.id === 'queue'" class="queue__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
           <SvgIcon name="queue_add" width="18" height="18" />
+        </button>
+        <button v-else-if="item.id === 'share'" class="queue__action" title="Поделиться" aria-label="Поделиться" @click.stop="shareTrack">
+          <SvgIcon name="share" width="16" height="16" />
         </button>
       </template>
     </div>

@@ -120,13 +120,6 @@ function showAddToPlaylistModal() {
   void library.loadMyPlaylists();
 }
 
-function shareTrack() {
-  if (!track.value) return;
-  ui.trackContextMenuOpen = false;
-  ui.activeShareTrack = track.value;
-  ui.shareModalOpen = true;
-}
-
 const menuRef = ref<HTMLElement | null>(null);
 
 const stylePosition = ref({
@@ -209,10 +202,6 @@ watch(
           <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Удалить из плейлиста
         </button>
-        <button class="track-context-btn" @click="shareTrack">
-          <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Поделиться...
-        </button>
         <button class="track-context-btn" @click="openSimilar">
           <SvgIcon name="similar" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Похожие
@@ -234,10 +223,6 @@ watch(
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
           </svg>
           Редактировать кнопки
-        </button>
-        <button class="track-context-btn" @click="shareTrack">
-          <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Поделиться...
         </button>
       </template>
     </div>
