@@ -112,7 +112,7 @@ function handleWebviewDomReady(event: any) {
             }
             html, body {
               display: flex !important;
-              align-items: center !important;
+              align-items: flex-end !important;
               justify-content: center !important;
               height: 100% !important;
               margin: 0 !important;
@@ -127,7 +127,7 @@ function handleWebviewDomReady(event: any) {
               border: 1px solid rgba(255, 255, 255, 0.08) !important;
               box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5) !important;
               border-radius: 20px !important;
-              margin: 0 !important;
+              margin-bottom: 24px !important;
             }
             span, h1, h2, h3, h4, p, label, a {
               color: #e1e3e6 !important;
@@ -142,6 +142,13 @@ function handleWebviewDomReady(event: any) {
 
       function clean() {
         injectStyle();
+
+        // Always make document root and body transparent
+        document.body.style.setProperty('background', 'transparent', 'important');
+        document.body.style.setProperty('background-color', 'transparent', 'important');
+        document.documentElement.style.setProperty('background', 'transparent', 'important');
+        document.documentElement.style.setProperty('background-color', 'transparent', 'important');
+
         const divs = document.querySelectorAll('div');
         let card = null;
         for (const el of divs) {
@@ -159,10 +166,6 @@ function handleWebviewDomReady(event: any) {
             p.style.setProperty('background-color', 'transparent', 'important');
             p = p.parentElement;
           }
-          document.body.style.setProperty('background', 'transparent', 'important');
-          document.body.style.setProperty('background-color', 'transparent', 'important');
-          document.documentElement.style.setProperty('background', 'transparent', 'important');
-          document.documentElement.style.setProperty('background-color', 'transparent', 'important');
         }
       }
       clean();
@@ -1080,18 +1083,18 @@ async function handle2faSubmit() {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   z-index: 1000;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-end;
 }
 .auth__webview-container {
   width: 100%;
   max-width: 480px;
-  height: 520px;
+  height: 440px;
   background: transparent !important;
   display: flex;
   flex-direction: column;
@@ -1112,24 +1115,28 @@ async function handle2faSubmit() {
 }
 
 /* Transition Animations */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: opacity 0.3s ease;
+.fade-slide-enter-active {
+  transition: opacity 0.5s ease, backdrop-filter 0.5s ease;
 }
 .fade-slide-enter-active .auth__webview-container {
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+}
+
+.fade-slide-leave-active {
+  transition: opacity 0.3s ease 0.15s, backdrop-filter 0.3s ease 0.15s;
 }
 .fade-slide-leave-active .auth__webview-container {
-  transition: transform 0.25s ease-in, opacity 0.25s ease;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .fade-slide-enter-from,
 .fade-slide-leave-to {
   opacity: 0;
+  backdrop-filter: blur(0px);
+  background-color: rgba(0, 0, 0, 0);
 }
 .fade-slide-enter-from .auth__webview-container,
 .fade-slide-leave-to .auth__webview-container {
-  transform: scale(0.9) translateY(12px);
-  opacity: 0;
+  transform: translateY(100%);
 }
 </style>
