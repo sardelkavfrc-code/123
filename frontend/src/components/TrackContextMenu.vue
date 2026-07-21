@@ -235,10 +235,6 @@ watch(
           </svg>
           Редактировать кнопки
         </button>
-        <button class="track-context-btn" @click="shareTrack">
-          <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Поделиться...
-        </button>
       </template>
     </div>
   </Transition>
