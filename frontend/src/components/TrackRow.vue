@@ -10,6 +10,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
+import { api } from "@/api/client";
 import SvgIcon from "./SvgIcon.vue";
 
 const props = defineProps<{
@@ -17,10 +18,14 @@ const props = defineProps<{
   index?: number;
   showIndex?: boolean;
   variant?: "default" | "compact";
+  isSelectMode?: boolean;
+  isSelected?: boolean;
 }>();
 
 const emit = defineEmits<{
   (e: "play"): void;
+  (e: "toggle-select"): void;
+  (e: "context-menu-selected", event: MouseEvent): void;
 }>();
 
 const player = usePlayerStore();
@@ -31,7 +36,7 @@ const router = useRouter();
 const auth = useAuthStore();
 
 const isMyPlaylistMember = computed(() => {
-  return library.activePlaylist && library.activePlaylist.owner_id === auth.status.user_id;
+  return library.activePlaylist && library.activePlaylist.owner_id === auth.status?.user_id;
 });
 
 async function removeFromPlaylist() {
@@ -42,6 +47,60 @@ async function removeFromPlaylist() {
     ui.notify("Трек удален из плейлиста", "success");
   } catch (err: any) {
     ui.notify(err.message || "Не удалось удалить трек", "error");
+  }
+}
+
+async function deleteLocalDisk() {
+  if (props.track.owner_id !== -999999) return;
+  if (!confirm(`Удалить трек ${props.track.title} из базы и с диска?`)) return;
+  try {
+    await api.deleteLocalTrack(props.track.id, true);
+    player.removeTrack(props.track);
+    await library.loadLocalTracks();
+    ui.notify("Файл удален", "success");
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось удалить трек", "error");
+  }
+}
+
+async function deleteLocalDb() {
+  if (props.track.owner_id !== -999999) return;
+  if (!confirm(`Скрыть трек ${props.track.title} из медиатеки (оставить файл на диске)?`)) return;
+  try {
+    await api.deleteLocalTrack(props.track.id, false);
+    
+    // Add path to ignored paths so it doesn't show up again
+    if (props.track.url) {
+      try {
+        const urlObj = new URL(props.track.url, window.location.origin);
+        const path = urlObj.searchParams.get("path");
+        if (path && !settings.ignoredPaths.includes(path)) {
+          settings.ignoredPaths.push(path);
+        }
+      } catch {
+        const idx = props.track.url.indexOf("path=");
+        if (idx >= 0) {
+          const path = decodeURIComponent(props.track.url.substring(idx + 5));
+          if (path && !settings.ignoredPaths.includes(path)) {
+            settings.ignoredPaths.push(path);
+          }
+        }
+      }
+    }
+    
+    player.removeTrack(props.track);
+    await library.loadLocalTracks();
+    ui.notify("Трек скрыт из списка", "success");
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось удалить трек", "error");
+  }
+}
+
+function handleContextMenu(e: MouseEvent) {
+  if (props.isSelectMode && props.isSelected) {
+    emit("context-menu-selected", e);
+  } else {
+    ui.showTrackContextMenu(e, props.track, 'full');
   }
 }
 
@@ -71,6 +130,10 @@ function dislikeTrack() {
 const unavailable = computed(() => !props.track.url);
 
 function playOne() {
+  if (props.isSelectMode) {
+    emit("toggle-select");
+    return;
+  }
   if (unavailable.value) {
     ui.notify("Трек недоступен", "error");
     return;
@@ -78,7 +141,17 @@ function playOne() {
   emit("play");
 }
 
+function handleRowClick() {
+  if (props.isSelectMode) {
+    emit("toggle-select");
+  }
+}
+
 function gotoSpecificArtist(artistId?: string | null, artistName?: string | null) {
+  if (props.isSelectMode) {
+    emit("toggle-select");
+    return;
+  }
   if (artistId) {
     router.push({
       name: "artist",
@@ -142,8 +215,28 @@ async function toggleLibrary() {
   }
 }
 import { useSettingsStore } from "@/stores/settings";
+import { useDownloadStore } from "@/stores/download";
 
 const settings = useSettingsStore();
+const downloadStore = useDownloadStore();
+
+const isDownloaded = computed(() => {
+  if (props.track.owner_id === -999999) return true;
+  const key = `${props.track.artist.toLowerCase()} - ${props.track.title.toLowerCase()}`;
+  return library.localTracksMap.has(key);
+});
+
+const isDownloading = computed(() => {
+  return downloadStore.queue.some(
+    item => item.id === props.track.id && item.owner_id === props.track.owner_id && (item.status === 'downloading' || item.status === 'pending')
+  );
+});
+
+function downloadSingleTrack() {
+  void downloadStore.downloadTracks([props.track]);
+  ui.notify("Начато скачивание трека", "success");
+}
+
 const trackItems = computed(() => {
   return settings.trackItems.filter((item) => item.visible);
 });
@@ -153,24 +246,32 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 <template>
   <div
     class="row"
-    :class="{ 'row--playing': isCurrent, 'row--compact': variant === 'compact', 'row--off': unavailable }"
+    :class="{ 'row--playing': isCurrent, 'row--compact': variant === 'compact', 'row--off': unavailable, 'row--selected': isSelected }"
+    @click="handleRowClick"
     @dblclick="playOne"
-    @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'edit_only')"
+    @contextmenu.prevent.stop="handleContextMenu"
     @mouseenter="ui.hoveredTrackKey = trackKey"
     @mouseleave="ui.hoveredTrackKey === trackKey ? ui.hoveredTrackKey = null : null"
   >
     <div class="row__lead">
-      <span v-if="showIndex && !isCurrent" class="row__index">{{ (index ?? 0) + 1 }}</span>
-      <button
-        v-else
-        class="row__play"
-        :aria-label="isCurrent && isPlaying ? 'Пауза' : 'Воспроизвести'"
-        :title="isCurrent && isPlaying ? 'Пауза' : 'Воспроизвести'"
-        @click.stop="isCurrent ? player.togglePlay() : playOne()"
-      >
-        <SvgIcon v-if="isCurrent && isPlaying" name="pause" width="14" height="14" />
-        <SvgIcon v-else name="play" width="14" height="14" />
-      </button>
+      <div v-if="isSelectMode" class="row__checkbox-wrap" @click.stop="emit('toggle-select')">
+        <span class="row__checkbox" :class="{ 'row__checkbox--checked': isSelected }">
+          <SvgIcon v-if="isSelected" name="check" width="10" height="10" />
+        </span>
+      </div>
+      <template v-else>
+        <span v-if="showIndex && !isCurrent" class="row__index">{{ (index ?? 0) + 1 }}</span>
+        <button
+          v-else
+          class="row__play"
+          :aria-label="isCurrent && isPlaying ? 'Пауза' : 'Воспроизвести'"
+          :title="isCurrent && isPlaying ? 'Пауза' : 'Воспроизвести'"
+          @click.stop="isCurrent ? player.togglePlay() : playOne()"
+        >
+          <SvgIcon v-if="isCurrent && isPlaying" name="pause" width="14" height="14" />
+          <SvgIcon v-else name="play" width="14" height="14" />
+        </button>
+      </template>
     </div>
 
     <div class="row__cover" v-lazy-bg="displayCover">
@@ -197,7 +298,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 
     <div class="row__actions">
       <button
-        v-if="isMyPlaylistMember"
+        v-if="isMyPlaylistMember && track.owner_id !== -999999"
         class="row__action row__action--remove-playlist"
         title="Удалить из плейлиста"
         aria-label="Удалить из плейлиста"
@@ -206,43 +307,79 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
         <SvgIcon name="cross" width="16" height="16" />
       </button>
 
+      <button
+        v-if="track.owner_id === -999999"
+        class="row__action row__action--remove-playlist"
+        title="Скрыть из медиатеки (оставить на диске)"
+        aria-label="Скрыть из медиатеки"
+        @click.stop="deleteLocalDb"
+      >
+        <SvgIcon name="cross" width="16" height="16" />
+      </button>
+
+      <button
+        v-if="track.owner_id === -999999"
+        class="row__action row__action--remove-playlist"
+        title="Удалить файл с диска"
+        aria-label="Удалить файл с диска"
+        @click.stop="deleteLocalDisk"
+      >
+        <SvgIcon name="cross" width="16" height="16" style="color: var(--danger)" />
+      </button>
+
       <template v-for="item in trackItems" :key="item.id">
-        <button
-          v-if="item.id === 'library'"
-          class="row__action row__action--lib"
-          :class="{ 'row__action--in-lib': inLibrary }"
-          :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
-          @click.stop="toggleLibrary"
-        >
-          <SvgIcon v-if="!inLibrary" name="plus" width="18" height="18" />
-          <template v-else>
-            <SvgIcon name="check" class="row__lib-check" width="18" height="18" />
-            <SvgIcon name="cross" class="row__lib-x" width="18" height="18" />
-          </template>
-        </button>
-        <button v-else-if="item.id === 'uncensored'" class="row__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensoredSearch">
-          <SvgIcon name="uncensored" width="18" height="18" />
-        </button>
-        <button v-else-if="item.id === 'similar'" class="row__action" title="Похожие" aria-label="Похожие" @click.stop="openSimilar">
-          <SvgIcon name="similar" width="18" height="18" />
-        </button>
-        <button v-else-if="item.id === 'queue'" class="row__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
-          <SvgIcon name="queue_add" width="18" height="18" />
-        </button>
-        <button v-else-if="item.id === 'share'" class="row__action" title="Поделиться" aria-label="Поделиться" @click.stop="shareTrack">
-          <SvgIcon name="share" width="16" height="16" />
-        </button>
-        <button
-          v-else-if="item.id === 'dislike'"
-          class="row__action row__action--dislike"
-          :class="{ 'row__action--disliked': isDisliked }"
-          :title="isDisliked ? 'Отменить дизлайк' : 'Не нравится (больше не показывать)'"
-          aria-label="Не нравится"
-          @click.stop="dislikeTrack"
-        >
-          <SvgIcon name="dislike" width="16" height="16" />
-        </button>
+        <template v-if="track.owner_id !== -999999 || item.id === 'queue'">
+          <button
+            v-if="item.id === 'library'"
+            class="row__action row__action--lib"
+            :class="{ 'row__action--in-lib': inLibrary }"
+            :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
+            @click.stop="toggleLibrary"
+          >
+            <SvgIcon v-if="!inLibrary" name="plus" width="18" height="18" />
+            <template v-else>
+              <SvgIcon name="check" class="row__lib-check" width="18" height="18" />
+              <SvgIcon name="cross" class="row__lib-x" width="18" height="18" />
+            </template>
+          </button>
+          <button v-else-if="item.id === 'uncensored'" class="row__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensoredSearch">
+            <SvgIcon name="uncensored" width="18" height="18" />
+          </button>
+          <button v-else-if="item.id === 'similar'" class="row__action" title="Похожие" aria-label="Похожие" @click.stop="openSimilar">
+            <SvgIcon name="similar" width="18" height="18" />
+          </button>
+          <button v-else-if="item.id === 'queue'" class="row__action" title="Слушать далее" aria-label="Слушать далее" @click.stop="addToQueue">
+            <SvgIcon name="queue_add" width="18" height="18" />
+          </button>
+          <button v-else-if="item.id === 'share'" class="row__action" title="Поделиться" aria-label="Поделиться" @click.stop="shareTrack">
+            <SvgIcon name="share" width="16" height="16" />
+          </button>
+          <button
+            v-else-if="item.id === 'dislike'"
+            class="row__action row__action--dislike"
+            :class="{ 'row__action--disliked': isDisliked }"
+            :title="isDisliked ? 'Отменить дизлайк' : 'Не нравится (больше не показывать)'"
+            aria-label="Не нравится"
+            @click.stop="dislikeTrack"
+          >
+            <SvgIcon name="dislike" width="16" height="16" />
+          </button>
+        </template>
       </template>
+
+      <!-- Single Track Download Button -->
+      <button
+        v-if="track.owner_id !== -999999 && !isDownloaded && !isDownloading"
+        class="row__action row__action--download"
+        title="Скачать трек"
+        aria-label="Скачать"
+        @click.stop="downloadSingleTrack"
+      >
+        <SvgIcon name="download" width="16" height="16" />
+      </button>
+      <div v-else-if="isDownloading" class="row__download-spinner" title="Скачивается...">
+        <div class="spinner-mini"></div>
+      </div>
     </div>
 
     <div class="row__duration">{{ formatDuration(track.duration) }}</div>
@@ -464,5 +601,46 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   color: var(--text-2);
   font-size: calc(12px * var(--font-scale, 1));
   text-align: right;
+}
+.row__checkbox-wrap {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.row__checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 2px solid var(--border-strong);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+  transition: background var(--motion-duration-base) var(--motion-ease-out), border-color var(--motion-duration-base) var(--motion-ease-out);
+}
+.row__checkbox--checked {
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  border-color: transparent;
+}
+.row__download-spinner {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.spinner-mini {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent-1);
+  border-radius: 50%;
+  animation: spin-mini 1s linear infinite;
+}
+@keyframes spin-mini {
+  to { transform: rotate(360deg); }
 }
 </style>

@@ -18,6 +18,7 @@ const ALL_ITEMS_MAP: Record<string, { label: string; icon: IconName }> = {
   search: { label: "Поиск", icon: "search" },
   queue: { label: "Очередь", icon: "queue" },
   settings: { label: "Настройки", icon: "settings" },
+  device: { label: "Устройство", icon: "device" },
 };
 
 function resetDefaults() {
@@ -28,6 +29,7 @@ function resetDefaults() {
     { id: "search", visible: true },
     { id: "queue", visible: true },
     { id: "settings", visible: true },
+    { id: "device", visible: true },
   ];
 }
 </script>

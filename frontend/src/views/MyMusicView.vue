@@ -43,6 +43,102 @@ const {
 } = storeToRefs(library);
 
 const activeTab = ref<"library" | "recent" | "playlists">("library");
+
+import { useDownloadStore } from "@/stores/download";
+
+const downloadStore = useDownloadStore();
+
+const isSelectMode = ref(false);
+const selectedTracks = ref<Set<string>>(new Set());
+const selectedTracksList = ref<Track[]>([]);
+
+function enterSelectMode() {
+  showSettings.value = false;
+  isSelectMode.value = true;
+  selectedTracks.value = new Set();
+  selectedTracksList.value = [];
+}
+
+function exitSelectMode() {
+  isSelectMode.value = false;
+  selectedTracks.value = new Set();
+  selectedTracksList.value = [];
+}
+
+function toggleSelectTrack(track: Track) {
+  const key = `${track.owner_id}_${track.id}`;
+  const nextSet = new Set(selectedTracks.value);
+  if (nextSet.has(key)) {
+    nextSet.delete(key);
+    selectedTracksList.value = selectedTracksList.value.filter(t => `${t.owner_id}_${t.id}` !== key);
+  } else {
+    nextSet.add(key);
+    selectedTracksList.value.push(track);
+  }
+  selectedTracks.value = nextSet;
+}
+
+function toggleSelectAll() {
+  const allSelected = filtered.value.every(t => selectedTracks.value.has(`${t.owner_id}_${t.id}`));
+  if (allSelected) {
+    selectedTracks.value = new Set();
+    selectedTracksList.value = [];
+  } else {
+    const nextSet = new Set(selectedTracks.value);
+    filtered.value.forEach(t => {
+      const key = `${t.owner_id}_${t.id}`;
+      if (!nextSet.has(key)) {
+        nextSet.add(key);
+        selectedTracksList.value.push(t);
+      }
+    });
+    selectedTracks.value = nextSet;
+  }
+}
+
+function downloadSelected() {
+  if (selectedTracksList.value.length === 0) return;
+  void downloadStore.downloadTracks(selectedTracksList.value);
+  ui.notify(`Начато скачивание ${selectedTracksList.value.length} треков`, "success");
+  exitSelectMode();
+}
+
+function handleContextMenuSelected(e: MouseEvent) {
+  if (selectedTracksList.value.length > 0) {
+    ui.showTrackContextMenu(e, selectedTracksList.value, 'full');
+  }
+}
+
+async function downloadPlaylist(playlist: AlbumSummary) {
+  ui.notify("Загрузка списка треков плейлиста...", "info");
+  try {
+    const numericId = typeof playlist.id === "string" ? parseInt(playlist.id) : playlist.id;
+    const res = await api.playlistTracks(playlist.owner_id || 0, numericId, { count: 200 });
+    const tracks = res.items || [];
+    if (tracks.length > 0) {
+      void downloadStore.downloadTracks(tracks);
+      ui.notify(`Начато скачивание плейлиста «${playlist.title}» (${tracks.length} треков)`, "success");
+    } else {
+      ui.notify("В плейлисте нет треков для скачивания", "error");
+    }
+  } catch (err) {
+    ui.notify("Не удалось загрузить треки плейлиста", "error");
+  }
+}
+
+function downloadPlaylistTracks(tracks: Track[]) {
+  if (tracks.length === 0) return;
+  void downloadStore.downloadTracks(tracks);
+  ui.notify(`Начато скачивание плейлиста «${activePlaylist.value?.title}» (${tracks.length} треков)`, "success");
+}
+
+watch(activeTab, () => {
+  exitSelectMode();
+});
+
+onBeforeUnmount(() => {
+  exitSelectMode();
+});
 const recentMusic = ref<Track[]>([]);
 const recentMusicLoading = ref(false);
 const recentMusicLoadingMore = ref(false);
@@ -443,6 +539,10 @@ async function refreshAll() {
                 </svg>
                 Создать плейлист
               </div>
+              <div class="my-music__dropdown-item" @click="enterSelectMode">
+                <SvgIcon name="download" width="16" height="16" />
+                Скачать треки
+              </div>
               <div class="my-music__dropdown-item" @click="goToDislikes">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
@@ -499,9 +599,13 @@ async function refreshAll() {
             :tracks="filtered"
             show-index
             manual-play
+            :is-select-mode="isSelectMode"
+            :selected-tracks="selectedTracks"
             empty-title="В библиотеке пусто"
             empty-subtitle="Сохрани треки из поиска или рекомендаций — они появятся здесь"
             @play="handlePlay"
+            @toggle-select="toggleSelectTrack"
+            @context-menu-selected="handleContextMenuSelected"
           />
           <div v-if="myMusicLoadingMore" class="my-music__loading">
             <Spinner :size="16" /> Подгружаем ещё…
@@ -521,9 +625,12 @@ async function refreshAll() {
             :tracks="filtered"
             show-index
             manual-play
+            :is-select-mode="isSelectMode"
+            :selected-tracks="selectedTracks"
             empty-title="Недавно воспроизведенных треков нет"
             empty-subtitle="Слушай музыку из поиска или рекомендаций, чтобы она появлялась здесь"
             @play="handlePlay"
+            @toggle-select="toggleSelectTrack"
           />
           <div v-if="recentMusicLoadingMore" class="my-music__loading">
             <Spinner :size="16" /> Подгружаем ещё…
@@ -558,6 +665,10 @@ async function refreshAll() {
                   <button class="btn btn--primary" :disabled="playlistTracksLoading || !currentPlaylistTracks.length" @click="playActivePlaylist">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                     Слушать
+                  </button>
+                  <button class="btn btn--secondary" :disabled="playlistTracksLoading || !currentPlaylistTracks.length" @click="downloadPlaylistTracks(currentPlaylistTracks)">
+                    <SvgIcon name="download" width="16" height="16" style="margin-right: 8px;" />
+                    Скачать
                   </button>
                   <button class="btn btn--ghost" @click="shareActivePlaylist">
                     <SvgIcon name="share" width="16" height="16" style="margin-right: 8px;" />
@@ -597,6 +708,7 @@ async function refreshAll() {
                 :playlist="pl"
                 @play="openPlaylist"
                 @delete="deletePlaylist"
+                @download="downloadPlaylist"
               />
             </div>
             <EmptyState
@@ -622,6 +734,27 @@ async function refreshAll() {
       :show="showCreateWizard"
       @close="showCreateWizard = false"
     />
+
+    <!-- Selection actions bar -->
+    <Transition name="slide-up">
+      <div v-if="isSelectMode" class="selection-bar">
+        <div class="selection-bar__info">
+          Выбрано треков: <span class="selection-bar__count">{{ selectedTracks.size }}</span>
+        </div>
+        <div class="selection-bar__actions">
+          <button class="btn btn--secondary" @click="toggleSelectAll">
+            {{ selectedTracks.size === filtered.length ? 'Снять всё' : 'Выбрать все' }}
+          </button>
+          <button class="btn btn--primary selection-bar__download-btn" :disabled="selectedTracks.size === 0" @click="downloadSelected">
+            <SvgIcon name="download" width="16" height="16" style="margin-right: 6px;" />
+            Скачать
+          </button>
+          <button class="btn btn--ghost" @click="exitSelectMode">
+            Отмена
+          </button>
+        </div>
+      </div>
+    </Transition>
   </ScrollArea>
 </template>
 
@@ -1002,5 +1135,53 @@ async function refreshAll() {
 }
 .my-music__refresh-btn--spin :deep(svg) {
   animation: spin 1s linear infinite;
+}
+
+.selection-bar {
+  position: fixed;
+  bottom: calc(var(--player-height) + 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.selection-bar__info {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-0);
+}
+
+.selection-bar__count {
+  color: var(--accent-1);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.selection-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: opacity var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1),
+              transform var(--motion-duration-slow) cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 24px);
 }
 </style>

@@ -17,6 +17,10 @@ python-dotenv = "^1.0.1"
 orjson = "^3.10.7"
 vkaudiotoken = "^0.5.1"
 pypresence = "^4.6.1"
+tinytag = "^2.2.1"
+mutagen = "^1.48.1"
+av = "^18.0.0"
+cryptography = "^49.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"

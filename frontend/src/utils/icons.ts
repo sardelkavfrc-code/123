@@ -37,7 +37,9 @@ export type IconName =
   | "chevron_left"
   | "chevron_right"
   | "share"
-  | "refresh";
+  | "refresh"
+  | "download"
+  | "device";
 
 export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef>> = {
   line: {
@@ -270,6 +272,24 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       strokeLinejoin: "round",
       content: `<polyline points="9 18 15 12 9 6" />`,
     },
+    download: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />`,
+    },
+    device: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />`,
+    },
   },
   flat: {
     home: {
@@ -420,6 +440,16 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       viewBox: "0 0 24 24",
       fill: "currentColor",
       content: `<path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />`,
+    },
+    download: {
+      viewBox: "0 0 24 24",
+      fill: "currentColor",
+      content: `<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />`,
+    },
+    device: {
+      viewBox: "0 0 24 24",
+      fill: "currentColor",
+      content: `<path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z" />`,
     },
   },
   rounded: {
@@ -646,6 +676,24 @@ export const ICONS: Record<"line" | "flat" | "rounded", Record<IconName, IconDef
       strokeLinecap: "round",
       strokeLinejoin: "round",
       content: `<path d="M9 18l6-6-6-6" />`,
+    },
+    download: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />`,
+    },
+    device: {
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      content: `<rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />`,
     },
   },
 };

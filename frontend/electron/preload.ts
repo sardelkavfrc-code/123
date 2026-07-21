@@ -22,6 +22,13 @@ contextBridge.exposeInMainWorld("vkmp", {
   openVKValidation: (url: string) => ipcRenderer.invoke("auth:open-vk-validation", url),
   waitForBackend: () => ipcRenderer.invoke("backend:wait"),
   getVersion: () => ipcRenderer.invoke("app:version"),
+  selectFolder: () => ipcRenderer.invoke("dialog:select-folder"),
+  getPendingOpenFiles: () => ipcRenderer.invoke("get-pending-open-files"),
+  onOpenFile: (cb: (paths: string[]) => void) => {
+    const handler = (_event: unknown, paths: string[]) => cb(paths);
+    ipcRenderer.on("open-files", handler);
+    return () => ipcRenderer.removeListener("open-files", handler);
+  },
   
   updater: {
     checkForUpdates: () => ipcRenderer.invoke("update:check"),

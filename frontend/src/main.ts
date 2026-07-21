@@ -1,5 +1,47 @@
 import { createApp } from "vue";
 import { createPinia } from "pinia";
+
+window.addEventListener("error", (event) => {
+  const payload = {
+    message: event.message,
+    stack: event.error?.stack || null,
+  };
+  const send = (url: string) => {
+    fetch(`${url}/local/log_error`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  };
+  if (window.vkmp?.getBackendUrl) {
+    window.vkmp.getBackendUrl().then((url) => {
+      send(url || "http://127.0.0.1:8765");
+    }).catch(() => send("http://127.0.0.1:8765"));
+  } else {
+    send("http://127.0.0.1:8765");
+  }
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const payload = {
+    message: String(event.reason?.message || event.reason),
+    stack: event.reason?.stack || null,
+  };
+  const send = (url: string) => {
+    fetch(`${url}/local/log_error`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  };
+  if (window.vkmp?.getBackendUrl) {
+    window.vkmp.getBackendUrl().then((url) => {
+      send(url || "http://127.0.0.1:8765");
+    }).catch(() => send("http://127.0.0.1:8765"));
+  } else {
+    send("http://127.0.0.1:8765");
+  }
+});
 import { MotionPlugin } from "@vueuse/motion";
 import App from "./App.vue";
 import { router } from "./router";

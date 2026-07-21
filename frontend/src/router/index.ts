@@ -61,6 +61,11 @@ const routes: RouteRecordRaw[] = [
     name: "settings",
     component: () => import("@/views/SettingsView.vue"),
   },
+  {
+    path: "/device",
+    name: "device",
+    component: () => import("@/views/DeviceView.vue"),
+  },
   { path: "/:pathMatch(.*)*", redirect: "/" },
 ];
 
@@ -76,15 +81,38 @@ export const router = createRouter({
   },
 });
 
+let isFirstNavigation = true;
+
 router.beforeEach(async (to) => {
   if (window.vkmp?.waitForBackend) {
     await window.vkmp.waitForBackend().catch(() => {});
   }
   const auth = useAuthStore();
-  if (!auth.checked) {
+
+  if (isFirstNavigation) {
+    isFirstNavigation = false;
+    const updateState = localStorage.getItem("vkmp:update_restore_state");
+    if (!updateState && (to.name === "home" || to.path === "/")) {
+      const savedTab = localStorage.getItem("vkmp:active_tab");
+      if (savedTab && savedTab !== "home") {
+        return { name: savedTab };
+      }
+    }
+  }
+
+  // Defer authentication refresh until VK routes are accessed
+  const vkRoutes = ["home", "library", "friends", "search", "friend-music", "artist", "similar"];
+  if (vkRoutes.includes(to.name as string)) {
+    if (!auth.vkApiAllowed) {
+      auth.vkApiAllowed = true;
+      await auth.refresh();
+    }
+  }
+
+  if (to.name !== "device" && !auth.checked) {
     await auth.refresh();
   }
-  if (!to.meta.public && !auth.isAuthenticated) {
+  if (to.name !== "device" && !to.meta.public && !auth.isAuthenticated) {
     return { name: "auth", query: { redirect: to.fullPath } };
   }
   if (to.name === "auth" && auth.isAuthenticated) {

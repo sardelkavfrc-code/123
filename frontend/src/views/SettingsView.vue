@@ -159,6 +159,22 @@ async function logout() {
   router.replace({ name: "auth" });
 }
 
+async function changeDownloadPath() {
+  if (window.vkmp?.selectFolder) {
+    const folder = await window.vkmp.selectFolder();
+    if (folder) {
+      settings.downloadPath = folder;
+      if (!settings.localFolders.includes(folder)) {
+        settings.localFolders.push(folder);
+      }
+    }
+  }
+}
+
+function resetDownloadPath() {
+  settings.downloadPath = "";
+}
+
 function pickTheme(value: ThemeName) {
   theme.value = value;
 }
@@ -995,6 +1011,26 @@ function onAfterLeave(el: Element) {
       <!-- Приложение -->
       <template v-if="activeTab === 'app'">
         <article class="settings__card">
+          <h2>Скачивание</h2>
+          <div class="settings__row">
+            <div>
+              <div class="settings__row-title">Папка для скачивания музыки</div>
+              <div class="settings__row-sub" style="font-family: monospace;">
+                {{ settings.downloadPath || 'По умолчанию: папка приложения (.vk-music-player/downloads)' }}
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn--secondary btn--sm" style="padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border);" @click="changeDownloadPath">
+                Изменить...
+              </button>
+              <button v-if="settings.downloadPath" class="btn btn--ghost btn--sm" style="padding: 4px 12px; border-radius: 6px;" @click="resetDownloadPath">
+                Сбросить
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <article class="settings__card">
           <h2>Анимации и производительность</h2>
           <label class="settings__row">
             <div>
@@ -1161,7 +1197,7 @@ function onAfterLeave(el: Element) {
             <div>
               <div class="settings__row-title">{{ auth.displayName }}</div>
               <div class="settings__row-sub">
-                {{ auth.status.authenticated ? `id ${auth.status.user_id}` : "Не авторизован" }}
+                {{ auth.status?.authenticated ? `id ${auth.status.user_id}` : "Не авторизован" }}
               </div>
             </div>
             <button class="btn btn--ghost" @click="logout">Выйти</button>

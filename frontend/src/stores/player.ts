@@ -834,14 +834,20 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
+  let rpcCleared = false;
+
   // Discord RPC synchronization
   watch(
     [current, isPlaying, () => settings.discordRpc, () => settings.discordRpcText, () => settings.discordRpcShowTrack],
     ([track, playing, rpcEnabled, customText, rpcShowTrack]) => {
-      if (!rpcEnabled) {
-        api.clearRpc().catch(() => {});
+      if (!rpcEnabled || (track && track.owner_id === -999999)) {
+        if (!rpcCleared) {
+          rpcCleared = true;
+          api.clearRpc().catch(() => {});
+        }
         return;
       }
+      rpcCleared = false;
       
       const payload: any = {
         is_playing: playing,
@@ -881,7 +887,7 @@ export const usePlayerStore = defineStore("player", () => {
       }
 
       if (!track) return;
-      if (track.owner_id === undefined || track.id === undefined || track.id === -1) return;
+      if (track.owner_id === undefined || track.id === undefined || track.id === -1 || track.owner_id === -999999) return;
 
       // 2. Трек включился с нуля (или переключили на новый)
       if (playing && playbackUuid === null) {

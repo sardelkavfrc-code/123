@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
-import asyncio
 import httpx
-import logging
 
 from ..config import Settings, get_settings
 from .exceptions import VKError

@@ -14,7 +14,7 @@ import hashlib
 from typing import Any
 
 import httpx
-from fastapi import APIRouter, Query, Response, HTTPException
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from ..models.audio import CoverLookup
 

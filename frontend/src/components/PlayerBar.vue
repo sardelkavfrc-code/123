@@ -198,6 +198,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
             :key="inLibrary ? 'in' : 'out'"
             class="player__icon-btn player__icon-btn--lib"
             :class="{ 'player__icon-btn--active': inLibrary }"
+            :disabled="current.owner_id === -999999"
             :aria-label="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
             :title="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
             @click="toggleLibrary"
@@ -215,10 +216,10 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
     <div class="player__controls">
       <div class="player__buttons">
         <div class="player__actions">
-          <button class="player__icon-btn" :disabled="!current" title="Без цензуры" aria-label="Без цензуры" @click="uncensoredSearch">
+          <button class="player__icon-btn" :disabled="!current || current.owner_id === -999999" title="Без цензуры" aria-label="Без цензуры" @click="uncensoredSearch">
             <SvgIcon name="uncensored" width="22" height="22" />
           </button>
-          <button class="player__icon-btn" :disabled="!current" title="Похожие (рекомендации ВК)" aria-label="Похожие" @click="openSimilar">
+          <button class="player__icon-btn" :disabled="!current || current.owner_id === -999999" title="Похожие (рекомендации ВК)" aria-label="Похожие" @click="openSimilar">
             <SvgIcon name="similar" width="22" height="22" />
           </button>
         </div>
@@ -267,7 +268,7 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
           <button
             class="player__icon-btn"
             :class="{ 'player__icon-btn--disliked': isDisliked }"
-            :disabled="!current"
+            :disabled="!current || current.owner_id === -999999"
             :title="isDisliked ? 'Отменить дизлайк' : 'Не нравится (больше не показывать)'"
             aria-label="Не нравится"
             @click="dislikeTrack"

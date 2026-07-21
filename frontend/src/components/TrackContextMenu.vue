@@ -7,6 +7,9 @@ import { useDislikesStore } from "@/stores/dislikes";
 import { useAuthStore } from "@/stores/auth";
 import { useRouter } from "vue-router";
 import SvgIcon from "@/components/SvgIcon.vue";
+import { useSettingsStore } from "@/stores/settings";
+import { api } from "@/api/client";
+import { useDownloadStore } from "@/stores/download";
 
 const ui = useUIStore();
 const library = useLibraryStore();
@@ -14,10 +17,11 @@ const player = usePlayerStore();
 const dislikes = useDislikesStore();
 const auth = useAuthStore();
 const router = useRouter();
+const settings = useSettingsStore();
 
 const canRemoveFromPlaylist = computed(() => {
   if (!player.currentPlaylist || !track.value) return false;
-  return player.currentPlaylist.owner_id === auth.status.user_id;
+  return player.currentPlaylist.owner_id === auth.status?.user_id;
 });
 
 async function removeFromPlaylist() {
@@ -35,8 +39,14 @@ async function removeFromPlaylist() {
 }
 
 defineEmits(['mouseenter', 'mouseleave']);
+const downloadStore = useDownloadStore();
 
-const track = computed(() => ui.activeContextMenuTrack);
+const isMulti = computed(() => Array.isArray(ui.activeContextMenuTrack));
+const track = computed(() => isMulti.value ? ui.activeContextMenuTrack[0] : ui.activeContextMenuTrack);
+const tracks = computed(() => isMulti.value ? ui.activeContextMenuTrack : (track.value ? [track.value] : []));
+
+const isAllLocal = computed(() => tracks.value.length > 0 && tracks.value.every((t: any) => t.owner_id === -999999));
+const hasDownloadable = computed(() => tracks.value.some((t: any) => t.owner_id !== -999999));
 
 const inLibrary = computed(() => {
   if (!track.value) return false;
@@ -89,15 +99,66 @@ function openSimilar() {
 }
 
 function addToQueue() {
-  if (!track.value) return;
+  if (tracks.value.length === 0) return;
   ui.trackContextMenuOpen = false;
-  player.enqueueNext(track.value);
-  ui.notify("Трек будет играть следующим", "success");
+  tracks.value.forEach((t: any) => player.enqueueNext(t));
+  ui.notify(tracks.value.length === 1 ? "Трек будет играть следующим" : `В очередь добавлено треков: ${tracks.value.length}`, "success");
 }
 
 function triggerTrackEdit() {
   ui.trackContextMenuOpen = false;
   ui.trackSettingsOpen = true;
+}
+
+async function deleteLocalTrack(deleteFile: boolean) {
+  if (tracks.value.length === 0) return;
+  ui.trackContextMenuOpen = false;
+  
+  try {
+    for (const t of tracks.value) {
+      if (t.owner_id !== -999999) continue;
+      if (!deleteFile) {
+        if (t.url) {
+          try {
+            const urlObj = new URL(t.url, window.location.origin);
+            const path = urlObj.searchParams.get("path");
+            if (path && !settings.ignoredPaths.includes(path)) {
+              settings.ignoredPaths.push(path);
+            }
+          } catch {
+            const idx = t.url.indexOf("path=");
+            if (idx >= 0) {
+              const path = decodeURIComponent(t.url.substring(idx + 5));
+              if (path && !settings.ignoredPaths.includes(path)) {
+                settings.ignoredPaths.push(path);
+              }
+            }
+          }
+        }
+      }
+      await api.deleteLocalTrack(t.id, deleteFile);
+      player.removeTrack(t);
+    }
+    void library.loadLocalTracks();
+    ui.notify(deleteFile ? "Файлы удалены" : "Треки скрыты из списка", "success");
+  } catch {
+    ui.notify("Не удалось удалить треки", "error");
+  }
+}
+
+function downloadMulti() {
+  ui.trackContextMenuOpen = false;
+  const downloadable = tracks.value.filter((t: any) => t.owner_id !== -999999);
+  if (downloadable.length === 0) return;
+  void downloadStore.downloadTracks(downloadable);
+  ui.notify(`Начато скачивание ${downloadable.length} треков`, "success");
+}
+
+function downloadSingle() {
+  if (!track.value) return;
+  ui.trackContextMenuOpen = false;
+  void downloadStore.downloadTracks([track.value]);
+  ui.notify("Начато скачивание", "success");
 }
 
 function toggleDislike() {
@@ -192,8 +253,27 @@ watch(
       @mouseenter="$emit('mouseenter', $event)"
       @mouseleave="$emit('mouseleave', $event)"
     >
-      <template v-if="ui.activeContextMenuType === 'full'">
-        <button class="track-context-btn" @click="toggleLibrary">
+      <template v-if="ui.activeContextMenuType === 'full' && isMulti">
+        <button class="track-context-btn" @click="addToQueue">
+          <SvgIcon name="queue_add" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          В очередь ({{ tracks.length }})
+        </button>
+        <button v-if="hasDownloadable" class="track-context-btn" @click="downloadMulti">
+          <SvgIcon name="download" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Скачать выбранные
+        </button>
+        <button v-if="isAllLocal" class="track-context-btn" @click="deleteLocalTrack(false)">
+          <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Удалить из списка ({{ tracks.length }})
+        </button>
+        <button v-if="isAllLocal" class="track-context-btn" @click="deleteLocalTrack(true)">
+          <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7; color: var(--danger);" />
+          Удалить с диска ({{ tracks.length }})
+        </button>
+      </template>
+
+      <template v-else-if="ui.activeContextMenuType === 'full'">
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="toggleLibrary">
           <SvgIcon :name="inLibrary ? 'cross' : 'plus'" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           {{ inLibrary ? 'Удалить из библиотеки' : 'В библиотеку' }}
         </button>
@@ -201,27 +281,39 @@ watch(
           <SvgIcon name="queue_add" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Слушать далее
         </button>
-        <button class="track-context-btn" @click="showAddToPlaylistModal">
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="downloadSingle">
+          <SvgIcon name="download" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Скачать
+        </button>
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="showAddToPlaylistModal">
           <SvgIcon name="plus" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Добавить в плейлист...
         </button>
-        <button v-if="canRemoveFromPlaylist" class="track-context-btn" @click="removeFromPlaylist">
+        <button v-if="canRemoveFromPlaylist && track.owner_id !== -999999" class="track-context-btn" @click="removeFromPlaylist">
           <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Удалить из плейлиста
         </button>
-        <button class="track-context-btn" @click="shareTrack">
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="shareTrack">
           <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Поделиться...
         </button>
-        <button class="track-context-btn" @click="openSimilar">
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="openSimilar">
           <SvgIcon name="similar" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Похожие
         </button>
-        <button class="track-context-btn" @click="uncensoredSearch">
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="uncensoredSearch">
           <SvgIcon name="uncensored" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Найти без цензуры
         </button>
-        <button class="track-context-btn" @click="toggleDislike">
+        <button v-if="track.owner_id === -999999" class="track-context-btn" @click="deleteLocalTrack(false)">
+          <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+          Удалить из списка
+        </button>
+        <button v-if="track.owner_id === -999999" class="track-context-btn" @click="deleteLocalTrack(true)">
+          <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7; color: var(--danger);" />
+          Удалить с устройства
+        </button>
+        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="toggleDislike">
           <SvgIcon name="dislike" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           {{ isDisliked ? 'Отменить дизлайк' : 'Не нравится' }}
         </button>

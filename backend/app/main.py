@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
-from .routers import art, audio, auth, friends, rpc
+from .routers import art, audio, auth, friends, local, rpc
 from .vk.client import VKClient
 
 
@@ -15,10 +15,15 @@ from .vk.client import VKClient
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     settings.session_dir.mkdir(parents=True, exist_ok=True)
+    
+    from .utils import local_db
+    local_db.init_db()
+    
     app.state.vk_client = VKClient(settings)
     
     # Proactively refresh token if session is older than 2 weeks (14 days = 1209600 seconds)
     import asyncio
+
     from . import storage
     session = storage.load()
     if session and session.access_token:
@@ -59,6 +64,12 @@ def create_app() -> FastAPI:
     app.include_router(friends.router)
     app.include_router(art.router)
     app.include_router(rpc.router)
+    app.include_router(local.router)
+
+    from fastapi.staticfiles import StaticFiles
+    covers_dir = settings.session_dir / "local_covers"
+    covers_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/api/local/covers", StaticFiles(directory=covers_dir), name="local_covers")
 
     @app.get("/health")
     async def health() -> dict[str, str]:

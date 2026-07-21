@@ -23,6 +23,32 @@ export const useAuthStore = defineStore("auth", () => {
   const checked = ref(false);
   const loading = ref(false);
   const lastError = ref<string | null>(null);
+  const vkApiAllowed = ref(false);
+
+  // Initialize from cache
+  const cachedStatus = localStorage.getItem("vkmp:auth_status");
+  if (cachedStatus) {
+    try {
+      status.value = JSON.parse(cachedStatus);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Determine if we can skip the initial auth check
+  const savedTab = localStorage.getItem("vkmp:active_tab") || "home";
+  const isVkRoute = ["home", "library", "friends", "search", "friend-music", "artist", "similar"].includes(savedTab);
+  
+  if (localStorage.getItem("wasAuthenticated") === "true") {
+    if (!isVkRoute) {
+      checked.value = true;
+      status.value.authenticated = true;
+    } else {
+      vkApiAllowed.value = true;
+    }
+  } else {
+    vkApiAllowed.value = true;
+  }
 
   const isAuthenticated = computed(() => status.value.authenticated);
   const hasAudio = computed(() => status.value.has_audio);
@@ -36,8 +62,10 @@ export const useAuthStore = defineStore("auth", () => {
       status.value = await api.authStatus();
       if (status.value.authenticated) {
         localStorage.setItem("wasAuthenticated", "true");
+        localStorage.setItem("vkmp:auth_status", JSON.stringify(status.value));
       } else {
         localStorage.removeItem("wasAuthenticated");
+        localStorage.removeItem("vkmp:auth_status");
       }
     } catch (err) {
       if (err instanceof APIError && err.status === 401) {
@@ -89,6 +117,7 @@ export const useAuthStore = defineStore("auth", () => {
     } finally {
       status.value = emptyStatus();
       localStorage.removeItem("wasAuthenticated");
+      localStorage.removeItem("vkmp:auth_status");
     }
   }
 
@@ -98,6 +127,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       status.value = await api.loginWithToken({ remember: true, ...payload });
       localStorage.setItem("wasAuthenticated", "true");
+      localStorage.setItem("vkmp:auth_status", JSON.stringify(status.value));
       return true;
     } catch (err) {
       if (err instanceof APIError) {
@@ -296,6 +326,7 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       status.value = await api.confirmAuth(payload);
       localStorage.setItem("wasAuthenticated", "true");
+      localStorage.setItem("vkmp:auth_status", JSON.stringify(status.value));
       return true;
     } catch (err) {
       if (err instanceof APIError) {
@@ -314,6 +345,7 @@ export const useAuthStore = defineStore("auth", () => {
     checked,
     loading,
     lastError,
+    vkApiAllowed,
     isAuthenticated,
     hasAudio,
     displayName,

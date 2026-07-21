@@ -35,7 +35,7 @@ export const useUIStore = defineStore("ui", () => {
   const trackContextMenuOpen = ref(false);
   const trackContextMenuPos = ref({ x: 0, y: 0 });
   const hoveredTrackKey = ref<string | null>(null);
-  const activeContextMenuTrack = ref<any>(null); // Store the full track object instead of just key
+  const activeContextMenuTrack = ref<any | any[]>(null); // Store the full track object(s)
   const activeContextMenuType = ref<'full' | 'edit_only'>('full');
   
   const addToPlaylistModalOpen = ref(false);
@@ -77,8 +77,8 @@ export const useUIStore = defineStore("ui", () => {
     captchaSid.value = null;
   }
 
-  function showTrackContextMenu(event: MouseEvent, track: any, menuType: 'full' | 'edit_only' = 'full') {
-    activeContextMenuTrack.value = track;
+  function showTrackContextMenu(event: MouseEvent, trackOrTracks: any | any[], menuType: 'full' | 'edit_only' = 'full') {
+    activeContextMenuTrack.value = trackOrTracks;
     activeContextMenuType.value = menuType;
     if (trackContextMenuOpen.value) {
       trackContextMenuOpen.value = false;

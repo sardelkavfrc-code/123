@@ -33,6 +33,9 @@ declare global {
       setAutoStart: (enabled: boolean, hidden: boolean) => Promise<boolean>;
       getAutoStart: () => Promise<boolean>;
       onMediaKey: (cb: (key: "play-pause" | "next" | "prev") => void) => () => void;
+      selectFolder: () => Promise<string | null>;
+      getPendingOpenFiles: () => Promise<string[]>;
+      onOpenFile: (cb: (paths: string[]) => void) => () => void;
       setTrayInfo: (info: { title: string; artist: string; isPlaying: boolean } | null) => void;
       openVKAuth: (silent?: boolean) => Promise<VKAuthResult>;
       openVKCaptcha: (redirectUrl: string, remixstlid: string, vkCookies?: string) => Promise<{ success: boolean; remixstlid?: string; vkCookies?: string }>;

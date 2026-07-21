@@ -12,7 +12,7 @@ const auth = useAuthStore();
 const ui = useUIStore();
 const settings = useSettingsStore();
 
-const photo = computed(() => auth.status.photo);
+const photo = computed(() => auth.status?.photo);
 const name = computed(() => auth.displayName);
 
 const ALL_SIDEBAR_ITEMS: Record<string, { to: { name: string }; label: string; icon: IconName }> = {
@@ -21,6 +21,7 @@ const ALL_SIDEBAR_ITEMS: Record<string, { to: { name: string }; label: string; i
   friends: { to: { name: "friends" }, label: "Друзья", icon: "friends" },
   queue: { to: { name: "queue" }, label: "Очередь", icon: "queue" },
   settings: { to: { name: "settings" }, label: "Настройки", icon: "settings" },
+  device: { to: { name: "device" }, label: "Устройство", icon: "device" },
 };
 
 const items = computed(() => {

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import logging
 import base64
+import logging
+
 import httpx
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .. import storage
 from ..deps import VKDep
@@ -117,6 +118,7 @@ async def _resolve_user(vk: VKDep, token: str, *, has_audio: bool) -> AuthStatus
 
 
 import asyncio
+
 
 @router.get("/status", response_model=AuthStatus)
 async def status_endpoint(vk: VKDep) -> AuthStatus:
@@ -306,7 +308,7 @@ async def send_sms(payload: SendSmsRequest, vk: VKDep):
         except VKError as exc:
             print(f"BACKEND SEND SMS VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
             if exc.code == 3615 or "code" in exc.message.lower():
-                print(f"SendSms failed with 3615. Clearing device_id and anonymous token to bypass rate limit...", flush=True)
+                print("SendSms failed with 3615. Clearing device_id and anonymous token to bypass rate limit...", flush=True)
                 storage.clear_device_id()
                 vk.clear_anonymous_token()
                 raise HTTPException(
@@ -390,7 +392,7 @@ async def send_callreset(payload: SendSmsRequest, vk: VKDep):
         except VKError as exc:
             print(f"BACKEND SEND CALLRESET VKError: code={exc.code}, msg={exc.message}, raw={exc.raw}", flush=True)
             if exc.code == 3615 or "code" in exc.message.lower():
-                print(f"SendCallReset failed with 3615. Clearing device_id and anonymous token to bypass rate limit...", flush=True)
+                print("SendCallReset failed with 3615. Clearing device_id and anonymous token to bypass rate limit...", flush=True)
                 storage.clear_device_id()
                 vk.clear_anonymous_token()
                 raise HTTPException(

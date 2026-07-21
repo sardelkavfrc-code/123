@@ -142,6 +142,7 @@ interface PersistedSettings {
   sidebarItems: SidebarItemSetting[];
   trackItems: SidebarItemSetting[];
   mixMood: string;
+  localFolders: string[];
   mixFamiliarity: string;
   mixLanguage: string;
   homeShowStreamMixes: boolean;
@@ -152,6 +153,8 @@ interface PersistedSettings {
   homeShowPlaylists: boolean;
   homeShowMixes: boolean;
   iconSet: "line" | "flat" | "rounded";
+  downloadPath?: string;
+  ignoredPaths?: string[];
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -219,6 +222,9 @@ const defaults: PersistedSettings = {
     { id: "dislike", visible: true },
   ],
   iconSet: "rounded",
+  localFolders: [],
+  downloadPath: "",
+  ignoredPaths: [],
   mixMood: "any",
   mixFamiliarity: "any",
   mixLanguage: "any",
@@ -333,8 +339,19 @@ export const useSettingsStore = defineStore("settings", () => {
   const customBgBrightness = ref(initial.customBgBrightness ?? 100);
   const coverBgBlur = ref(initial.coverBgBlur ?? 90);
   const sidebarItems = ref<SidebarItemSetting[]>(initial.sidebarItems ?? defaults.sidebarItems);
+  if (!sidebarItems.value.some(item => item.id === "device")) {
+    const settingsIndex = sidebarItems.value.findIndex(item => item.id === "settings");
+    if (settingsIndex >= 0) {
+      sidebarItems.value.splice(settingsIndex + 1, 0, { id: "device", visible: true });
+    } else {
+      sidebarItems.value.push({ id: "device", visible: true });
+    }
+  }
   const trackItems = ref<SidebarItemSetting[]>(initial.trackItems ?? defaults.trackItems);
   const iconSet = ref<"line" | "flat" | "rounded">(initial.iconSet ?? defaults.iconSet);
+  const localFolders = ref<string[]>(initial.localFolders ?? []);
+  const downloadPath = ref<string>(initial.downloadPath ?? "");
+  const ignoredPaths = ref<string[]>(initial.ignoredPaths ?? []);
 
   const mixMood = ref(initial.mixMood ?? defaults.mixMood);
   const mixFamiliarity = ref(initial.mixFamiliarity ?? defaults.mixFamiliarity);
@@ -569,6 +586,9 @@ export const useSettingsStore = defineStore("settings", () => {
       sidebarItems: sidebarItems.value,
       trackItems: trackItems.value,
       iconSet: iconSet.value,
+      localFolders: localFolders.value,
+      downloadPath: downloadPath.value,
+      ignoredPaths: ignoredPaths.value,
       mixMood: mixMood.value,
       mixFamiliarity: mixFamiliarity.value,
       mixLanguage: mixLanguage.value,
@@ -636,6 +656,9 @@ export const useSettingsStore = defineStore("settings", () => {
       sidebarItems,
       trackItems,
       iconSet,
+      localFolders,
+      downloadPath,
+      ignoredPaths,
       mixMood,
       mixFamiliarity,
       mixLanguage,
@@ -720,6 +743,7 @@ export const useSettingsStore = defineStore("settings", () => {
     sidebarItems.value = defaults.sidebarItems.map(item => ({ ...item }));
     trackItems.value = defaults.trackItems.map(item => ({ ...item }));
     iconSet.value = defaults.iconSet;
+    localFolders.value = [];
     mixMood.value = defaults.mixMood;
     mixFamiliarity.value = defaults.mixFamiliarity;
     mixLanguage.value = defaults.mixLanguage;
@@ -801,5 +825,8 @@ export const useSettingsStore = defineStore("settings", () => {
     homeShowMoods,
     homeShowPlaylists,
     homeShowMixes,
+    localFolders,
+    downloadPath,
+    ignoredPaths,
   };
 });

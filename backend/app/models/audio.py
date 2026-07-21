@@ -79,7 +79,7 @@ class AlbumSummary(APIModel):
     track_count: int | None = None
     type: str | None = None
     main_color: str | None = None
-    tracks: list["Track"] = Field(default_factory=list)
+    tracks: list[Track] = Field(default_factory=list)
     owner_name: str | None = None
     owner_photo: str | None = None
     access_key: str | None = None

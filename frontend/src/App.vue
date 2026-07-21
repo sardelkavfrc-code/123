@@ -17,6 +17,8 @@ import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
 import { useAuthStore } from "@/stores/auth";
 import { useLibraryStore } from "@/stores/library";
+import { api } from "@/api/client";
+import DownloadManagerWidget from "@/components/DownloadManagerWidget.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -26,6 +28,36 @@ const ui = useUIStore();
 const auth = useAuthStore();
 const library = useLibraryStore();
 const settings = useSettingsStore();
+
+function handleDragOver(e: DragEvent) {
+  e.preventDefault();
+}
+
+async function handleDrop(e: DragEvent) {
+  e.preventDefault();
+  if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+    const paths = Array.from(e.dataTransfer.files).map(f => (f as any).path).filter(Boolean);
+    if (paths.length > 0) {
+      await handleOpenPaths(paths);
+    }
+  }
+}
+
+async function handleOpenPaths(paths: string[]) {
+  ui.notify("Загрузка локальных файлов...", "info");
+  try {
+    const tracks = await api.parseLocalPaths(paths);
+    if (tracks && tracks.length > 0) {
+      player.playQueue(tracks, 0);
+      void library.loadLocalTracks();
+      ui.notify(`Воспроизведение: добавлено ${tracks.length} треков`, "success");
+    } else {
+      ui.notify("Не удалось прочитать аудиофайлы по указанным путям", "error");
+    }
+  } catch (err) {
+    ui.notify("Ошибка при загрузке локальных файлов", "error");
+  }
+}
 
 watch(
   () => auth.isAuthenticated,
@@ -38,6 +70,12 @@ watch(
   },
   { immediate: true }
 );
+
+watch(() => route.name, (name) => {
+  if (name && typeof name === "string" && name !== "auth") {
+    localStorage.setItem("vkmp:active_tab", name);
+  }
+});
 
 let detachMediaKey: (() => void) | null = null;
 
@@ -95,12 +133,24 @@ function closeTrackContextMenu() {
   }
 }
 
+let detachOpenFile: (() => void) | null = null;
+
 onMounted(() => {
   if (window.vkmp) {
     detachMediaKey = window.vkmp.onMediaKey((key) => {
       if (key === "play-pause") player.togglePlay();
       else if (key === "next") player.next();
       else if (key === "prev") player.prev();
+    });
+
+    detachOpenFile = window.vkmp.onOpenFile(async (paths: string[]) => {
+      await handleOpenPaths(paths);
+    });
+
+    void window.vkmp.getPendingOpenFiles().then(async (paths: string[]) => {
+      if (paths && paths.length > 0) {
+        await handleOpenPaths(paths);
+      }
     });
 
     if (settings.autoUpdateCheck) {
@@ -111,7 +161,6 @@ onMounted(() => {
       }, 3000);
     }
     
-    // Check every hour
     setInterval(() => {
       if (settings.autoUpdateCheck) {
         window.vkmp?.updater?.checkForUpdates().catch(() => {});
@@ -119,10 +168,17 @@ onMounted(() => {
     }, 1000 * 60 * 60);
   }
 
-  // Restore state after update
-  const unwatch = watch(() => useAuthStore().checked, (isChecked) => {
+  window.addEventListener("dragover", handleDragOver);
+  window.addEventListener("drop", handleDrop);
+
+  let unwatch: (() => void) | null = null;
+  unwatch = watch(() => useAuthStore().checked, (isChecked) => {
     if (isChecked) {
-      unwatch();
+      if (unwatch) {
+        unwatch();
+      } else {
+        Promise.resolve().then(() => unwatch?.());
+      }
       try {
         const rawState = localStorage.getItem("vkmp:update_restore_state");
         if (rawState) {
@@ -151,6 +207,9 @@ onMounted(() => {
 
 onUnmounted(() => {
   detachMediaKey?.();
+  detachOpenFile?.();
+  window.removeEventListener("dragover", handleDragOver);
+  window.removeEventListener("drop", handleDrop);
   window.removeEventListener("click", closeTrackContextMenu);
   window.removeEventListener("contextmenu", closeTrackContextMenu);
 });
@@ -188,9 +247,7 @@ watch(
       <main class="app-grid__main">
         <router-view v-slot="{ Component }">
           <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
-            <keep-alive>
-              <component :is="Component" />
-            </keep-alive>
+            <component :is="Component" :key="$route.path" />
           </transition>
         </router-view>
       </main>
@@ -215,6 +272,8 @@ watch(
     <AddToPlaylistModal />
 
     <ShareModal />
+
+    <DownloadManagerWidget />
   </div>
 </template>
 

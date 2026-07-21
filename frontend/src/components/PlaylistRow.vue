@@ -10,6 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   play: [playlist: AlbumSummary];
   delete: [playlist: AlbumSummary];
+  download: [playlist: AlbumSummary];
 }>();
 
 const coverImage = computed(() => props.playlist.cover || null);
@@ -54,6 +55,13 @@ const subtitleText = computed(() => {
     </div>
 
     <div class="playlist-row__actions">
+      <button
+        class="playlist-row__action playlist-row__action--download"
+        title="Скачать все треки плейлиста"
+        @click.stop="emit('download', playlist)"
+      >
+        <SvgIcon name="download" width="16" height="16" />
+      </button>
       <button
         class="playlist-row__action"
         title="Удалить из моей музыки"
@@ -184,5 +192,9 @@ const subtitleText = computed(() => {
   background: var(--bg-3);
   color: var(--danger, #ff4d4f);
   transform: scale(var(--motion-scale-hover));
+}
+
+.playlist-row__action--download:hover {
+  color: var(--accent-1);
 }
 </style>

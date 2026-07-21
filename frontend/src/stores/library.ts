@@ -279,7 +279,7 @@ export const useLibraryStore = defineStore("library", () => {
     myPlaylistsError.value = null;
     try {
       const auth = useAuthStore();
-      if (!auth.status.user_id) return [];
+      if (!auth.status?.user_id) return [];
       const list = await api.albums(auth.status.user_id);
       myPlaylists.value = list.items;
       return list.items;
@@ -381,9 +381,29 @@ export const useLibraryStore = defineStore("library", () => {
     myPlaylistsLoading.value = false;
     myPlaylistsError.value = null;
     activePlaylist.value = null;
-    currentPlaylistTracks.value = [];
     friends.value = null;
     homeSections.value = null;
+    localTracks.value = [];
+  }
+
+  const localTracks = ref<Track[]>([]);
+
+  const localTracksMap = computed(() => {
+    const map = new Map<string, Track>();
+    for (const t of localTracks.value) {
+      const key = `${t.artist.toLowerCase()} - ${t.title.toLowerCase()}`;
+      map.set(key, t);
+    }
+    return map;
+  });
+
+  async function loadLocalTracks() {
+    try {
+      const tracks = await api.getLocalTracks();
+      localTracks.value = tracks;
+    } catch (err) {
+      console.error("Failed to load local tracks:", err);
+    }
   }
 
   return {
@@ -423,5 +443,8 @@ export const useLibraryStore = defineStore("library", () => {
     addTracksToPlaylist,
     removeTrackFromPlaylist,
     reset,
+    localTracks,
+    localTracksMap,
+    loadLocalTracks,
   };
 });

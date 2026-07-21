@@ -8,6 +8,7 @@ import {
   globalShortcut,
   shell,
   session,
+  dialog,
 } from "electron";
 import { autoUpdater } from "electron-updater";
 import { spawn, type ChildProcessByStdio } from "node:child_process";
@@ -30,6 +31,7 @@ app.commandLine.appendSwitch("disable-renderer-backgrounding");
 app.commandLine.appendSwitch("disable-background-timer-throttling");
 app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 app.commandLine.appendSwitch("disable-blink-features", "AutomationControlled");
+app.commandLine.appendSwitch("log-level", "3"); // Suppress native Chromium errors like ffmpeg_common
 
 let mainWindow: BrowserWindow | null = null;
 let silentAuthWin: BrowserWindow | null = null;
@@ -520,6 +522,36 @@ function registerMediaKeys() {
   });
 }
 
+import * as fs from "node:fs";
+
+let pendingOpenPaths: string[] = [];
+
+function getPathsFromArgv(argv: string[]): string[] {
+  const paths: string[] = [];
+  let startIndex = 1;
+  if (process.defaultApp || /node_modules[\\/]electron[\\/]dist/.test(process.execPath)) {
+    startIndex = 2;
+  }
+  for (let i = startIndex; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg.startsWith("-")) continue;
+    try {
+      if (fs.existsSync(arg)) {
+        paths.push(path.resolve(arg));
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return paths;
+}
+
+// Parse initial arguments
+const initialPaths = getPathsFromArgv(process.argv);
+if (initialPaths.length > 0) {
+  pendingOpenPaths = [...initialPaths];
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
@@ -537,8 +569,21 @@ app.on("second-instance", (event, commandLine) => {
     if (mainWindow.isMinimized()) mainWindow.restore();
     if (!mainWindow.isVisible()) mainWindow.show();
     mainWindow.focus();
+    
+    // Parse new paths and send to renderer immediately
+    const newPaths = getPathsFromArgv(commandLine);
+    if (newPaths.length > 0) {
+      mainWindow.webContents.send("open-files", newPaths);
+    }
+  } else {
+    const newPaths = getPathsFromArgv(commandLine);
+    if (newPaths.length > 0) {
+      pendingOpenPaths = [...pendingOpenPaths, ...newPaths];
+    }
   }
 });
+
+app.commandLine.appendSwitch("ignore-certificate-errors");
 
 app.whenReady().then(() => {
   startBackend().catch((err) => {
@@ -675,6 +720,32 @@ ipcMain.handle("backend:wait", async () => {
   }
 });
 ipcMain.handle("app:version", () => app.getVersion());
+
+ipcMain.handle("dialog:select-folder", async () => {
+  if (!mainWindow) return null;
+  let defaultDir = path.join(os.homedir(), ".vk-music-player", "downloads");
+  if (!fs.existsSync(defaultDir)) {
+    try {
+      fs.mkdirSync(defaultDir, { recursive: true });
+    } catch {
+      defaultDir = app.getPath("downloads");
+    }
+  }
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ["openDirectory"],
+    defaultPath: defaultDir,
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return null;
+  }
+  return result.filePaths[0];
+});
+
+ipcMain.handle("get-pending-open-files", () => {
+  const paths = [...pendingOpenPaths];
+  pendingOpenPaths = [];
+  return paths;
+});
 
 ipcMain.on("window:minimize", () => mainWindow?.minimize());
 ipcMain.on("window:maximize", () => {

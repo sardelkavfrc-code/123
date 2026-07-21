@@ -5,7 +5,15 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..deps import SessionDep, VKDep
-from ..models.audio import AlbumList, AlbumSummary, Artist, CatalogSearchResult, Track, TrackList, HomeSection
+from ..models.audio import (
+    AlbumList,
+    AlbumSummary,
+    Artist,
+    CatalogSearchResult,
+    HomeSection,
+    Track,
+    TrackList,
+)
 from ..services.audio import (
     parse_albums,
     parse_artist,
@@ -1022,6 +1030,7 @@ async def add_track_to_playlist(
 
 from pydantic import BaseModel
 
+
 class AddTracksRequest(BaseModel):
     playlist_id: int
     playlist_owner_id: int
@@ -1483,8 +1492,8 @@ async def track_event(
     duration: int = Query(0, description="Сколько секунд прослушано (для stop/pause/play)"),
 ) -> dict[str, bool]:
     """Регистрирует события проигрывания трека в статистике ВК для рекомендаций."""
-    import time
     import json
+    import time
     
     current_time = int(time.time())
     vk_event_type = f"audio_{event_type}" if event_type in ["start", "stop", "pause", "play"] else "audio_play"

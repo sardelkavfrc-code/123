@@ -12,10 +12,14 @@ const props = defineProps<{
   emptyTitle?: string;
   emptySubtitle?: string;
   manualPlay?: boolean;
+  isSelectMode?: boolean;
+  selectedTracks?: Set<string>;
 }>();
 
 const emit = defineEmits<{
   (e: "play", track: Track, index: number): void;
+  (e: "toggle-select", track: Track): void;
+  (e: "context-menu-selected", event: MouseEvent): void;
 }>();
 
 const player = usePlayerStore();
@@ -162,23 +166,21 @@ watch(() => props.tracks, () => {
 
 <template>
   <div v-if="tracks.length" ref="containerRef" class="track-list" :style="{ height: `${totalHeight}px` }">
-    <div
+    <TrackRow
       v-for="item in visibleItems"
       :key="item.key"
-      class="track-list__item"
-      :style="{
-        transform: `translateY(${item.offsetTop}px)`,
-        height: `${rowHeight}px`
-      }"
-    >
-      <TrackRow
-        :track="item.track"
-        :index="item.index"
-        :show-index="showIndex"
-        :variant="variant"
-        @play="playAll(Math.max(0, indexInPlayable(item.track)))"
-      />
-    </div>
+      :track="item.track"
+      :index="item.index"
+      :show-index="showIndex"
+      :variant="variant"
+      :is-select-mode="isSelectMode"
+      :is-selected="selectedTracks?.has(`${item.track.owner_id}_${item.track.id}`)"
+      class="track-list__row"
+      :style="{ position: 'absolute', top: 0, left: 0, right: 0, height: `${rowHeight}px`, transform: `translateY(${item.offsetTop}px)` }"
+      @play="() => playAll(indexInPlayable(item.track))"
+      @toggle-select="emit('toggle-select', item.track)"
+      @context-menu-selected="emit('context-menu-selected', $event)"
+    />
   </div>
   <EmptyState
     v-else

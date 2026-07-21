@@ -64,8 +64,10 @@ async def get_user(user_id: int, vk: VKDep, session: SessionDep) -> User:
     return user
 
 
-from pydantic import BaseModel
 import random
+
+from pydantic import BaseModel
+
 
 class ShareRequest(BaseModel):
     peer_id: int

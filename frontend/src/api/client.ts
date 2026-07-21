@@ -557,5 +557,37 @@ export const api = {
     });
     return data;
   },
+  async getLocalTracks(): Promise<Track[]> {
+    const { data } = await http.get<Track[]>("/local/tracks");
+    return data;
+  },
+  async scanLocalTracks(folders: string[], ignoredPaths: string[] = []): Promise<any> {
+    const { data } = await http.post("/local/scan", { folders, ignored_paths: ignoredPaths });
+    return data;
+  },
+  async getLocalScanStatus(): Promise<{ is_scanning: boolean; status: string; count: number; error: string | null }> {
+    const { data } = await http.get<any>("/local/scan/status");
+    return data;
+  },
+  async parseLocalPaths(paths: string[]): Promise<Track[]> {
+    const { data } = await http.post<Track[]>("/local/parse_paths", { paths });
+    return data;
+  },
+  async downloadTracks(tracks: any[], targetDir?: string): Promise<any> {
+    const { data } = await http.post("/local/download", { tracks, target_dir: targetDir });
+    return data;
+  },
+  async deleteLocalTrack(id: number, deleteFile: boolean = false): Promise<any> {
+    const { data } = await http.post("/local/track/delete", { id, delete_file: deleteFile });
+    return data;
+  },
+  async getLocalDownloadQueue(): Promise<any[]> {
+    const { data } = await http.get<any[]>("/local/download/queue");
+    return data;
+  },
+  async cancelLocalDownload(id: number, ownerId: number): Promise<any> {
+    const { data } = await http.post("/local/download/cancel", { id, owner_id: ownerId });
+    return data;
+  },
 };
 
