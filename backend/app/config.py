@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     vk_client_secret: str = Field(default="hHbZxrka2uZ6jB1inYsH", alias="VK_CLIENT_SECRET")
     vk_api_version: str = Field(default="5.274", alias="VK_API_VERSION")
     vk_user_agent: str = Field(
-        default="VKAndroidApp/8.183-54468 (Android 11; SDK 30; armeabi-v7a; Realme RMX3263; ru; 320x720)",
+        default="VKAndroidApp/8.183-54468 (Android 11; SDK 30; armeabi-v7a; VK Music Player; ru; 320x720)",
         alias="VK_USER_AGENT",
     )
 
