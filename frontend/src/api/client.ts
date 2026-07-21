@@ -395,6 +395,12 @@ export const api = {
     });
     return data;
   },
+  async restoreTrack(audio_id: number, owner_id: number): Promise<{ ok: boolean }> {
+    const { data } = await http.post<{ ok: boolean }>("/audio/restore", null, {
+      params: { audio_id, owner_id },
+    });
+    return data;
+  },
   async dislikeTrack(audio_id: number, owner_id: number): Promise<{ ok: boolean }> {
     const { data } = await http.post<{ ok: boolean }>("/audio/dislike", null, {
       params: { audio_id, owner_id },

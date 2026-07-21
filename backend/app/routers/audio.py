@@ -869,6 +869,23 @@ async def delete(
     return {"ok": bool(result)}
 
 
+@router.post("/restore")
+async def restore(
+    audio_id: int,
+    owner_id: int,
+    vk: VKDep,
+    session: SessionDep,
+) -> dict[str, bool]:
+    result = await _safe_call(
+        vk,
+        "audio.restore",
+        session.access_token,
+        audio_id=audio_id,
+        owner_id=owner_id,
+    )
+    return {"ok": bool(result)}
+
+
 @router.post("/playlist/follow")
 async def follow_playlist(
     playlist_id: int,

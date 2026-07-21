@@ -4,6 +4,7 @@ import { api, APIError } from "@/api/client";
 import type { FriendList, Track, TrackList, HomeSection, AlbumSummary } from "@/api/types";
 import { useSettingsStore } from "./settings";
 import { useAuthStore } from "./auth";
+import { useUIStore } from "./ui";
 
 /** VK rejects audio.get requests with count > 200 — keep page size below that. */
 const PAGE_SIZE = 100;
@@ -209,14 +210,62 @@ export const useLibraryStore = defineStore("library", () => {
     const targetId = added ? added.id : track.id;
     const targetOwnerId = added ? added.owner_id : track.owner_id;
 
+    // Remember positions to undo cleanly
+    const myMusicIndex = myMusic.value.findIndex((t) => t.id === targetId && t.owner_id === targetOwnerId);
+    const myMusicAllIndex = myMusicAll.value.findIndex((t) => t.id === targetId && t.owner_id === targetOwnerId);
+
+    // Call API to remove
     await api.removeTrack(targetId, targetOwnerId);
+    
+    // Local remove
+    const removedTrack = myMusic.value[myMusicIndex] || track;
     myMusic.value = myMusic.value.filter((t) => !(t.id === targetId && t.owner_id === targetOwnerId));
     if (myMusicAll.value.length > 0) {
       myMusicAll.value = myMusicAll.value.filter((t) => !(t.id === targetId && t.owner_id === targetOwnerId));
     }
+    
+    // Backup references for added originale maps
+    const wasAddedOriginal = addedOriginals.value.has(key);
+    const backupAddedTrack = addedTracksMap.value.get(key);
+    
     addedOriginals.value.delete(key);
     addedTracksMap.value.delete(key);
     refreshMyMusicIndex(myMusic.value);
+
+    // Trigger toast notification with Undo action (5 seconds)
+    const ui = useUIStore();
+    ui.notify(
+      "Удалено из библиотеки", 
+      "success", 
+      5000, 
+      "Отменить", 
+      async () => {
+        try {
+          await api.restoreTrack(targetId, targetOwnerId);
+          // Restore local state
+          if (myMusicIndex >= 0) {
+            myMusic.value.splice(myMusicIndex, 0, removedTrack);
+          } else {
+            myMusic.value.unshift(removedTrack);
+          }
+          if (myMusicAllIndex >= 0 && myMusicAll.value.length > 0) {
+            myMusicAll.value.splice(myMusicAllIndex, 0, removedTrack);
+          } else if (myMusicAll.value.length > 0) {
+            myMusicAll.value.unshift(removedTrack);
+          }
+          if (wasAddedOriginal) {
+            addedOriginals.value.add(key);
+          }
+          if (backupAddedTrack) {
+            addedTracksMap.value.set(key, backupAddedTrack);
+          }
+          refreshMyMusicIndex(myMusic.value);
+          ui.notify("Восстановлено в библиотеку", "success");
+        } catch (e: any) {
+          ui.notify(e.message || "Не удалось восстановить", "error");
+        }
+      }
+    );
   }
 
   function isInLibrary(track: Track): boolean {

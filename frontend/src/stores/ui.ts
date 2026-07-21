@@ -6,6 +6,9 @@ interface Toast {
   id: number;
   kind: "info" | "success" | "error";
   message: string;
+  actionLabel?: string;
+  action?: () => void;
+  duration?: number;
 }
 
 export const useUIStore = defineStore("ui", () => {
@@ -89,12 +92,18 @@ export const useUIStore = defineStore("ui", () => {
     }
   }
 
-  function notify(message: string, kind: Toast["kind"] = "info") {
+  function notify(
+    message: string, 
+    kind: Toast["kind"] = "info", 
+    duration = 3200,
+    actionLabel?: string,
+    action?: () => void
+  ) {
     const id = nextId++;
-    toasts.value.push({ id, message, kind });
+    toasts.value.push({ id, message, kind, actionLabel, action, duration });
     window.setTimeout(() => {
       toasts.value = toasts.value.filter((t) => t.id !== id);
-    }, 3200);
+    }, duration);
   }
 
   function dismiss(id: number) {

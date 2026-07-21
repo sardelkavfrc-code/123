@@ -47,7 +47,6 @@ async function toggleLibrary() {
   try {
     if (inLibrary.value) {
       await library.removeFromLibrary(current.value);
-      ui.notify("Удалено из библиотеки", "success");
     } else {
       await library.addToLibrary(current.value);
       ui.notify("Добавлено в библиотеку", "success");

@@ -133,7 +133,6 @@ async function toggleLibrary() {
   try {
     if (inLibrary.value) {
       await library.removeFromLibrary(props.track);
-      ui.notify("Удалено из библиотеки", "success");
     } else {
       await library.addToLibrary(props.track);
       ui.notify("Добавлено в библиотеку", "success");
