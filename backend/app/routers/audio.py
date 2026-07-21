@@ -877,6 +877,11 @@ async def follow_playlist(
     session: SessionDep,
     access_key: str | None = None,
 ) -> dict[str, bool]:
+    if playlist_id < 0:
+        # Algorithmic mix or dynamic recommendation playlist cannot be followed via VK API.
+        # Return success to allow frontend to toggle followed state without throwing 502.
+        return {"ok": True}
+        
     kwargs = {
         "playlist_id": playlist_id,
         "owner_id": owner_id,
@@ -899,6 +904,10 @@ async def delete_playlist(
     vk: VKDep,
     session: SessionDep,
 ) -> dict[str, bool]:
+    if playlist_id < 0:
+        # Algorithmic mix or dynamic recommendation playlist cannot be deleted via VK API.
+        return {"ok": True}
+        
     result = await _safe_call(
         vk,
         "audio.deletePlaylist",
