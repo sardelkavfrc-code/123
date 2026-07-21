@@ -878,9 +878,21 @@ async def follow_playlist(
     access_key: str | None = None,
 ) -> dict[str, bool]:
     if playlist_id < 0:
-        # Algorithmic mix or dynamic recommendation playlist cannot be followed via VK API.
-        # Return success to allow frontend to toggle followed state without throwing 502.
-        return {"ok": True}
+        # Algorithmic mix or dynamic recommendation playlist (like -21 "Плейлист дня").
+        # Save it as a copy on VK using audio.savePlaylistAsCopy.
+        kwargs = {
+            "playlist_id": playlist_id,
+            "owner_id": owner_id,
+        }
+        if access_key:
+            kwargs["access_key"] = access_key
+        result = await _safe_call(
+            vk,
+            "audio.savePlaylistAsCopy",
+            session.access_token,
+            **kwargs
+        )
+        return {"ok": bool(result)}
         
     kwargs = {
         "playlist_id": playlist_id,
@@ -905,7 +917,32 @@ async def delete_playlist(
     session: SessionDep,
 ) -> dict[str, bool]:
     if playlist_id < 0:
-        # Algorithmic mix or dynamic recommendation playlist cannot be deleted via VK API.
+        # For negative playlist IDs, it was saved as a copy.
+        # Find the copied playlist in user's library and delete it.
+        try:
+            playlists = await _safe_call(
+                vk,
+                "audio.getPlaylists",
+                session.access_token,
+                owner_id=session.user_id,
+                count=100,
+            )
+            if isinstance(playlists, dict) and "items" in playlists:
+                items = playlists["items"]
+                for pl in items:
+                    orig = pl.get("original")
+                    if isinstance(orig, dict) and orig.get("playlist_id") == playlist_id:
+                        # Found the copy! Delete it.
+                        await _safe_call(
+                            vk,
+                            "audio.deletePlaylist",
+                            session.access_token,
+                            playlist_id=pl["id"],
+                            owner_id=session.user_id,
+                        )
+                        break
+        except Exception as e:
+            logger.error("Failed to delete copied playlist for negative ID %s: %s", playlist_id, e)
         return {"ok": True}
         
     result = await _safe_call(

@@ -320,19 +320,11 @@ async function openPlaylist(playlist: AlbumSummary) {
   library.currentPlaylistTracks = [];
   playlistTracksLoading.value = true;
   try {
-    if (Number(playlist.id) < 0 && playlist.tracks && playlist.tracks.length) {
-      library.currentPlaylistTracks = playlist.tracks;
-    } else {
-      const numericId = Number(playlist.id.split("_").pop() || playlist.id);
-      const res = await api.playlistTracks(playlist.owner_id || 0, numericId, { count: 200 });
-      library.currentPlaylistTracks = res.items || [];
-    }
+    const numericId = Number(playlist.id.split("_").pop() || playlist.id);
+    const res = await api.playlistTracks(playlist.owner_id || 0, numericId, { count: 200 });
+    library.currentPlaylistTracks = res.items || [];
   } catch (e) {
-    if (playlist.tracks && playlist.tracks.length) {
-      library.currentPlaylistTracks = playlist.tracks;
-    } else {
-      ui.notify("Не удалось загрузить треки плейлиста", "error");
-    }
+    ui.notify("Не удалось загрузить треки плейлиста", "error");
   } finally {
     playlistTracksLoading.value = false;
   }
