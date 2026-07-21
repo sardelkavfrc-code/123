@@ -116,9 +116,13 @@ export const useLibraryStore = defineStore("library", () => {
   const myMusicAll = ref<Track[]>([]);
   let activeLoadAllPromise: Promise<Track[]> | null = null;
 
-  async function loadAllMyMusic(): Promise<Track[]> {
-    if (myMusicAll.value.length > 0) return myMusicAll.value;
-    if (activeLoadAllPromise) return activeLoadAllPromise;
+  async function loadAllMyMusic(force = false): Promise<Track[]> {
+    if (myMusicAll.value.length > 0 && !force) return myMusicAll.value;
+    if (activeLoadAllPromise && !force) return activeLoadAllPromise;
+
+    if (force) {
+      myMusicAll.value = [];
+    }
 
     activeLoadAllPromise = (async () => {
       try {

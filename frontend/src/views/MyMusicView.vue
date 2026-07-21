@@ -349,6 +349,36 @@ function shareActivePlaylist() {
   ui.activeSharePlaylist = library.activePlaylist;
   ui.shareModalOpen = true;
 }
+
+const isRefreshing = ref(false);
+
+async function refreshAll() {
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  try {
+    if (activeTab.value === "library") {
+      await library.loadMyMusic(true);
+      await library.loadAllMyMusic(true);
+      ui.notify("Библиотека обновлена", "success");
+    } else if (activeTab.value === "recent") {
+      recentMusic.value = [];
+      await loadRecent();
+      ui.notify("Недавние треки обновлены", "success");
+    } else if (activeTab.value === "playlists") {
+      if (library.activePlaylist) {
+        await openPlaylist(library.activePlaylist);
+        ui.notify("Плейлист обновлен", "success");
+      } else {
+        await library.loadMyPlaylists(true);
+        ui.notify("Список плейлистов обновлен", "success");
+      }
+    }
+  } catch (err: any) {
+    ui.notify(err.message || "Не удалось обновить", "error");
+  } finally {
+    isRefreshing.value = false;
+  }
+}
 </script>
 
 <template>
@@ -381,6 +411,16 @@ function shareActivePlaylist() {
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
           </svg>
           Поиск
+        </button>
+        <button 
+          class="btn btn--ghost my-music__refresh-btn" 
+          :class="{ 'my-music__refresh-btn--spin': isRefreshing }"
+          :disabled="isRefreshing"
+          @click="refreshAll"
+          title="Обновить"
+          aria-label="Обновить"
+        >
+          <SvgIcon name="refresh" width="16" height="16" />
         </button>
         <button 
           v-if="unavailableTracks.length > 0"
@@ -950,5 +990,17 @@ function shareActivePlaylist() {
   margin-top: 8px;
   display: flex;
   gap: 12px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.my-music__refresh-btn--spin :deep(svg) {
+  animation: spin 1s linear infinite;
 }
 </style>
