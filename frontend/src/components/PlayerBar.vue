@@ -167,8 +167,12 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
       
       <TransitionGroup tag="div" name="track-anim" class="player__info-group">
         <div v-if="current" class="player__info-wrap" :key="current.owner_id + '_' + current.id">
-            <div class="player__title" :title="current.title">
-              {{ current.title }}
+            <div 
+              class="player__title" 
+              :class="{ 'player__title--has-subtitle': current.subtitle }"
+              :title="current.title + (current.subtitle ? ' (' + current.subtitle + ')' : '')"
+            >
+              <span class="player__title-main">{{ current.title }}</span>
               <span v-if="current.subtitle" class="player__subtitle">{{ current.subtitle }}</span>
             </div>
             <div class="player__artist-wrap" :title="current.artist">
@@ -450,6 +454,13 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
   text-overflow: ellipsis;
   white-space: normal;
   line-height: 1.3;
+  color: var(--text-0);
+}
+.player__title-main {
+  color: var(--text-0);
+}
+.player__title--has-subtitle {
+  color: #828282;
 }
 .player__subtitle {
   color: #828282;
