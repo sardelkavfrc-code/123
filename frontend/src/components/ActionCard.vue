@@ -39,7 +39,7 @@ const isPlaceholder = computed(() => {
 
 const background = computed(() => {
   if (isPlaceholder.value) {
-    return `url(/genre_placeholder.jpg)`;
+    return `url(genre_placeholder.jpg)`;
   }
   if (props.action.url) {
     return `url(${props.action.url})`;
