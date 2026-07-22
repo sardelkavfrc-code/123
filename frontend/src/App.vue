@@ -12,6 +12,7 @@ import TrackContextMenu from "@/components/TrackContextMenu.vue";
 import CaptchaModal from "@/components/CaptchaModal.vue";
 import AddToPlaylistModal from "@/components/AddToPlaylistModal.vue";
 import ShareModal from "@/components/ShareModal.vue";
+import ConfirmModal from "@/components/ConfirmModal.vue";
 import { usePlayerStore } from "@/stores/player";
 import { useSettingsStore } from "@/stores/settings";
 import { useUIStore } from "@/stores/ui";
@@ -272,6 +273,8 @@ watch(
     <AddToPlaylistModal />
 
     <ShareModal />
+
+    <ConfirmModal />
 
     <DownloadManagerWidget />
   </div>

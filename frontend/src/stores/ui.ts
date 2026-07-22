@@ -77,6 +77,46 @@ export const useUIStore = defineStore("ui", () => {
     captchaSid.value = null;
   }
 
+  // Confirm Modal State
+  const confirmModalOpen = ref(false);
+  const confirmModalTitle = ref("");
+  const confirmModalMessage = ref("");
+  const confirmModalConfirmText = ref("OK");
+  const confirmModalCancelText = ref("Отмена");
+  let confirmResolver: ((result: boolean) => void) | null = null;
+
+  function confirm(
+    title: string,
+    message: string,
+    confirmText = "OK",
+    cancelText = "Отмена"
+  ): Promise<boolean> {
+    confirmModalTitle.value = title;
+    confirmModalMessage.value = message;
+    confirmModalConfirmText.value = confirmText;
+    confirmModalCancelText.value = cancelText;
+    confirmModalOpen.value = true;
+    return new Promise((resolve) => {
+      confirmResolver = resolve;
+    });
+  }
+
+  function resolveConfirm() {
+    if (confirmResolver) {
+      confirmResolver(true);
+      confirmResolver = null;
+    }
+    confirmModalOpen.value = false;
+  }
+
+  function cancelConfirm() {
+    if (confirmResolver) {
+      confirmResolver(false);
+      confirmResolver = null;
+    }
+    confirmModalOpen.value = false;
+  }
+
   function showTrackContextMenu(event: MouseEvent, trackOrTracks: any | any[], menuType: 'full' | 'edit_only' = 'full') {
     activeContextMenuTrack.value = trackOrTracks;
     activeContextMenuType.value = menuType;
@@ -138,5 +178,15 @@ export const useUIStore = defineStore("ui", () => {
     requestCaptcha,
     resolveCaptcha,
     cancelCaptcha,
+    
+    // Confirm Modal State
+    confirmModalOpen,
+    confirmModalTitle,
+    confirmModalMessage,
+    confirmModalConfirmText,
+    confirmModalCancelText,
+    confirm,
+    resolveConfirm,
+    cancelConfirm,
   };
 });

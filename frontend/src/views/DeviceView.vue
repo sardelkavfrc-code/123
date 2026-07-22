@@ -137,7 +137,13 @@ function selectAll() {
 
 async function deleteSelected() {
   if (selectedTracks.value.size === 0) return;
-  if (!confirm(`Удалить выбранные треки (${selectedTracks.value.size} шт) из базы и с диска?`)) return;
+  const isConfirmed = await ui.confirm(
+    "Удаление треков",
+    `Удалить выбранные треки (${selectedTracks.value.size} шт) из базы и с диска?`,
+    "Удалить",
+    "Отмена"
+  );
+  if (!isConfirmed) return;
 
   const tracksToDelete = filteredTracks.value.filter(t => selectedTracks.value.has(`${t.owner_id}_${t.id}`));
   

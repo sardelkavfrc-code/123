@@ -360,7 +360,13 @@ async function handleReplace(oldTrack: Track, newTrack: Track) {
 }
 
 async function handleDeleteAll() {
-  if (confirm("Вы уверены, что хотите удалить ВСЕ недоступные треки из библиотеки?")) {
+  const isConfirmed = await ui.confirm(
+    "Удаление всех треков",
+    "Вы уверены, что хотите удалить ВСЕ недоступные треки из библиотеки?",
+    "Удалить",
+    "Отмена"
+  );
+  if (isConfirmed) {
     isDeletingAll.value = true;
     try {
       emit('deleteAll');

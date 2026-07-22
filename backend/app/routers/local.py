@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import threading
+import time
 from pathlib import Path
 from urllib.parse import urljoin
 
@@ -133,7 +134,7 @@ async def download_hls_track(m3u8_url: str, output_path: Path, progress_callback
 
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
     
-    async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
+    async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
         resp = await client.get(m3u8_url)
         resp.raise_for_status()
         lines = resp.text.splitlines()
@@ -442,10 +443,14 @@ class DownloadManager:
             for item in self.queue:
                 if item.track_id == track_id and item.owner_id == owner_id:
                     if item.status == "pending":
-                        item.status = "failed"
-                        item.error = "Отменено пользователем"
+                        self.queue.remove(item)
                     elif item.status == "downloading":
                         item.cancelled = True
+                    break
+                        
+    def cancel_all_pending(self):
+        with self.lock:
+            self.queue = [item for item in self.queue if item.status != "pending"]
                         
     def _run_loop(self):
         loop = asyncio.new_event_loop()
@@ -453,6 +458,9 @@ class DownloadManager:
         loop.run_until_complete(self._process_queue())
         
     async def _process_queue(self):
+        semaphore = asyncio.Semaphore(2)
+        pending_tasks = set()
+
         while True:
             item = None
             with self.lock:
@@ -460,21 +468,41 @@ class DownloadManager:
                     if q_item.status == "pending":
                         item = q_item
                         break
-                if not item:
-                    break
-                item.status = "downloading"
                 
-            try:
-                await self._download_item(item)
-                item.status = "completed"
-                item.progress = 100
-            except Exception as e:
+                if item:
+                    item.status = "downloading"
+
+            if not item:
+                if pending_tasks:
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    break
+                
+            await semaphore.acquire()
+            task = asyncio.create_task(self._download_task_wrapper(item, semaphore))
+            pending_tasks.add(task)
+            task.add_done_callback(pending_tasks.discard)
+            
+    async def _download_task_wrapper(self, item: DownloadItem, semaphore: asyncio.Semaphore):
+        try:
+            await self._download_item(item)
+            item.status = "completed"
+            item.progress = 100
+        except Exception as e:
+            if item.cancelled:
+                with self.lock:
+                    if item in self.queue:
+                        self.queue.remove(item)
+            else:
                 import traceback
                 error_trace = traceback.format_exc()
                 logger.error(f"Download failed for {item.title}: {e}\n{error_trace}")
                 print(f"[DOWNLOAD ERROR] {item.title}: {e}\n{error_trace}", flush=True)
                 item.status = "failed"
                 item.error = str(e)
+        finally:
+            semaphore.release()
                 
     async def _download_item(self, item: DownloadItem):
         # Refresh stream URL in case it has expired or is missing
@@ -527,7 +555,7 @@ class DownloadManager:
             covers_dir.mkdir(parents=True, exist_ok=True)
             cover_path = covers_dir / f"{local_track_id}.jpg"
             try:
-                async with httpx.AsyncClient(follow_redirects=True) as client:
+                async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
                     resp = await client.get(item.cover_url)
                     if resp.status_code == 200:
                         cover_bytes = resp.content
@@ -544,7 +572,7 @@ class DownloadManager:
         if is_hls:
             await download_hls_track(item.url, output_path, progress_cb)
         else:
-            async with httpx.AsyncClient(follow_redirects=True) as client:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
                 async with client.stream("GET", item.url) as response:
                     response.raise_for_status()
                     total_bytes = int(response.headers.get("content-length", 0))
@@ -779,4 +807,9 @@ async def get_download_queue():
 @router.post("/download/cancel")
 async def cancel_download_endpoint(payload: CancelDownloadPayload):
     download_manager.cancel_download(payload.id, payload.owner_id)
+    return {"status": "ok"}
+
+@router.post("/download/cancel_all")
+async def cancel_all_download_endpoint():
+    download_manager.cancel_all_pending()
     return {"status": "ok"}

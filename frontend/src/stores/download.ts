@@ -19,7 +19,9 @@ export const useDownloadStore = defineStore("download", () => {
   const queue = ref<DownloadItem[]>([]);
   const isExpanded = ref(false);
   const isPolling = ref(false);
+  const showWidget = ref(false);
   let pollInterval: number | null = null;
+  let hideTimeout: number | null = null;
 
   const activeCount = computed(() => {
     return queue.value.filter(item => item.status === "pending" || item.status === "downloading").length;
@@ -41,6 +43,22 @@ export const useDownloadStore = defineStore("download", () => {
       if (hasCompleted) {
         const library = useLibraryStore();
         void library.loadLocalTracks();
+      }
+
+      if (activeCount.value === 0 && queue.value.length > 0) {
+        if (!hideTimeout) {
+          hideTimeout = window.setTimeout(() => {
+            if (activeCount.value === 0) {
+              showWidget.value = false;
+              isExpanded.value = false;
+            }
+          }, 3000); // Hide after 3 seconds
+        }
+      } else {
+        if (hideTimeout) {
+          window.clearTimeout(hideTimeout);
+          hideTimeout = null;
+        }
       }
     } catch (err) {
       console.error("Failed to fetch download queue:", err);
@@ -82,6 +100,12 @@ export const useDownloadStore = defineStore("download", () => {
       }
     }
 
+    showWidget.value = true;
+    if (hideTimeout) {
+      window.clearTimeout(hideTimeout);
+      hideTimeout = null;
+    }
+
     try {
       await api.downloadTracks(tracks, settings.downloadPath || undefined);
       startPolling();
@@ -92,6 +116,8 @@ export const useDownloadStore = defineStore("download", () => {
 
   async function cancelDownload(trackId: number, ownerId: number) {
     try {
+      // Optimistically remove from UI
+      queue.value = queue.value.filter(t => !(t.id === trackId && t.owner_id === ownerId));
       await api.cancelLocalDownload(trackId, ownerId);
       void fetchQueue();
     } catch (err) {
@@ -99,15 +125,30 @@ export const useDownloadStore = defineStore("download", () => {
     }
   }
 
+  async function cancelAllDownloads() {
+    try {
+      // Optimistically remove pending items from UI
+      queue.value = queue.value.filter(t => t.status !== 'pending');
+      
+      await api.cancelAllLocalDownloads();
+      void fetchQueue();
+    } catch (err) {
+      console.error("Failed to cancel all downloads:", err);
+    }
+  }
+
   return {
     queue,
     isExpanded,
     isPolling,
+    showWidget,
     activeCount,
     totalCount,
+    fetchQueue,
     startPolling,
     stopPolling,
     downloadTracks,
     cancelDownload,
+    cancelAllDownloads
   };
 });

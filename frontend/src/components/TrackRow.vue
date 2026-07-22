@@ -55,7 +55,13 @@ async function removeFromPlaylist() {
 
 async function deleteLocalDisk() {
   if (props.track.owner_id !== -999999) return;
-  if (!confirm(`Удалить трек ${props.track.title} из базы и с диска?`)) return;
+  const isConfirmed = await ui.confirm(
+    "Удаление трека",
+    `Удалить трек ${props.track.title} из базы и с диска?`,
+    "Удалить",
+    "Отмена"
+  );
+  if (!isConfirmed) return;
   try {
     await api.deleteLocalTrack(props.track.id, true);
     player.removeTrack(props.track);
@@ -68,7 +74,13 @@ async function deleteLocalDisk() {
 
 async function deleteLocalDb() {
   if (props.track.owner_id !== -999999) return;
-  if (!confirm(`Скрыть трек ${props.track.title} из медиатеки (оставить файл на диске)?`)) return;
+  const isConfirmed = await ui.confirm(
+    "Скрыть трек",
+    `Скрыть трек ${props.track.title} из медиатеки (оставить файл на диске)?`,
+    "Скрыть",
+    "Отмена"
+  );
+  if (!isConfirmed) return;
   try {
     await api.deleteLocalTrack(props.track.id, false);
     

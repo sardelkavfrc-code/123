@@ -47,31 +47,56 @@ watch(
 </script>
 
 <template>
-  <div v-if="downloadStore.totalCount > 0" class="download-manager">
-    <!-- Floating Circular Action Button -->
-    <button
-      class="download-fab"
-      :class="{ 'download-fab--active': downloadStore.activeCount > 0 }"
-      @click="downloadStore.isExpanded = !downloadStore.isExpanded"
-      title="Загрузки"
-    >
-      <div v-if="downloadStore.activeCount > 0" class="download-fab__badge">
-        {{ downloadStore.activeCount }}
-      </div>
-      <SvgIcon name="download" width="22" height="22" />
-    </button>
+  <Transition name="slide-up">
+    <div v-if="downloadStore.showWidget && downloadStore.totalCount > 0" class="download-manager">
+    <!-- Invisible overlay to close on click outside -->
+    <div
+      v-if="downloadStore.isExpanded"
+      class="download-widget__overlay"
+      @click="downloadStore.isExpanded = false"
+    ></div>
 
-    <!-- Expanded Popup Card -->
-    <Transition name="fade-scale">
-      <div v-if="downloadStore.isExpanded" class="download-card">
+    <div
+      class="download-widget"
+      :class="{
+        'download-widget--expanded': downloadStore.isExpanded,
+        'download-widget--collapsed': !downloadStore.isExpanded,
+        'download-widget--active': downloadStore.activeCount > 0 && !downloadStore.isExpanded
+      }"
+      @click="!downloadStore.isExpanded && (downloadStore.isExpanded = true)"
+    >
+      <!-- Gradient pseudo-element for smooth transition -->
+      <div class="download-widget__bg" :class="{ 'is-active': downloadStore.activeCount > 0 && !downloadStore.isExpanded }"></div>
+
+      <!-- Collapsed FAB Content -->
+      <div class="download-widget__fab-content" :class="{ 'is-hidden': downloadStore.isExpanded }">
+        <SvgIcon name="download" width="22" height="22" />
+      </div>
+
+      <!-- Expanded Card Content -->
+      <div class="download-widget__card-content" :class="{ 'is-visible': downloadStore.isExpanded }">
         <div class="download-card__header">
-          <h3>Загрузки</h3>
-          <button
-            class="download-card__close-btn"
-            @click="downloadStore.isExpanded = false"
-          >
-            <SvgIcon name="cross" width="14" height="14" />
-          </button>
+          <div class="download-card__title">
+            <h3>Загрузки</h3>
+            <span v-if="downloadStore.activeCount > 0" class="download-card__badge">{{ downloadStore.activeCount }}</span>
+          </div>
+          
+          <div class="download-card__actions">
+            <button
+              v-if="downloadStore.activeCount > 0"
+              class="download-card__cancel-all"
+              @click.stop="downloadStore.cancelAllDownloads()"
+              title="Отменить всё"
+            >
+              Отменить всё
+            </button>
+            <button
+              class="download-card__close-btn"
+              @click.stop="downloadStore.isExpanded = false"
+            >
+              <SvgIcon name="cross" width="14" height="14" />
+            </button>
+          </div>
         </div>
 
         <div ref="containerRef" class="download-card__list">
@@ -91,11 +116,10 @@ watch(
             </div>
 
             <div class="download-item__status-wrap">
-              <!-- Cancel Button for pending or downloading -->
               <button
                 v-if="item.status === 'pending' || item.status === 'downloading'"
                 class="download-item__cancel-btn"
-                @click="downloadStore.cancelDownload(item.id, item.owner_id)"
+                @click.stop="downloadStore.cancelDownload(item.id, item.owner_id)"
                 title="Отменить"
               >
                 <SvgIcon name="cross" width="12" height="12" />
@@ -114,7 +138,6 @@ watch(
               </div>
             </div>
 
-            <!-- Progress bar -->
             <div
               v-if="item.status === 'downloading' || item.status === 'pending'"
               class="download-item__progress-bar"
@@ -127,8 +150,15 @@ watch(
           </div>
         </div>
       </div>
+    </div>
+    <!-- External badge to avoid clipping when overflow is hidden on widget -->
+    <Transition name="fade">
+      <div v-if="!downloadStore.isExpanded && downloadStore.activeCount > 0" class="download-fab__ext-badge">
+        {{ downloadStore.activeCount }}
+      </div>
     </Transition>
   </div>
+  </Transition>
 </template>
 
 <style scoped>
@@ -142,41 +172,103 @@ watch(
   align-items: flex-end;
 }
 
-.download-fab {
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background: var(--bg-elev);
-  border: 1px solid var(--border-strong);
-  color: var(--text-0);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  position: relative;
-  transition: transform var(--motion-duration-base) var(--motion-ease-out),
-              background var(--motion-duration-base) var(--motion-ease-out);
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: all 0.5s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.slide-up-enter-from,
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(20px);
 }
 
-.download-fab:hover {
-  transform: scale(1.08);
+.download-widget__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -1; /* Place behind the widget but cover everything else */
+  cursor: default;
+}
+
+.download-widget {
+  position: relative;
+  z-index: 1;
+  background: var(--bg-elev-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* Smoother transition instead of heavy spring bounce */
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+              height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1),
+              border-radius 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+.download-widget__bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.download-widget__bg.is-active {
+  opacity: 1;
+}
+
+/* Collapsed State (FAB) */
+.download-widget--collapsed {
+  width: 52px;
+  height: 52px;
+  border-radius: 26px;
+  cursor: pointer;
+}
+
+.download-widget--collapsed:hover {
   background: var(--bg-3);
 }
 
-.download-fab--active {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+.download-widget--active {
   border-color: transparent;
   color: var(--accent-text);
   animation: pulse-glow 2s infinite;
 }
 
-.download-fab--active:hover {
-  background: linear-gradient(135deg, var(--accent-1), var(--accent-3));
+.download-widget--active:hover {
   opacity: 0.95;
 }
 
-.download-fab__badge {
+/* Expanded State (Card) */
+.download-widget--expanded {
+  width: 340px;
+  height: 440px;
+  border-radius: var(--radius-lg, 16px);
+  cursor: default;
+}
+
+/* FAB Content (Icon & Badge) */
+.download-widget__fab-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  opacity: 1;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.download-widget__fab-content.is-hidden {
+  opacity: 0;
+  transform: scale(0.5);
+}
+
+.download-fab__ext-badge {
   position: absolute;
   top: -4px;
   right: -4px;
@@ -187,22 +279,26 @@ watch(
   padding: 2px 6px;
   border-radius: 10px;
   border: 2px solid var(--bg-0);
+  z-index: 10;
+  pointer-events: none;
 }
 
-.download-card {
-  width: 320px;
-  max-height: 400px;
-  background: var(--bg-elev-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5);
-  margin-bottom: 16px;
+/* Card Content (Header & List) */
+.download-widget__card-content {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  animation: slideUpFade 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+}
+
+.download-widget__card-content.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .download-card__header {
@@ -213,11 +309,48 @@ watch(
   justify-content: space-between;
 }
 
+.download-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .download-card__header h3 {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
   color: var(--text-0);
+}
+
+.download-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-card__cancel-all {
+  background: rgba(255, 94, 126, 0.1);
+  color: var(--danger);
+  border: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.download-card__cancel-all:hover {
+  background: rgba(255, 94, 126, 0.2);
+}
+
+.download-card__badge {
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 10px;
 }
 
 .download-card__close-btn {
@@ -330,18 +463,6 @@ watch(
   transition: width 0.3s ease;
 }
 
-.fade-scale-enter-active,
-.fade-scale-leave-active {
-  transition: opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
-              transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.fade-scale-enter-from,
-.fade-scale-leave-to {
-  opacity: 0;
-  transform: scale(0.95) translateY(10px);
-}
-
 @keyframes pulse-glow {
   0% {
     box-shadow: 0 8px 24px rgba(62, 172, 255, 0.4);
@@ -351,17 +472,6 @@ watch(
   }
   100% {
     box-shadow: 0 8px 24px rgba(62, 172, 255, 0.4);
-  }
-}
-
-@keyframes slideUpFade {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 </style>
