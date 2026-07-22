@@ -115,7 +115,7 @@ onUnmounted(() => {
     @mouseleave="handleMouseLeaveSidebar"
   >
     <div class="sidebar__logo-wrap">
-      <img src="logo.png" alt="VK Music" class="sidebar__logo" />
+      <img :src="'./logo.png'" alt="VK Music" class="sidebar__logo" />
       <div class="sidebar__logo-text-wrapper">
         <div class="sidebar__logo-text">VK&nbsp;Music</div>
       </div>

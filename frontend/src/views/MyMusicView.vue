@@ -534,7 +534,7 @@ async function refreshAll() {
           title="Показать недоступные треки"
           @click="showUnavailableModal = true"
         >
-          <img src="unavailable-icon.png" alt="error" />
+          <img :src="'./unavailable-icon.png'" alt="error" />
         </button>
         <div class="my-music__settings-wrapper" @mouseleave="showSettings = false">
           <button class="btn btn--ghost my-music__settings-btn" @click="showSettings = !showSettings" aria-label="Настройки">

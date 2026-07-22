@@ -1,6 +1,6 @@
 {
   "name": "vk-music-player",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "main": "dist-electron/main.js",
   "description": "Desktop ВКонтакте music player built with Vue 3, Electron and a Python FastAPI backend.",
