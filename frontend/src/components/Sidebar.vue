@@ -94,12 +94,7 @@ function triggerEdit() {
   ui.sidebarSettingsOpen = true;
 }
 
-function saveTab(name: string) {
-  if (name) {
-    const spawnTab = name === "device" ? "device" : "library";
-    localStorage.setItem("vkmp:active_tab", spawnTab);
-  }
-}
+
 
 onMounted(() => {
   window.addEventListener("click", closeContextMenu);
