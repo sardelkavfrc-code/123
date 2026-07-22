@@ -174,14 +174,6 @@ function toggleDislike() {
   }
 }
 
-function showAddToPlaylistModal() {
-  if (!track.value) return;
-  ui.trackContextMenuOpen = false;
-  ui.activePlaylistTrack = track.value;
-  ui.addToPlaylistModalOpen = true;
-  void library.loadMyPlaylists();
-}
-
 function shareTrack() {
   if (!track.value) return;
   ui.trackContextMenuOpen = false;
@@ -274,37 +266,42 @@ watch(
       </template>
 
       <template v-else-if="ui.activeContextMenuType === 'full'">
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="toggleLibrary">
-          <SvgIcon :name="inLibrary ? 'cross' : 'plus'" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          {{ inLibrary ? 'Удалить из библиотеки' : 'В библиотеку' }}
-        </button>
-        <button class="track-context-btn" @click="addToQueue">
-          <SvgIcon name="queue_add" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Слушать далее
-        </button>
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="downloadSingle">
-          <SvgIcon name="download" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Скачать
-        </button>
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="showAddToPlaylistModal">
-          <SvgIcon name="plus" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Добавить в плейлист...
-        </button>
+        <template v-for="item in settings.trackItems" :key="item.id">
+          <template v-if="item.visible">
+            <button v-if="item.id === 'library' && track.owner_id !== -999999" class="track-context-btn" @click="toggleLibrary">
+              <SvgIcon :name="inLibrary ? 'cross' : 'plus'" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              {{ inLibrary ? 'Удалить из библиотеки' : 'В библиотеку' }}
+            </button>
+            <button v-else-if="item.id === 'queue'" class="track-context-btn" @click="addToQueue">
+              <SvgIcon name="queue_add" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              Слушать далее
+            </button>
+            <button v-else-if="item.id === 'download' && track.owner_id !== -999999" class="track-context-btn" @click="downloadSingle">
+              <SvgIcon name="download" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              Скачать
+            </button>
+            <button v-else-if="item.id === 'share' && track.owner_id !== -999999" class="track-context-btn" @click="shareTrack">
+              <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              Поделиться...
+            </button>
+            <button v-else-if="item.id === 'similar' && track.owner_id !== -999999" class="track-context-btn" @click="openSimilar">
+              <SvgIcon name="similar" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              Похожие
+            </button>
+            <button v-else-if="item.id === 'uncensored' && track.owner_id !== -999999" class="track-context-btn" @click="uncensoredSearch">
+              <SvgIcon name="uncensored" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              Найти без цензуры
+            </button>
+            <button v-else-if="item.id === 'dislike' && track.owner_id !== -999999" class="track-context-btn" @click="toggleDislike">
+              <SvgIcon name="dislike" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+              {{ isDisliked ? 'Отменить дизлайк' : 'Не нравится' }}
+            </button>
+          </template>
+        </template>
+        
         <button v-if="canRemoveFromPlaylist && track.owner_id !== -999999" class="track-context-btn" @click="removeFromPlaylist">
           <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
           Удалить из плейлиста
-        </button>
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="shareTrack">
-          <SvgIcon name="share" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Поделиться...
-        </button>
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="openSimilar">
-          <SvgIcon name="similar" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Похожие
-        </button>
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="uncensoredSearch">
-          <SvgIcon name="uncensored" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          Найти без цензуры
         </button>
         <button v-if="track.owner_id === -999999" class="track-context-btn" @click="deleteLocalTrack(false)">
           <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
@@ -313,10 +310,6 @@ watch(
         <button v-if="track.owner_id === -999999" class="track-context-btn" @click="deleteLocalTrack(true)">
           <SvgIcon name="cross" width="16" height="16" style="margin-right: 12px; opacity: 0.7; color: var(--danger);" />
           Удалить с устройства
-        </button>
-        <button v-if="track.owner_id !== -999999" class="track-context-btn" @click="toggleDislike">
-          <SvgIcon name="dislike" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
-          {{ isDisliked ? 'Отменить дизлайк' : 'Не нравится' }}
         </button>
       </template>
 

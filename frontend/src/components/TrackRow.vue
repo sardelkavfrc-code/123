@@ -365,23 +365,26 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
           >
             <SvgIcon name="dislike" width="16" height="16" />
           </button>
+
+          <template v-else-if="item.id === 'download'">
+            <button
+              v-if="!isDownloaded && !isDownloading"
+              class="row__action row__action--download"
+              title="Скачать трек"
+              aria-label="Скачать"
+              @click.stop="downloadSingleTrack"
+            >
+              <SvgIcon name="download" width="16" height="16" />
+            </button>
+            <div v-else-if="isDownloading" class="row__download-spinner" title="Скачивается...">
+              <div class="spinner-mini"></div>
+            </div>
+          </template>
+        </template>
         </template>
       </template>
 
-      <!-- Single Track Download Button -->
-      <button
-        v-if="track.owner_id !== -999999 && !isDownloaded && !isDownloading"
-        class="row__action row__action--download"
-        title="Скачать трек"
-        aria-label="Скачать"
-        @click.stop="downloadSingleTrack"
-      >
-        <SvgIcon name="download" width="16" height="16" />
-      </button>
-        <div v-else-if="isDownloading" class="row__download-spinner" title="Скачивается...">
-          <div class="spinner-mini"></div>
-        </div>
-      </template>
+
       
       <button
         v-if="settings.trackContextMenuStyle === 'default'"
