@@ -39,36 +39,8 @@ export const useLibraryStore = defineStore("library", () => {
     () => myMusicTotal.value > 0 && myMusic.value.length < myMusicTotal.value
   );
 
-  watch(
-    [homeSections],
-    () => {
-      if (homeSections.value) {
-        localStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({
-            timestamp: Date.now(),
-            homeSections: homeSections.value,
-          })
-        );
-      }
-    },
-    { deep: true }
-  );
-
   function loadFromCache() {
-    try {
-      const stored = localStorage.getItem(CACHE_KEY);
-      if (!stored) return false;
-      const parsed = JSON.parse(stored);
-      if (Date.now() - parsed.timestamp > CACHE_TTL) {
-        localStorage.removeItem(CACHE_KEY);
-        return false;
-      }
-      if (parsed.homeSections) homeSections.value = parsed.homeSections;
-      return true;
-    } catch {
-      return false;
-    }
+    return false;
   }
 
   function refreshMyMusicIndex(items: Track[]) {

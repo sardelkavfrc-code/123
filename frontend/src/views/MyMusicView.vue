@@ -98,7 +98,15 @@ function toggleSelectAll() {
 
 function downloadSelected() {
   if (selectedTracksList.value.length === 0) return;
-  void downloadStore.downloadTracks(selectedTracksList.value);
+  const indexMap = new Map();
+  filtered.value.forEach((t, i) => indexMap.set(`${t.owner_id}_${t.id}`, i));
+  const sortedSelection = [...selectedTracksList.value].sort((a, b) => {
+    const idxA = indexMap.get(`${a.owner_id}_${a.id}`) ?? 999999;
+    const idxB = indexMap.get(`${b.owner_id}_${b.id}`) ?? 999999;
+    return idxA - idxB;
+  });
+  const withIndex = sortedSelection.map((t, idx) => ({ ...t, playlist_index: idx + 1 }));
+  void downloadStore.downloadTracks(withIndex);
   ui.notify(`Начато скачивание ${selectedTracksList.value.length} треков`, "success");
   exitSelectMode();
 }
@@ -116,7 +124,8 @@ async function downloadPlaylist(playlist: AlbumSummary) {
     const res = await api.playlistTracks(playlist.owner_id || 0, numericId, { count: 200 });
     const tracks = res.items || [];
     if (tracks.length > 0) {
-      void downloadStore.downloadTracks(tracks);
+      const withIndex = tracks.map((t, idx) => ({ ...t, playlist_index: idx + 1 }));
+      void downloadStore.downloadTracks(withIndex);
       ui.notify(`Начато скачивание плейлиста «${playlist.title}» (${tracks.length} треков)`, "success");
     } else {
       ui.notify("В плейлисте нет треков для скачивания", "error");
@@ -128,7 +137,8 @@ async function downloadPlaylist(playlist: AlbumSummary) {
 
 function downloadPlaylistTracks(tracks: Track[]) {
   if (tracks.length === 0) return;
-  void downloadStore.downloadTracks(tracks);
+  const withIndex = tracks.map((t, idx) => ({ ...t, playlist_index: idx + 1 }));
+  void downloadStore.downloadTracks(withIndex);
   ui.notify(`Начато скачивание плейлиста «${activePlaylist.value?.title}» (${tracks.length} треков)`, "success");
 }
 
@@ -173,6 +183,7 @@ const showUnavailableModal = ref(false);
 
 onMounted(async () => {
   await library.loadMyMusic();
+  // Скрытая фоновая загрузка всего списка для Shuffle и поиска
   void library.loadAllMyMusic();
   window.addEventListener("resize", updateIndicator);
   setTimeout(() => {
@@ -454,7 +465,6 @@ async function refreshAll() {
   try {
     if (activeTab.value === "library") {
       await library.loadMyMusic(true);
-      await library.loadAllMyMusic(true);
       ui.notify("Библиотека обновлена", "success");
     } else if (activeTab.value === "recent") {
       recentMusic.value = [];
@@ -1139,7 +1149,7 @@ async function refreshAll() {
 
 .selection-bar {
   position: fixed;
-  bottom: calc(var(--player-height) + 16px);
+  bottom: calc(var(--player-height, 80px) + 24px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--bg-elev);

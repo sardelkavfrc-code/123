@@ -97,6 +97,7 @@ router.beforeEach(async (to) => {
       if (savedTab && savedTab !== "home") {
         return { name: savedTab };
       }
+      return { name: "library" };
     }
   }
 

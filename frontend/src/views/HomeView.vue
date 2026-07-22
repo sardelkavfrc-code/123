@@ -131,7 +131,7 @@ const mixLoading = ref(false);
 
 onMounted(async () => {
   library.loadFromCache();
-  library.loadExplore(true);
+  library.loadExplore();
   ensureCacheBuffer().catch(console.error);
 });
 

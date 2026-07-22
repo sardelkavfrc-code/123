@@ -100,7 +100,11 @@ function handleContextMenu(e: MouseEvent) {
   if (props.isSelectMode && props.isSelected) {
     emit("context-menu-selected", e);
   } else {
-    ui.showTrackContextMenu(e, props.track, 'full');
+    if (settings.trackContextMenuStyle === 'dots') {
+      ui.showTrackContextMenu(e, props.track, 'edit_only');
+    } else {
+      ui.showTrackContextMenu(e, props.track, 'full');
+    }
   }
 }
 
@@ -327,7 +331,8 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
         <SvgIcon name="cross" width="16" height="16" style="color: var(--danger)" />
       </button>
 
-      <template v-for="item in trackItems" :key="item.id">
+      <template v-if="settings.trackContextMenuStyle === 'dots'">
+        <template v-for="item in trackItems" :key="item.id">
         <template v-if="track.owner_id !== -999999 || item.id === 'queue'">
           <button
             v-if="item.id === 'library'"
@@ -377,9 +382,22 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
       >
         <SvgIcon name="download" width="16" height="16" />
       </button>
-      <div v-else-if="isDownloading" class="row__download-spinner" title="Скачивается...">
-        <div class="spinner-mini"></div>
-      </div>
+        <div v-else-if="isDownloading" class="row__download-spinner" title="Скачивается...">
+          <div class="spinner-mini"></div>
+        </div>
+      </template>
+      
+      <button
+        v-if="settings.trackContextMenuStyle === 'default'"
+        class="row__action"
+        title="Ещё"
+        aria-label="Меню"
+        @click.stop="ui.showTrackContextMenu($event, track, 'full')"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+        </svg>
+      </button>
     </div>
 
     <div class="row__duration">{{ formatDuration(track.duration) }}</div>

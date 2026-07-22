@@ -25,7 +25,7 @@ interface PlaybackBackend {
 
 interface BackendCallbacks {
   onLoad: (duration: number) => void;
-  onLoadError: () => void;
+  onLoadError: (errCode?: number) => void;
   onPlay: () => void;
   onPause: () => void;
   onEnd: () => void;
@@ -66,7 +66,7 @@ function createHtml5Backend(
     cb.onPause();
   });
   audio.addEventListener("ended", () => cb.onEnd());
-  audio.addEventListener("error", () => cb.onLoadError());
+  audio.addEventListener("error", () => cb.onLoadError(audio.error?.code));
 
   audio.src = url;
 
@@ -196,7 +196,7 @@ function createHlsBackend(
     cb.onPause();
   });
   audio.addEventListener("ended", () => cb.onEnd());
-  audio.addEventListener("error", () => cb.onLoadError());
+  audio.addEventListener("error", () => cb.onLoadError(audio.error?.code));
 
   // Safari handles HLS natively. For Chromium/Electron we need Hls.js → MSE.
   if (Hls.isSupported()) {
@@ -205,7 +205,7 @@ function createHlsBackend(
     hls.attachMedia(audio);
     hls.on(Hls.Events.ERROR, (_event, data) => {
       if (data.fatal) {
-        cb.onLoadError();
+        cb.onLoadError(data.type === Hls.ErrorTypes.NETWORK_ERROR ? 2 : undefined);
       }
     });
   } else if (audio.canPlayType("application/vnd.apple.mpegurl")) {
@@ -362,12 +362,13 @@ export const usePlayerStore = defineStore("player", () => {
 
   let prefetchAudio: HTMLAudioElement | null = null;
   let prefetchHls: Hls | null = null;
-  let prefetchTimeout: number | null = null;
+  let prefetchTimeout: number | undefined;
+  let scrobbleTimeout: number | undefined;
+  let scrobbledTrackId: number | null = null;
 
   function destroyPrefetch() {
     if (prefetchTimeout) {
       window.clearTimeout(prefetchTimeout);
-      prefetchTimeout = null;
     }
     if (prefetchAudio) {
       prefetchAudio.pause();
@@ -381,7 +382,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function prefetchNextTrack() {
+  async function prefetchNextTrack() {
     destroyPrefetch();
 
     if (!settings.prefetchEnabled) return;
@@ -390,7 +391,18 @@ export const usePlayerStore = defineStore("player", () => {
     if (nextIdx < 0 || nextIdx >= queue.value.length) return;
 
     const nextTrack = queue.value[nextIdx];
-    if (!nextTrack || !nextTrack.url) return;
+    if (!nextTrack) return;
+    
+    if (!nextTrack.url) {
+      try {
+        const freshTrack = await api.refreshUrl(nextTrack.owner_id, nextTrack.id, nextTrack.access_key);
+        nextTrack.url = freshTrack.url;
+      } catch (e) {
+        return;
+      }
+    }
+
+    if (!nextTrack.url) return;
 
     if (nextTrack.cover_large) {
       const img = new Image();
@@ -512,6 +524,10 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function destroyBackend() {
+    if (scrobbleTimeout) {
+      window.clearTimeout(scrobbleTimeout);
+      scrobbleTimeout = undefined;
+    }
     stopTick();
     destroyPrefetch();
     if (backend) {
@@ -520,11 +536,32 @@ export const usePlayerStore = defineStore("player", () => {
     }
   }
 
-  function loadCurrent(autoPlay: boolean, fadeInMs?: number, startTime?: number) {
+  async function loadCurrent(autoPlay: boolean, fadeInMs?: number, startTime?: number) {
     destroyBackend();
     const track = current.value;
-    if (!track || !track.url) {
+    if (!track) {
       isPlaying.value = false;
+      return;
+    }
+
+    if (!track.url) {
+      loadingTrack.value = true;
+      try {
+        const freshTrack = await api.refreshUrl(track.owner_id, track.id, track.access_key);
+        track.url = freshTrack.url;
+      } catch (e) {
+        isPlaying.value = false;
+        loadingTrack.value = false;
+        import("@/stores/ui").then(({ useUIStore }) => {
+          useUIStore().notify("Трек недоступен в вашем регионе или удален", "error");
+        });
+        return;
+      }
+    }
+
+    if (!track.url) {
+      isPlaying.value = false;
+      loadingTrack.value = false;
       return;
     }
     loadingTrack.value = true;
@@ -539,8 +576,15 @@ export const usePlayerStore = defineStore("player", () => {
         loadingTrack.value = false;
         if (d > 0) duration.value = d;
       },
-      onLoadError: () => {
+      onLoadError: (errCode?: number) => {
         if (backend !== thisBackend) return;
+        if (errCode === 2) {
+            console.log("[Player] Network error, attempting to reconnect...");
+            const curTime = currentTime.value;
+            track.url = ""; // Force refresh
+            void loadCurrent(true, 0, curTime);
+            return;
+        }
         loadingTrack.value = false;
         isPlaying.value = false;
       },
@@ -550,10 +594,22 @@ export const usePlayerStore = defineStore("player", () => {
         startTick();
         if (prefetchTimeout) window.clearTimeout(prefetchTimeout);
         prefetchTimeout = window.setTimeout(() => {
-          prefetchNextTrack();
+          void prefetchNextTrack();
         }, 1000);
+
+        if (scrobbleTimeout) window.clearTimeout(scrobbleTimeout);
+        scrobbleTimeout = window.setTimeout(() => {
+          const t = current.value;
+          if (t && scrobbledTrackId !== t.id) {
+            scrobbledTrackId = t.id;
+            // Send full duration to register in "Recent"
+            const dur = Math.round(t.duration || duration.value || 0);
+            api.trackEvent("play", t.id, t.owner_id, playbackUuid || 0, dur).catch(() => {});
+          }
+        }, 5000);
       },
       onPause: () => {
+        if (scrobbleTimeout) window.clearTimeout(scrobbleTimeout);
         if (backend !== thisBackend) return;
         isPlaying.value = false;
       },
@@ -589,6 +645,13 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function handleEnd() {
+    const track = current.value;
+    if (track) {
+      const uuid = Math.floor(Math.random() * 1000000000);
+      // Send stop event with track duration to register it as fully listened (added to recent)
+      void api.trackEvent("stop", track.id, track.owner_id, uuid, track.duration).catch(console.error);
+    }
+
     if (repeat.value === "all") {
       loadCurrent(true);
       return;
@@ -617,18 +680,17 @@ export const usePlayerStore = defineStore("player", () => {
     playlist?: AlbumSummary
   ) {
     currentPlaylist.value = playlist || null;
-    const filtered = tracks.filter((t) => t.url);
-    originalQueue.value = [...filtered];
-    queue.value = shuffle.value ? shuffleArray(filtered, startIndex) : [...filtered];
-    index.value = shuffle.value ? 0 : Math.min(Math.max(0, startIndex), filtered.length - 1);
+    originalQueue.value = [...tracks];
+    queue.value = shuffle.value ? shuffleArray([...tracks], startIndex) : [...tracks];
+    index.value = shuffle.value ? 0 : Math.min(Math.max(0, startIndex), tracks.length - 1);
     nearEndCallback = onNearEnd || null;
-    loadCurrent(options.autoPlay ?? true, undefined, options.startTime);
+    void loadCurrent(options.autoPlay ?? true, undefined, options.startTime);
   }
 
   function playAtIndex(i: number) {
     if (i < 0 || i >= queue.value.length) return;
     index.value = i;
-    loadCurrent(true);
+    void loadCurrent(true);
   }
 
   function playTrack(track: Track) {
@@ -636,27 +698,24 @@ export const usePlayerStore = defineStore("player", () => {
   }
 
   function enqueueNext(track: Track) {
-    if (!track.url) return;
     queue.value.splice(index.value + 1, 0, track);
     originalQueue.value = [...queue.value];
   }
 
   function appendToQueue(track: Track) {
-    if (!track.url) return;
     queue.value.push(track);
     originalQueue.value = [...queue.value];
   }
 
   function appendTracksToQueue(tracks: Track[]) {
-    const valid = tracks.filter((t) => t.url);
-    if (valid.length === 0) return;
-    queue.value.push(...valid);
+    if (tracks.length === 0) return;
+    queue.value.push(...tracks);
     originalQueue.value = [...queue.value];
   }
 
   function togglePlay() {
     if (!backend) {
-      if (current.value) loadCurrent(true);
+      if (current.value) void loadCurrent(true);
       return;
     }
     if (isPlaying.value) {
@@ -679,7 +738,7 @@ export const usePlayerStore = defineStore("player", () => {
         backend.play();
       }
     } else if (!backend && current.value) {
-      loadCurrent(true);
+      void loadCurrent(true);
     }
   }
 
@@ -698,7 +757,7 @@ export const usePlayerStore = defineStore("player", () => {
   function next() {
     if (index.value + 1 < queue.value.length) {
       index.value += 1;
-      loadCurrent(true);
+      void loadCurrent(true);
     }
   }
 
@@ -709,7 +768,7 @@ export const usePlayerStore = defineStore("player", () => {
     }
     if (index.value > 0) {
       index.value -= 1;
-      loadCurrent(true);
+      void loadCurrent(true);
     }
   }
 
@@ -759,6 +818,7 @@ export const usePlayerStore = defineStore("player", () => {
     isPlaying.value = false;
     nearEndCallback = null;
     currentPlaylist.value = null;
+    scrobbledTrackId = null;
   }
 
   function removeFromQueue(target: number) {
@@ -775,7 +835,7 @@ export const usePlayerStore = defineStore("player", () => {
         return;
       }
       if (index.value >= queue.value.length) index.value = queue.value.length - 1;
-      loadCurrent(isPlaying.value);
+      void loadCurrent(isPlaying.value);
     }
   }
 
@@ -889,21 +949,19 @@ export const usePlayerStore = defineStore("player", () => {
       if (!track) return;
       if (track.owner_id === undefined || track.id === undefined || track.id === -1 || track.owner_id === -999999) return;
 
-      // 2. Трек включился с нуля (или переключили на новый)
+      // 2. Трек начался с нуля
       if (playing && playbackUuid === null) {
         playbackUuid = Math.floor(Math.random() * 2147483647);
         lastTrackId = track.id;
         maxListenedDuration = Math.floor(currentTime.value);
         api.trackEvent("start", track.id, track.owner_id, playbackUuid).catch(() => {});
       }
-
       // 3. Трек поставили на паузу
-      if (!playing && prevPlaying && playbackUuid !== null && track.id === prevTrack?.id) {
+      else if (!playing && prevPlaying && playbackUuid !== null && track.id === prevTrack?.id) {
         api.trackEvent("pause", track.id, track.owner_id, playbackUuid, maxListenedDuration).catch(() => {});
       }
-
       // 4. Трек сняли с паузы
-      if (playing && !prevPlaying && playbackUuid !== null && track.id === prevTrack?.id) {
+      else if (playing && !prevPlaying && playbackUuid !== null && track.id === prevTrack?.id) {
         api.trackEvent("play", track.id, track.owner_id, playbackUuid, maxListenedDuration).catch(() => {});
       }
     }

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { useUIStore } from "@/stores/ui";
 import { useLibraryStore } from "@/stores/library";
 import Spinner from "@/components/Spinner.vue";
 
-defineProps<{
+const props = defineProps<{
   show: boolean;
 }>();
 
@@ -18,6 +18,18 @@ const playlistDesc = ref("");
 const trackSearchQuery = ref("");
 const selectedTrackIds = ref(new Set<string>());
 const creating = ref(false);
+const loadingTracks = ref(false);
+
+watch(() => props.show, async (newVal) => {
+  if (newVal && library.myMusicAll.length === 0) {
+    loadingTracks.value = true;
+    try {
+      await library.loadAllMyMusic();
+    } finally {
+      loadingTracks.value = false;
+    }
+  }
+});
 
 const filteredTracks = computed(() => {
   const query = trackSearchQuery.value.trim().toLowerCase();
@@ -168,7 +180,11 @@ async function handleCreate() {
 
             <!-- TRACK LIST -->
             <div class="wizard-list-container">
-              <div v-if="!library.myMusicAll.length" class="wizard-list-status">
+              <div v-if="loadingTracks" class="wizard-list-status">
+                <Spinner :size="20" style="margin-right: 8px" />
+                Загрузка ваших треков...
+              </div>
+              <div v-else-if="!library.myMusicAll.length" class="wizard-list-status">
                 В вашей библиотеке нет треков
               </div>
               <div v-else-if="!filteredTracks.length" class="wizard-list-status">

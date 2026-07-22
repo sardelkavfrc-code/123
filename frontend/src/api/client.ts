@@ -589,5 +589,11 @@ export const api = {
     const { data } = await http.post("/local/download/cancel", { id, owner_id: ownerId });
     return data;
   },
+  async refreshUrl(owner_id: number, audio_id: number, access_key?: string): Promise<Track> {
+    const params: Record<string, any> = { owner_id, audio_id };
+    if (access_key) params.access_key = access_key;
+    const { data } = await http.get<Track>("/audio/refresh_url", { params });
+    return data;
+  },
 };
 

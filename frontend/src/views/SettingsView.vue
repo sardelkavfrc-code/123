@@ -61,6 +61,7 @@ const {
   homeCardsBrightnessTimeStart,
   homeCardsBrightnessTimeEnd,
   iconSet,
+  trackContextMenuStyle,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -789,6 +790,29 @@ function onAfterLeave(el: Element) {
                 @click="dragHandleStyle = 'grip'"
               >
                 Хват
+              </button>
+            </div>
+          </div>
+
+          <div class="settings__row" style="align-items: flex-start; margin-top: 16px;">
+            <div>
+              <div class="settings__row-title">Меню трека (ПКМ)</div>
+              <div class="settings__row-sub">Поведение правого клика в списке треков</div>
+            </div>
+            <div class="settings__segmented">
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': trackContextMenuStyle === 'default' }"
+                @click="trackContextMenuStyle = 'default'"
+              >
+                Обычное меню
+              </button>
+              <button 
+                class="settings__segmented-btn" 
+                :class="{ 'settings__segmented-btn--active': trackContextMenuStyle === 'dots' }"
+                @click="trackContextMenuStyle = 'dots'"
+              >
+                Настройка кнопок
               </button>
             </div>
           </div>

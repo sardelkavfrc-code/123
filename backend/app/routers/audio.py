@@ -109,41 +109,6 @@ def _get_playlist_cover(pl: dict) -> str | None:
     return None
 
 
-async def _fill_missing_urls(vk: VKDep, session: SessionDep, items: list[dict]):
-    missing = []
-    for item in items:
-        # If track has no URL, but is NOT explicitly restricted, we retry
-        if not item.get("url") and not item.get("content_restricted"):
-            missing.append(item)
-    
-    if not missing:
-        return
-
-    # Fetch in chunks of 100 in parallel
-    chunks = [missing[i:i+100] for i in range(0, len(missing), 100)]
-    tasks = []
-    for chunk in chunks:
-        ids = []
-        for t in chunk:
-            key = f"{t.get('owner_id')}_{t.get('id')}"
-            if t.get("access_key"):
-                key += f"_{t['access_key']}"
-            ids.append(key)
-        audios_param = ",".join(ids)
-        tasks.append(_safe_call(vk, "audio.getById", session.access_token, audios=audios_param))
-        
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    
-    for chunk, resp in zip(chunks, results, strict=False):
-        if isinstance(resp, Exception) or not resp:
-            continue
-        resp_map = {f"{t.get('owner_id')}_{t.get('id')}": t for t in resp}
-        for item in chunk:
-            key = f"{item.get('owner_id')}_{item.get('id')}"
-            if key in resp_map and resp_map[key].get("url"):
-                item["url"] = resp_map[key]["url"]
-
-
 @router.get("/my", response_model=TrackList)
 async def my_music(
     vk: VKDep,
@@ -154,8 +119,6 @@ async def my_music(
     response = await _safe_call(
         vk, "audio.get", session.access_token, owner_id=session.user_id, offset=offset, count=count
     )
-    if response and response.get("items"):
-        await _fill_missing_urls(vk, session, response["items"])
     return parse_track_list(response)
 
 
@@ -164,18 +127,22 @@ async def my_music_all(
     vk: VKDep,
     session: SessionDep,
 ) -> TrackList:
-    # First, run a quick call to get the total count
+    # First, run a quick call to get the total count and first 200 tracks
     try:
-        first_resp = await _safe_call(vk, "audio.getCount", session.access_token, owner_id=session.user_id)
-        total_count = int(first_resp) if first_resp is not None else 0
+        first_resp = await _safe_call(vk, "audio.get", session.access_token, owner_id=session.user_id, count=200, offset=0)
+        total_count = first_resp.get("count", 0) if first_resp else 0
+        first_items = first_resp.get("items", []) if first_resp else []
     except Exception:
         total_count = 0
+        first_items = []
 
     if total_count == 0:
         return parse_track_list({"count": 0, "items": []})
 
     chunk_size = 200
-    total_chunks = (total_count + chunk_size - 1) // chunk_size
+    # Calculate how many more chunks we need beyond the first 200 items
+    remaining = max(0, total_count - len(first_items))
+    total_chunks = (remaining + chunk_size - 1) // chunk_size
     
     # Run up to 6 concurrent execute tasks max
     num_partitions = min(6, total_chunks)
@@ -206,7 +173,7 @@ async def my_music_all(
         if chunk_offset >= total_chunks:
             break
         actual_chunks = min(chunks_per_partition, total_chunks - chunk_offset)
-        offset = chunk_offset * chunk_size
+        offset = len(first_items) + chunk_offset * chunk_size
         tasks.append(
             _safe_call(
                 vk,
@@ -222,14 +189,13 @@ async def my_music_all(
         
     results = await asyncio.gather(*tasks)
     
-    all_items = []
+    all_items = list(first_items)
     for res in results:
         if res:
             for chunk in res:
                 if chunk:
                     all_items.extend(chunk)
                     
-    await _fill_missing_urls(vk, session, all_items)
     return parse_track_list({"count": total_count, "items": all_items})
 
 
@@ -340,10 +306,6 @@ async def search_catalog(
         need_blocks=1,
     )
     
-    raw_audios = response.get("audios") or []
-    if isinstance(raw_audios, list) and raw_audios:
-        await _fill_missing_urls(vk, session, raw_audios)
-        
     return parse_catalog_search(response)
 
 
@@ -373,9 +335,7 @@ async def my_catalog(
         total = len(audios)
         paginated_audios = audios[offset:offset+count]
         
-        if paginated_audios:
-            await _fill_missing_urls(vk, session, paginated_audios)
-            
+        
         next_from = str(offset + count) if offset + count < total else None
         
         track_list = parse_track_list({"count": total, "items": paginated_audios})
@@ -427,9 +387,7 @@ async def catalog_block_items(
         if aid in audios_map:
             resolved_tracks.append(audios_map[aid])
             
-    if resolved_tracks:
-        await _fill_missing_urls(vk, session, resolved_tracks)
-        
+
     track_list = parse_track_list({"count": len(resolved_tracks), "items": resolved_tracks})
     track_list.next_from = next_from
     track_list.block_id = block_id
@@ -488,7 +446,6 @@ async def recommendations(
                     random.shuffle(recom_audios)
 
                 paginated = recom_audios[offset:offset+count]
-                await _fill_missing_urls(vk, session, paginated)
                 track_list = parse_track_list({"count": len(recom_audios), "items": paginated})
                 if offset + count < len(recom_audios):
                     track_list.next_from = str(offset + count)
@@ -531,7 +488,6 @@ async def mix(
     
     # audio.getStreamMixAudios returns array directly
     if isinstance(response, list):
-        await _fill_missing_urls(vk, session, response)
         return parse_track_list({"count": len(response), "items": response})
     
     return parse_track_list({"count": 0, "items": []})
@@ -651,7 +607,6 @@ async def explore(
                 if b_audios_ids:
                     items_a = [audio_map[aid] for aid in b_audios_ids if aid in audio_map]
                     if items_a:
-                        await _fill_missing_urls(vk, session, items_a)
                         parsed_a = parse_track_list({"count": len(items_a), "items": items_a}).items
                         b_audios_map = {f"{t.owner_id}_{t.id}": t for t in parsed_a}
                 
@@ -751,7 +706,6 @@ async def explore(
                         logging.getLogger(__name__).error(f"Failed to fetch more block items for explore block {b_id}: {e}")
                         
                 if items:
-                    await _fill_missing_urls(vk, session, items)
                     parsed_tracks = parse_track_list({"count": len(items), "items": items}).items
                     home_sections.append(HomeSection(
                         id=b_id,
@@ -1524,3 +1478,25 @@ async def track_event(
         
     return {"success": True}
 
+
+@router.get("/refresh_url", response_model=Track)
+async def refresh_url(
+    vk: VKDep,
+    session: SessionDep,
+    owner_id: int,
+    audio_id: int,
+    access_key: str | None = None,
+) -> Track:
+    key = f"{owner_id}_{audio_id}"
+    if access_key:
+        key += f"_{access_key}"
+        
+    response = await _safe_call(vk, "audio.getById", session.access_token, audios=key)
+    if not response or not isinstance(response, list) or len(response) == 0:
+        raise HTTPException(status_code=404, detail="Track not found")
+        
+    parsed = parse_track(response[0])
+    if not parsed:
+        raise HTTPException(status_code=500, detail="Failed to parse track")
+        
+    return parsed

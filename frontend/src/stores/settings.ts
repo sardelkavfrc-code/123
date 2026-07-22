@@ -155,6 +155,7 @@ interface PersistedSettings {
   iconSet: "line" | "flat" | "rounded";
   downloadPath?: string;
   ignoredPaths?: string[];
+  trackContextMenuStyle: "default" | "dots";
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -235,6 +236,7 @@ const defaults: PersistedSettings = {
   homeShowMoods: true,
   homeShowPlaylists: true,
   homeShowMixes: true,
+  trackContextMenuStyle: "default",
 };
 
 function load(): PersistedSettings {
@@ -352,6 +354,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const localFolders = ref<string[]>(initial.localFolders ?? []);
   const downloadPath = ref<string>(initial.downloadPath ?? "");
   const ignoredPaths = ref<string[]>(initial.ignoredPaths ?? []);
+  const trackContextMenuStyle = ref<"default" | "dots">(initial.trackContextMenuStyle ?? defaults.trackContextMenuStyle);
 
   const mixMood = ref(initial.mixMood ?? defaults.mixMood);
   const mixFamiliarity = ref(initial.mixFamiliarity ?? defaults.mixFamiliarity);
@@ -599,6 +602,7 @@ export const useSettingsStore = defineStore("settings", () => {
       homeShowMoods: homeShowMoods.value,
       homeShowPlaylists: homeShowPlaylists.value,
       homeShowMixes: homeShowMixes.value,
+      trackContextMenuStyle: trackContextMenuStyle.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -669,6 +673,7 @@ export const useSettingsStore = defineStore("settings", () => {
       homeShowMoods,
       homeShowPlaylists,
       homeShowMixes,
+      trackContextMenuStyle,
     ],
     () => {
       applyToDocument();
@@ -828,5 +833,6 @@ export const useSettingsStore = defineStore("settings", () => {
     localFolders,
     downloadPath,
     ignoredPaths,
+    trackContextMenuStyle,
   };
 });

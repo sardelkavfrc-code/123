@@ -150,7 +150,8 @@ function downloadMulti() {
   ui.trackContextMenuOpen = false;
   const downloadable = tracks.value.filter((t: any) => t.owner_id !== -999999);
   if (downloadable.length === 0) return;
-  void downloadStore.downloadTracks(downloadable);
+  const withIndex = downloadable.map((t: any, idx: number) => ({ ...t, playlist_index: idx + 1 }));
+  void downloadStore.downloadTracks(withIndex);
   ui.notify(`Начато скачивание ${downloadable.length} треков`, "success");
 }
 

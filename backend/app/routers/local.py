@@ -40,6 +40,7 @@ class DownloadTrackRequest(BaseModel):
     cover_medium: str | None = None
     cover_small: str | None = None
     cover_large: str | None = None
+    playlist_index: int | None = None
 
 class DownloadPayload(BaseModel):
     tracks: list[DownloadTrackRequest]
@@ -369,7 +370,7 @@ def scan_folders_task(folders: list[str], ignored_paths: list[str] = None):
 
 # --- Download Queue Manager ---
 class DownloadItem:
-    def __init__(self, track_id: int, owner_id: int, title: str, artist: str, album_title: str | None, duration: int, url: str, cover_url: str | None, target_dir: str | None = None):
+    def __init__(self, track_id: int, owner_id: int, title: str, artist: str, album_title: str | None, duration: int, url: str, cover_url: str | None, target_dir: str | None = None, added_at: float | None = None, playlist_index: int | None = None):
         self.track_id = track_id
         self.owner_id = owner_id
         self.title = title
@@ -379,6 +380,8 @@ class DownloadItem:
         self.url = url
         self.cover_url = cover_url
         self.target_dir = target_dir
+        self.added_at = added_at or time.time()
+        self.playlist_index = playlist_index
         self.status = "pending"
         self.progress = 0
         self.error = None
@@ -393,10 +396,13 @@ class DownloadManager:
     def add_tracks(self, tracks: list[DownloadTrackRequest], target_dir: str | None = None):
         with self.lock:
             self.queue = [item for item in self.queue if item.status in ("pending", "downloading")]
-            for t in tracks:
+            now = time.time()
+            for i, t in enumerate(tracks):
                 exists = any(item.track_id == t.id and item.owner_id == t.owner_id for item in self.queue)
                 if exists:
                     continue
+                # Decrement added_at so the first track has the highest added_at 
+                # (and appears at the top of the local tab when sorted DESC)
                 item = DownloadItem(
                     track_id=t.id,
                     owner_id=t.owner_id,
@@ -405,8 +411,10 @@ class DownloadManager:
                     album_title=t.album_title,
                     duration=t.duration,
                     url=t.url,
-                    cover_url=t.cover_medium or t.cover_small or t.cover_large,
-                    target_dir=target_dir
+                    cover_url=t.cover_large or t.cover_medium or t.cover_small,
+                    target_dir=target_dir,
+                    added_at=now - i,
+                    playlist_index=t.playlist_index
                 )
                 self.queue.append(item)
             
@@ -503,7 +511,10 @@ class DownloadManager:
             
         is_hls = ".m3u8" in item.url
         ext = ".mp3"
-        filename = f"{safe_artist} - {safe_title}{ext}"
+        if item.playlist_index is not None:
+            filename = f"{item.playlist_index:02d}. {safe_artist} - {safe_title}{ext}"
+        else:
+            filename = f"{safe_artist} - {safe_title}{ext}"
         output_path = downloads_dir / filename
         
         local_track_id = path_to_id(str(output_path.resolve()))
@@ -559,7 +570,8 @@ class DownloadManager:
             "artist": item.artist,
             "album": item.album_title,
             "duration": item.duration,
-            "has_cover": has_cover
+            "has_cover": has_cover,
+            "added_at": item.added_at
         }])
 
 download_manager = DownloadManager()
