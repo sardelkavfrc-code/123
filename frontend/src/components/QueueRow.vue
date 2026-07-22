@@ -10,6 +10,7 @@ import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
 import { useDownloadStore } from "@/stores/download";
 import SvgIcon from "./SvgIcon.vue";
+import HeartIcon from "./HeartIcon.vue";
 
 const props = defineProps<{
   track: Track;
@@ -180,19 +181,14 @@ function downloadSingleTrack() {
     </div>
     <div class="queue__actions">
       <template v-for="item in trackItems" :key="item.id">
-        <button
+        <HeartIcon
           v-if="item.id === 'library'"
           class="queue__action queue__action--lib"
-          :class="{ 'queue__action--in-lib': inLibrary }"
+          :active="inLibrary"
+          :aria-label="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
           :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
-          @click.stop="toggleLibrary"
-        >
-          <SvgIcon v-if="!inLibrary" name="plus" width="18" height="18" />
-          <template v-else>
-            <SvgIcon name="check" class="queue__lib-check" width="18" height="18" />
-            <SvgIcon name="cross" class="queue__lib-x" width="18" height="18" />
-          </template>
-        </button>
+          @action="toggleLibrary"
+        />
         <button v-else-if="item.id === 'uncensored'" class="queue__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensored">
           <SvgIcon name="uncensored" width="18" height="18" />
         </button>

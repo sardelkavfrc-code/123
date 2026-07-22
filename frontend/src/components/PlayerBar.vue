@@ -11,6 +11,7 @@ import { formatDuration } from "@/composables/useFormat";
 import { useExternalArt } from "@/composables/useExternalArt";
 import EqualizerModal from "./EqualizerModal.vue";
 import SvgIcon from "./SvgIcon.vue";
+import HeartIcon from "./HeartIcon.vue";
 
 const player = usePlayerStore();
 const library = useLibraryStore();
@@ -193,22 +194,18 @@ const volumePct = computed(() => Math.round(volumeSliderPos.value * 100));
         </div>
 
         <div class="player__lib-wrap" key="lib-btn">
-          <button
+          <HeartIcon
             v-if="current"
             :key="inLibrary ? 'in' : 'out'"
             class="player__icon-btn player__icon-btn--lib"
-            :class="{ 'player__icon-btn--active': inLibrary }"
+            width="22"
+            height="22"
+            :active="inLibrary"
             :disabled="current.owner_id === -999999"
             :aria-label="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
             :title="inLibrary ? 'Удалить из библиотеки' : 'Добавить в библиотеку'"
-            @click="toggleLibrary"
-          >
-            <SvgIcon v-if="!inLibrary" name="plus" width="22" height="22" />
-            <template v-else>
-              <SvgIcon name="check" class="player__lib-check" width="22" height="22" />
-              <SvgIcon name="cross" class="player__lib-remove" width="22" height="22" />
-            </template>
-          </button>
+            @action="toggleLibrary"
+          />
         </div>
       </TransitionGroup>
     </div>

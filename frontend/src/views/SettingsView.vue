@@ -672,7 +672,18 @@ function onAfterLeave(el: Element) {
                 <span>Цвет 2</span>
                 <input type="color" v-model="customAccentColor2" />
               </label>
+            
+          <div class="settings__row" style="align-items: flex-start; margin-top: 24px;">
+            <div>
+              <div class="settings__row-title">Иконка "Добавить в библиотеку"</div>
+              <div class="settings__row-sub">Выберите вид иконки добавления трека в библиотеку</div>
             </div>
+            <div class="settings__segmented">
+              
+              
+            </div>
+          </div>
+</div>
           </div>
         </article>
 

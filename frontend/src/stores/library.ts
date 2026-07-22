@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { api, APIError } from "@/api/client";
 import type { FriendList, Track, TrackList, HomeSection, AlbumSummary } from "@/api/types";
 import { useSettingsStore } from "./settings";
@@ -24,9 +24,6 @@ export const useLibraryStore = defineStore("library", () => {
 
   const friends = ref<FriendList | null>(null);
   const friendsLoading = ref(false);
-
-  const CACHE_KEY = "vkplayer_cache";
-  const CACHE_TTL = 24 * 60 * 60 * 1000;
 
   const homeSections = ref<HomeSection[] | null>(null);
   const homeSectionsLoading = ref(false);

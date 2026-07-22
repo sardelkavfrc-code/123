@@ -24,7 +24,7 @@ const emit = defineEmits<{
 
 const player = usePlayerStore();
 
-const containerRef = ref<HTMLElement | null>(null);
+const containerRef = ref<any>(null);
 const scrollTop = ref(0);
 const clientHeight = ref(window.innerHeight || 800); // fallback default height
  
@@ -41,12 +41,19 @@ const visibleItems = computed(() => {
   const endIdx = Math.min(len - 1, Math.ceil((scrollTop.value + clientHeight.value) / h) + 5);
   
   const result = [];
+  const counts: Record<string, number> = {};
   for (let i = startIdx; i <= endIdx; i++) {
+    const track = props.tracks[i];
+    const baseKey = `${track.owner_id}_${track.id}`;
+    counts[baseKey] = (counts[baseKey] || 0) + 1;
+    // Add count suffix only for duplicates to ensure unique keys
+    const key = counts[baseKey] === 1 ? baseKey : `${baseKey}_${counts[baseKey]}`;
+    
     result.push({
-      track: props.tracks[i],
+      track,
       index: i,
       offsetTop: i * h,
-      key: `${props.tracks[i].owner_id}_${props.tracks[i].id}_${i}`
+      key
     });
   }
   return result;
@@ -84,9 +91,10 @@ function getScrollParent(node: HTMLElement | null): HTMLElement | null {
 }
 
 function handleScroll() {
-  if (scrollParent && containerRef.value) {
+  const el = containerRef.value?.$el || containerRef.value;
+  if (scrollParent && el) {
     const parentRect = scrollParent.getBoundingClientRect();
-    const containerRect = containerRef.value.getBoundingClientRect();
+    const containerRect = el.getBoundingClientRect();
     // offsetTop of container relative to scrollParent's client area (accounting for current scroll)
     const offsetInParent = containerRect.top - parentRect.top + scrollParent.scrollTop;
     
@@ -108,8 +116,9 @@ function updateScrollParent() {
     scrollParent.removeEventListener("scroll", handleScroll);
   }
   
-  if (containerRef.value) {
-    scrollParent = getScrollParent(containerRef.value.parentElement);
+  const el = containerRef.value?.$el || containerRef.value;
+  if (el) {
+    scrollParent = getScrollParent(el.parentElement);
     if (!scrollParent) {
       scrollParent = document.documentElement;
     }
@@ -140,10 +149,11 @@ onMounted(() => {
     }
   });
   
-  if (containerRef.value) {
-    resizeObserver.observe(containerRef.value);
-    if (containerRef.value.parentElement) {
-      resizeObserver.observe(containerRef.value.parentElement);
+  const el = containerRef.value?.$el || containerRef.value;
+  if (el) {
+    resizeObserver.observe(el);
+    if (el.parentElement) {
+      resizeObserver.observe(el.parentElement);
     }
   }
 });
@@ -165,7 +175,14 @@ watch(() => props.tracks, () => {
 </script>
 
 <template>
-  <div v-if="tracks.length" ref="containerRef" class="track-list" :style="{ height: `${totalHeight}px` }">
+  <TransitionGroup 
+    v-if="tracks.length" 
+    name="track-list" 
+    tag="div" 
+    ref="containerRef" 
+    class="track-list" 
+    :style="{ height: `${totalHeight}px` }"
+  >
     <TrackRow
       v-for="item in visibleItems"
       :key="item.key"
@@ -176,12 +193,12 @@ watch(() => props.tracks, () => {
       :is-select-mode="isSelectMode"
       :is-selected="selectedTracks?.has(`${item.track.owner_id}_${item.track.id}`)"
       class="track-list__row"
-      :style="{ position: 'absolute', top: 0, left: 0, right: 0, height: `${rowHeight}px`, transform: `translateY(${item.offsetTop}px)` }"
+      :style="{ position: 'absolute', top: 0, left: 0, right: 0, height: `${rowHeight}px`, transform: `translateY(${item.offsetTop}px)`, transition: 'transform 0.5s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.4s ease, scale 0.4s cubic-bezier(0.32, 0.72, 0, 1)' }"
       @play="() => playAll(indexInPlayable(item.track))"
       @toggle-select="emit('toggle-select', item.track)"
       @context-menu-selected="emit('context-menu-selected', $event)"
     />
-  </div>
+  </TransitionGroup>
   <EmptyState
     v-else
     :title="emptyTitle ?? 'Пусто'"
@@ -194,10 +211,22 @@ watch(() => props.tracks, () => {
   position: relative;
   width: 100%;
 }
-.track-list__item {
+.track-list__row {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
+}
+.track-list-enter-active,
+.track-list-leave-active {
+  pointer-events: none;
+}
+.track-list-enter-from,
+.track-list-leave-to {
+  opacity: 0;
+  scale: 0.92;
+}
+.track-list-leave-active {
+  z-index: -1;
 }
 </style>

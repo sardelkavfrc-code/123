@@ -223,6 +223,7 @@ const defaults: PersistedSettings = {
     { id: "dislike", visible: true },
   ],
   iconSet: "rounded",
+  
   localFolders: [],
   downloadPath: "",
   ignoredPaths: [],
@@ -351,7 +352,7 @@ export const useSettingsStore = defineStore("settings", () => {
   }
   const trackItems = ref<SidebarItemSetting[]>(initial.trackItems ?? defaults.trackItems);
   const iconSet = ref<"line" | "flat" | "rounded">(initial.iconSet ?? defaults.iconSet);
-  const localFolders = ref<string[]>(initial.localFolders ?? []);
+    const localFolders = ref<string[]>(initial.localFolders ?? []);
   const downloadPath = ref<string>(initial.downloadPath ?? "");
   const ignoredPaths = ref<string[]>(initial.ignoredPaths ?? []);
   const trackContextMenuStyle = ref<"default" | "dots">(initial.trackContextMenuStyle ?? defaults.trackContextMenuStyle);
@@ -588,8 +589,7 @@ export const useSettingsStore = defineStore("settings", () => {
       homeCardsBrightnessTimeEnd: homeCardsBrightnessTimeEnd.value,
       sidebarItems: sidebarItems.value,
       trackItems: trackItems.value,
-      iconSet: iconSet.value,
-      localFolders: localFolders.value,
+      iconSet: iconSet.value,      localFolders: localFolders.value,
       downloadPath: downloadPath.value,
       ignoredPaths: ignoredPaths.value,
       mixMood: mixMood.value,
@@ -747,8 +747,7 @@ export const useSettingsStore = defineStore("settings", () => {
     homeCardsBrightnessTimeEnd.value = defaults.homeCardsBrightnessTimeEnd;
     sidebarItems.value = defaults.sidebarItems.map(item => ({ ...item }));
     trackItems.value = defaults.trackItems.map(item => ({ ...item }));
-    iconSet.value = defaults.iconSet;
-    localFolders.value = [];
+    iconSet.value = defaults.iconSet;    localFolders.value = [];
     mixMood.value = defaults.mixMood;
     mixFamiliarity.value = defaults.mixFamiliarity;
     mixLanguage.value = defaults.mixLanguage;

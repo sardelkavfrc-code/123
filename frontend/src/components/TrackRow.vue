@@ -12,6 +12,7 @@ import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
 import { api } from "@/api/client";
 import SvgIcon from "./SvgIcon.vue";
+import HeartIcon from "./HeartIcon.vue";
 
 const props = defineProps<{
   track: Track;
@@ -334,19 +335,14 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
       <template v-if="settings.trackContextMenuStyle === 'dots'">
         <template v-for="item in trackItems" :key="item.id">
         <template v-if="track.owner_id !== -999999 || item.id === 'queue'">
-          <button
+          <HeartIcon
             v-if="item.id === 'library'"
             class="row__action row__action--lib"
-            :class="{ 'row__action--in-lib': inLibrary }"
+            :active="inLibrary"
+            :aria-label="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
             :title="inLibrary ? 'Удалить из библиотеки' : 'В библиотеку'"
-            @click.stop="toggleLibrary"
-          >
-            <SvgIcon v-if="!inLibrary" name="plus" width="18" height="18" />
-            <template v-else>
-              <SvgIcon name="check" class="row__lib-check" width="18" height="18" />
-              <SvgIcon name="cross" class="row__lib-x" width="18" height="18" />
-            </template>
-          </button>
+            @action="toggleLibrary"
+          />
           <button v-else-if="item.id === 'uncensored'" class="row__action" title="Без цензуры" aria-label="Без цензуры" @click.stop="uncensoredSearch">
             <SvgIcon name="uncensored" width="18" height="18" />
           </button>
