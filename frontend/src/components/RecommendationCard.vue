@@ -41,7 +41,7 @@ const variants = computed(() =>
   motion.spring(
     { opacity: 0, y: 16, scale: 0.96 },
     { opacity: 1, y: 0, scale: 1 },
-    { stiffness: 260, damping: 24, delay: (props.index ?? 0) * 0.04 }
+    { stiffness: 260, damping: 24, delay: (props.index ?? 0) * 40 }
   )
 );
 

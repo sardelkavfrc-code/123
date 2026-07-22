@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from "vue";
 import { storeToRefs } from "pinia";
 import { useLibraryStore } from "@/stores/library";
-import { useMotion } from "@/composables/useSpring";
 import type { User } from "@/api/types";
 import PageHeader from "@/components/PageHeader.vue";
 import ScrollArea from "@/components/ScrollArea.vue";
@@ -11,7 +10,6 @@ import Spinner from "@/components/Spinner.vue";
 import { friendsLabel } from "@/composables/useFormat";
 
 const library = useLibraryStore();
-const motion = useMotion();
 const { friends, friendsLoading } = storeToRefs(library);
 const query = ref("");
 
@@ -30,9 +28,6 @@ const visibleFriends = computed(() => {
     `${u.first_name} ${u.last_name}`.toLowerCase().includes(q)
   );
 });
-
-const tileVariants = (i: number) =>
-  motion.spring({ opacity: 0, y: 10 }, { opacity: 1, y: 0 }, { stiffness: 240, damping: 26, delay: i * 0.025 });
 </script>
 
 <template>
@@ -62,7 +57,7 @@ const tileVariants = (i: number) =>
           :to="{ name: 'friend-music', params: { id: friend.id } }"
           class="friends__list-item hover-lift"
           :class="{ 'friends__list-item--locked': !friend.audio_visible }"
-          v-motion="tileVariants(i)"
+          :style="{ animationDelay: `${i * 0.03}s` }"
         >
           <div
             class="friends__avatar"
@@ -106,6 +101,17 @@ const tileVariants = (i: number) =>
   flex-direction: column;
   gap: 12px;
 }
+@keyframes slideUpFade {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .friends__list-item {
   display: flex;
   align-items: center;
@@ -116,6 +122,7 @@ const tileVariants = (i: number) =>
   border-radius: var(--radius-lg);
   text-decoration: none;
   transition: all var(--motion-duration-fast);
+  animation: slideUpFade 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .friends__list-item:hover {
   background: var(--bg-2);

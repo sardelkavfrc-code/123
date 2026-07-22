@@ -16,6 +16,9 @@ const motion = useMotion();
 
 const { loading, lastError } = storeToRefs(auth);
 
+const localLoading = ref(false);
+const isBusy = computed(() => loading.value || localLoading.value || showWebview.value);
+
 // Flow State
 type AuthStep = "login" | "callreset" | "sms" | "password" | "email" | "push" | "max_messenger" | "codegen" | "2fa" | "select_method";
 const step = ref<AuthStep>("login");
@@ -317,8 +320,9 @@ async function handleValidationResponse(res: any) {
 
 // Step 1: Submit email/phone
 async function handleLoginSubmit() {
-  if (loading.value) return;
+  if (isBusy.value) return;
   lastError.value = null;
+  localLoading.value = true;
   
   try {
     const res = await auth.validateAccount({
@@ -347,6 +351,8 @@ async function handleLoginSubmit() {
         return;
       }
     }
+  } finally {
+    localLoading.value = false;
   }
 }
 
@@ -534,7 +540,7 @@ async function handle2faSubmit() {
             type="text"
             class="input auth__input"
             placeholder="Телефон или Email"
-            :disabled="loading"
+            :disabled="isBusy"
             required
             autofocus
           />
@@ -542,9 +548,9 @@ async function handle2faSubmit() {
 
         
 
-        <button class="btn btn--primary auth__submit" type="submit" :disabled="loading || !loginInput">
-          <Spinner v-if="loading" :size="18" />
-          <span>{{ loading ? "Проверка аккаунта..." : "Продолжить" }}</span>
+        <button class="btn btn--primary auth__submit" type="submit" :disabled="isBusy || !loginInput">
+          <Spinner v-if="isBusy" :size="18" />
+          <span>{{ isBusy ? "Проверка аккаунта..." : "Продолжить" }}</span>
         </button>
       </form>
 

@@ -60,15 +60,15 @@ function onShareClick() {
 
 <template>
   <div class="large-playlist-card">
-    <div class="lpc-header" :style="{ background }" @click="emit('open', block)">
+    <div class="lpc-header" :class="{ 'lpc-header--loading': loading }" :style="{ background }" @click="emit('open', block)">
       <div class="lpc-header__overlay"></div>
       
-      <div class="lpc-header__actions">
+      <div class="lpc-header__actions" :class="{ 'lpc-header__actions--loading': loading }">
         <button class="lpc-action-btn" title="Добавить в мою музыку" @click.stop="onAddClick">
           <SvgIcon :name="isAdded ? 'check' : 'plus'" width="18" height="18" />
         </button>
         <button class="lpc-action-btn lpc-action-btn--play" title="Воспроизвести" :class="{ 'lpc-action-btn--loading': loading }" @click.stop="onPlayClick">
-          <Spinner v-if="loading" :size="20" color="#000" />
+          <Spinner v-if="loading" :size="20" color="#fff" />
           <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M8 5v14l11-7z" />
           </svg>
@@ -87,9 +87,6 @@ function onShareClick() {
           <div v-if="block.owner_name" class="lpc-header__owner">
             <img v-if="block.owner_photo" :src="block.owner_photo" class="lpc-header__owner-avatar" alt="Avatar" />
             <span class="lpc-header__owner-name">{{ block.owner_name }}</span>
-          </div>
-          <div class="lpc-header__play-wrapper" v-if="loading">
-            <Spinner :size="24" color="#fff" />
           </div>
         </div>
       </div>
@@ -133,7 +130,8 @@ function onShareClick() {
   z-index: 1;
   transition: background 0.2s ease;
 }
-.lpc-header:hover .lpc-header__overlay {
+.lpc-header:hover .lpc-header__overlay,
+.lpc-header--loading .lpc-header__overlay {
   background: rgba(8, 9, 14, 0.65);
 }
 .lpc-header__content {
@@ -147,7 +145,8 @@ function onShareClick() {
   transition: opacity 0.2s ease;
   min-width: 0;
 }
-.lpc-header:hover .lpc-header__content {
+.lpc-header:hover .lpc-header__content,
+.lpc-header--loading .lpc-header__content {
   opacity: 0.15;
 }
 .lpc-header__actions {
@@ -162,7 +161,8 @@ function onShareClick() {
   transition: opacity 0.2s ease;
   pointer-events: none;
 }
-.lpc-header:hover .lpc-header__actions {
+.lpc-header:hover .lpc-header__actions,
+.lpc-header__actions--loading {
   opacity: 1;
   pointer-events: auto;
 }

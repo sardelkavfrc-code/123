@@ -187,7 +187,7 @@ function goToArtist() {
   min-width: 0;
 }
 .slider-track--playing .slider-track__title {
-  color: var(--accent-text, var(--primary));
+  color: var(--accent-1);
 }
 .slider-track__title-text {
   overflow: hidden;

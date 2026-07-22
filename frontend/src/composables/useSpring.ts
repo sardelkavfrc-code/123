@@ -44,7 +44,7 @@ export function useMotion() {
     } as Variants;
   }
 
-  function staggerSlideUp(distance = 12, delayStep = 0.04): (i: number) => Variants {
+  function staggerSlideUp(distance = 12, delayStep = 40): (i: number) => Variants {
     return (i: number) =>
       spring(
         { opacity: 0, y: distance },

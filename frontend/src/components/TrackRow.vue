@@ -421,6 +421,9 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 12%, transparent), color-mix(in srgb, var(--accent-3) 12%, transparent));
   color: var(--text-0);
 }
+.row--playing .row__title {
+  color: var(--accent-1);
+}
 .row--off {
   opacity: 0.55;
 }

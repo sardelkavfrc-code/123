@@ -55,6 +55,22 @@ function toggleSettings(event: MouseEvent) {
   showMixSettings.value = false;
 }
 
+const dropdownLeaveTimeout = ref<number | null>(null);
+
+function onDropdownMouseLeave() {
+  if (dropdownLeaveTimeout.value) clearTimeout(dropdownLeaveTimeout.value);
+  dropdownLeaveTimeout.value = window.setTimeout(() => {
+    showDropdown.value = false;
+  }, 150);
+}
+
+function onDropdownMouseEnter() {
+  if (dropdownLeaveTimeout.value) {
+    clearTimeout(dropdownLeaveTimeout.value);
+    dropdownLeaveTimeout.value = null;
+  }
+}
+
 function toggleMixSettings(event: MouseEvent) {
   event.stopPropagation();
   if (showMixSettings.value && mixDropdownStyle.value.position === 'absolute' && mixDropdownStyle.value.left) {
@@ -122,6 +138,7 @@ onUnmounted(() => {
 });
 
 const loadingAlbumId = ref<string | null>(null);
+const loadingActionId = ref<string | null>(null);
 
 // VK Mix state. Buffers live per parameter-combo in useMixCache (module-scoped),
 // so switching parameters never leaks tracks from another combo and re-selecting
@@ -390,15 +407,20 @@ async function playMix() {
 }
 
 async function playAction(action: import("@/api/types").ActionItem) {
-  if (mixLoading.value) return;
+  if (mixLoading.value || loadingActionId.value === action.id) return;
   
-  if (action.mix_options) {
-    const opts = action.mix_options;
-    if (opts.vibes) mixMood.value = opts.vibes[0];
-    if (opts.recognitions) mixFamiliarity.value = opts.recognitions[0];
-    if (opts.langs) mixLanguage.value = opts.langs[0];
-    // We can directly call playMix, it will use the updated refs
-    await playMix();
+  loadingActionId.value = action.id;
+  try {
+    if (action.mix_options) {
+      const opts = action.mix_options;
+      if (opts.vibes) mixMood.value = opts.vibes[0];
+      if (opts.recognitions) mixFamiliarity.value = opts.recognitions[0];
+      if (opts.langs) mixLanguage.value = opts.langs[0];
+      // We can directly call playMix, it will use the updated refs
+      await playMix();
+    }
+  } finally {
+    loadingActionId.value = null;
   }
 }
 
@@ -464,7 +486,8 @@ async function fillMixBuffer(needTracks: number) {
 }
 
 async function playAlbum(album: AlbumSummary) {
-  if (album.owner_id == null) return;
+  if (album.owner_id == null || loadingAlbumId.value === album.id) return;
+  loadingAlbumId.value = album.id;
   try {
     const res = await api.playlistTracks(album.owner_id, parseInt(album.id), { count: 200 });
     if (res.items && res.items.length > 0) {
@@ -474,6 +497,8 @@ async function playAlbum(album: AlbumSummary) {
     }
   } catch (e) {
     ui.notify("Не удалось загрузить треки", "error");
+  } finally {
+    loadingAlbumId.value = null;
   }
 }
 </script>
@@ -484,11 +509,12 @@ async function playAlbum(album: AlbumSummary) {
       <PageHeader
         title="Что послушаем сегодня?"
       />
-      <div class="home__actions" ref="dropdownRef">
-        <button class="home__settings-btn" :class="{ 'home__settings-btn--active': showDropdown }" @click="toggleSettings" aria-label="Настройки яркости">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+      <div class="home__actions" ref="dropdownRef" @mouseleave="onDropdownMouseLeave" @mouseenter="onDropdownMouseEnter">
+        <button class="btn btn--ghost home__settings-btn" :class="{ 'home__settings-btn--active': showDropdown }" @click="toggleSettings" aria-label="Настройки Главной">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
             <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
           </svg>
+          Настройки
         </button>
         <button 
           class="btn btn--ghost home__refresh-btn" 
@@ -760,6 +786,7 @@ async function playAlbum(album: AlbumSummary) {
                 v-for="action in section.actions"
                 :key="action.id"
                 :action="action"
+                :loading="loadingActionId === action.id"
                 @click="playAction(action)"
               />
             </div>
@@ -777,6 +804,7 @@ async function playAlbum(album: AlbumSummary) {
                 v-for="action in section.actions"
                 :key="action.id"
                 :action="action"
+                :loading="loadingActionId === action.id"
                 @click="playAction(action)"
               />
             </div>
@@ -1248,31 +1276,8 @@ async function playAlbum(album: AlbumSummary) {
   align-items: center;
   gap: 12px;
 }
-.home__settings-btn {
-  background: var(--bg-3);
-  border: 1px solid var(--border);
-  color: var(--text-1);
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--motion-duration-fast) var(--motion-ease-out);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-.home__settings-btn:hover {
-  background: var(--bg-2);
-  color: var(--text-0);
-  border-color: var(--border-strong);
-  transform: rotate(30deg);
-}
 .home__settings-btn--active {
-  background: var(--accent-1);
-  color: #fff;
-  border-color: var(--accent-2);
-  transform: rotate(90deg) !important;
+  color: var(--accent-1) !important;
 }
 
 .home__refresh-btn {
@@ -1309,6 +1314,14 @@ async function playAlbum(album: AlbumSummary) {
   gap: 14px;
   z-index: 101;
   transform-origin: top right;
+}
+.home__dropdown::before {
+  content: "";
+  position: absolute;
+  top: -20px;
+  left: 0;
+  right: 0;
+  height: 20px;
 }
 .home__dropdown-title {
   font-size: calc(14px * var(--font-scale, 1));

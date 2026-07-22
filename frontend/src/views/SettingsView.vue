@@ -679,9 +679,7 @@ function onAfterLeave(el: Element) {
               <div class="settings__row-sub">Выберите вид иконки добавления трека в библиотеку</div>
             </div>
             <div class="settings__segmented">
-              
-              
-            </div>
+</div>
           </div>
 </div>
           </div>

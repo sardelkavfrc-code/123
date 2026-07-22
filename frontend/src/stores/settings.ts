@@ -210,7 +210,6 @@ const defaults: PersistedSettings = {
     { id: "home", visible: true },
     { id: "library", visible: true },
     { id: "friends", visible: true },
-    { id: "search", visible: true },
     { id: "queue", visible: true },
     { id: "settings", visible: true },
   ],
