@@ -53,6 +53,9 @@ export const useLibraryStore = defineStore("library", () => {
     myMusicError.value = null;
     try {
       const list = await api.myMusic({ count: PAGE_SIZE, offset: 0 });
+      if (myMusicAll.value.length > 0 && !force) {
+        return myMusic.value; // Prevent race condition if loadAllMyMusic finished first
+      }
       myMusic.value = list.items;
       myMusicTotal.value = list.count;
       refreshMyMusicIndex(list.items);

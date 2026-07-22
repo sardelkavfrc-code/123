@@ -167,6 +167,29 @@ async def my_music_all(
     return chunks;
     """
     
+    async def fetch_partition(chunk_offset, actual_chunks, offset):
+        for attempt in range(4):
+            try:
+                res = await _safe_call(
+                    vk,
+                    "execute",
+                    session.access_token,
+                    code=code,
+                    offset=offset,
+                    owner_id=session.user_id,
+                    count=chunk_size,
+                    num_chunks=actual_chunks,
+                )
+                if res is not None:
+                    return res
+            except Exception as e:
+                import logging
+                logging.warning(f"my_music_all partition {chunk_offset} attempt {attempt} failed: {e}")
+                if attempt == 3:
+                    return []
+                await asyncio.sleep(0.5 * (attempt + 1))
+        return []
+
     tasks = []
     for p in range(num_partitions):
         chunk_offset = p * chunks_per_partition
@@ -174,24 +197,13 @@ async def my_music_all(
             break
         actual_chunks = min(chunks_per_partition, total_chunks - chunk_offset)
         offset = len(first_items) + chunk_offset * chunk_size
-        tasks.append(
-            _safe_call(
-                vk,
-                "execute",
-                session.access_token,
-                code=code,
-                offset=offset,
-                owner_id=session.user_id,
-                count=chunk_size,
-                num_chunks=actual_chunks,
-            )
-        )
+        tasks.append(fetch_partition(chunk_offset, actual_chunks, offset))
         
-    results = await asyncio.gather(*tasks)
+    results = await asyncio.gather(*tasks, return_exceptions=True)
     
     all_items = list(first_items)
     for res in results:
-        if res:
+        if isinstance(res, list):
             for chunk in res:
                 if chunk:
                     all_items.extend(chunk)

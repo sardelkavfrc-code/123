@@ -8,6 +8,7 @@ import { useSettingsStore } from "@/stores/settings";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
+import { useDownloadStore } from "@/stores/download";
 import SvgIcon from "./SvgIcon.vue";
 
 const props = defineProps<{
@@ -27,6 +28,7 @@ const library = useLibraryStore();
 const ui = useUIStore();
 const settings = useSettingsStore();
 const router = useRouter();
+const downloadStore = useDownloadStore();
 
 const inLibrary = computed(() => library.isInLibrary(props.track));
 
@@ -102,6 +104,23 @@ const trackItems = computed(() => {
   return settings.trackItems.filter((item) => item.visible);
 });
 const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
+
+const isDownloaded = computed(() => {
+  if (props.track.owner_id === -999999) return true;
+  const key = `${props.track.artist?.toLowerCase() || ''} - ${props.track.title?.toLowerCase() || ''}`;
+  return library.localTracksMap.has(key);
+});
+
+const isDownloading = computed(() => {
+  return downloadStore.queue.some(
+    item => item.id === props.track.id && item.owner_id === props.track.owner_id && (item.status === 'downloading' || item.status === 'pending')
+  );
+});
+
+function downloadSingleTrack() {
+  void downloadStore.downloadTracks([props.track]);
+  ui.notify("Трек добавлен в очередь загрузок", "success");
+}
 </script>
 
 <template>
@@ -187,6 +206,19 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
           <SvgIcon name="share" width="16" height="16" />
         </button>
       </template>
+      <!-- Single Track Download Button -->
+      <button
+        v-if="track.owner_id !== -999999 && !isDownloaded && !isDownloading"
+        class="queue__action queue__action--download"
+        title="Скачать трек"
+        aria-label="Скачать"
+        @click.stop="downloadSingleTrack"
+      >
+        <SvgIcon name="download" width="16" height="16" />
+      </button>
+      <div v-else-if="isDownloading" class="queue__download-spinner" title="Скачивается...">
+        <div class="spinner-mini"></div>
+      </div>
     </div>
     <span class="queue__duration">{{ formatDuration(track.duration) }}</span>
     <button
@@ -222,5 +254,14 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 }
 .queue__action--in-lib:hover {
   background: rgba(255, 94, 126, 0.12);
+}
+
+.queue__download-spinner {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 </style>

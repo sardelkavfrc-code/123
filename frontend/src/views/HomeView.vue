@@ -337,9 +337,9 @@ async function ensureCacheBuffer() {
     const bucket = getMixBucket(mood, fam, lang);
 
     let attempts = 0;
-    // Поддерживаем кэш на уровне 150 треков. Запросы делаем последовательно,
-    // иначе ВК API отдаёт одинаковые массивы на параллельные запросы.
-    while (bucket.buffer.length < 150 && attempts < 10) {
+    // На старте делаем только 1 запрос (чтобы было ~3 трека для старта)
+    // и не спамим ВК АПИ лишними запросами.
+    while (bucket.buffer.length < 3 && attempts < 1) {
       // Пользователь переключил параметры на лету — прекращаем, чужой буфер не трогаем.
       if (mixMood.value !== mood || mixFamiliarity.value !== fam || mixLanguage.value !== lang) break;
 
@@ -348,7 +348,7 @@ async function ensureCacheBuffer() {
 
       let newTracks = 0;
       for (const t of res.items) {
-        if (bucket.buffer.length >= 150) break;
+        if (bucket.buffer.length >= 3) break;
         if (!bucket.seenIds.has(t.id)) {
           bucket.seenIds.add(t.id);
           if (!dislikes.isDisliked(t)) newTracks++;
@@ -380,13 +380,10 @@ async function playMix() {
       0,
       { autoPlay: true },
       async () => {
-        // Обычная подгрузка, когда доиграли почти до конца (осталось < 10 треков)
-        await fillMixBuffer(50);
+        // Подгружаем еще 15 треков когда очередь подходит к концу
+        await fillMixBuffer(15);
       }
     );
-
-    // 2. Запускаем фоновую докачку остальных треков
-    fillMixBuffer(100).catch(console.error);
   } finally {
     mixLoading.value = false;
   }

@@ -595,7 +595,7 @@ export const usePlayerStore = defineStore("player", () => {
         if (prefetchTimeout) window.clearTimeout(prefetchTimeout);
         prefetchTimeout = window.setTimeout(() => {
           void prefetchNextTrack();
-        }, 1000);
+        }, 100);
 
         if (scrobbleTimeout) window.clearTimeout(scrobbleTimeout);
         scrobbleTimeout = window.setTimeout(() => {
