@@ -71,7 +71,7 @@ function gotoSpecificArtist(artistId?: string | null, artistName?: string | null
 
 function uncensoredSearch() {
   if (!current.value) return;
-  const main = current.value.main_artists[0];
+  const main = current.value.main_artists?.[0];
   const q = `${main?.name || current.value.artist} ${current.value.title}`.trim();
   if (q) router.push({ name: "search", query: { q, mode: "any" } });
 }
@@ -122,7 +122,7 @@ function toggleTimeMode() {
 
 // Cover-art fallback (iTunes) when VK doesn't ship a cover. The composable
 // no-ops when the setting is off or when VK already has artwork.
-const trackArtist = computed(() => current.value?.main_artists[0]?.name || current.value?.artist || null);
+const trackArtist = computed(() => current.value?.main_artists?.[0]?.name || current.value?.artist || null);
 const trackTitle = computed(() => current.value?.title || null);
 const hasVkCover = computed(() => !!current.value?.cover_medium);
 

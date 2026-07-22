@@ -169,7 +169,7 @@ function gotoSpecificArtist(artistId?: string | null, artistName?: string | null
 }
 
 function uncensoredSearch() {
-  const main = props.track.main_artists[0];
+  const main = props.track.main_artists?.[0];
   const q = `${main?.name || props.track.artist} ${props.track.title}`.trim();
   if (q) router.push({ name: "search", query: { q, mode: "any" } });
 }
@@ -198,7 +198,7 @@ const hasVkCover = computed(() => !!props.track.cover_small);
 
 // Cover fallback (iTunes) only when VK doesn't ship a cover and the user
 // hasn't disabled the setting. Composable returns `null` otherwise.
-const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
+const trackArtist = computed(() => props.track.main_artists?.[0]?.name || props.track.artist || null);
 const trackTitle = computed(() => props.track.title || null);
 const { cover: externalCover } = useExternalArt(
   trackArtist,

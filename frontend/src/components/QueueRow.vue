@@ -46,7 +46,7 @@ async function toggleLibrary() {
   }
 }
 
-const trackArtist = computed(() => props.track.main_artists[0]?.name || props.track.artist || null);
+const trackArtist = computed(() => props.track.main_artists?.[0]?.name || props.track.artist || null);
 const trackTitle = computed(() => props.track.title || null);
 const hasVkCover = computed(() => !!props.track.cover_small);
 
@@ -71,7 +71,7 @@ function gotoSpecificArtist(artistId?: string | null, artistName?: string | null
 }
 
 function uncensored() {
-  const main = props.track.main_artists[0];
+  const main = props.track.main_artists?.[0];
   const q = `${main?.name || props.track.artist} ${props.track.title}`.trim();
   if (q) router.push({ name: "search", query: { q, mode: "any" } });
 }
