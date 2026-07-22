@@ -81,7 +81,7 @@ function uncensoredSearch() {
   const t = track.value;
   const artist = t.main_artists?.[0]?.name || t.artist || "";
   const query = `${artist} ${t.title}`.trim();
-  window.location.href = `/search?q=${encodeURIComponent(query)}&mode=any`;
+  if (query) router.push({ name: "search", query: { q: query, mode: "any" } });
 }
 
 function openSimilar() {
