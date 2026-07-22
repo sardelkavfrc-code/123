@@ -156,6 +156,7 @@ interface PersistedSettings {
   downloadPath?: string;
   ignoredPaths?: string[];
   trackContextMenuStyle: "default" | "dots";
+  accentPlayingTrack: boolean;
 }
 
 const STORAGE_KEY = "vkmp:settings";
@@ -238,6 +239,7 @@ const defaults: PersistedSettings = {
   homeShowPlaylists: true,
   homeShowMixes: true,
   trackContextMenuStyle: "default",
+  accentPlayingTrack: true,
 };
 
 function load(): PersistedSettings {
@@ -356,6 +358,7 @@ export const useSettingsStore = defineStore("settings", () => {
   const downloadPath = ref<string>(initial.downloadPath ?? "");
   const ignoredPaths = ref<string[]>(initial.ignoredPaths ?? []);
   const trackContextMenuStyle = ref<"default" | "dots">(initial.trackContextMenuStyle ?? defaults.trackContextMenuStyle);
+  const accentPlayingTrack = ref(initial.accentPlayingTrack ?? defaults.accentPlayingTrack);
 
   const mixMood = ref(initial.mixMood ?? defaults.mixMood);
   const mixFamiliarity = ref(initial.mixFamiliarity ?? defaults.mixFamiliarity);
@@ -603,6 +606,7 @@ export const useSettingsStore = defineStore("settings", () => {
       homeShowPlaylists: homeShowPlaylists.value,
       homeShowMixes: homeShowMixes.value,
       trackContextMenuStyle: trackContextMenuStyle.value,
+      accentPlayingTrack: accentPlayingTrack.value,
     };
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -674,6 +678,7 @@ export const useSettingsStore = defineStore("settings", () => {
       homeShowPlaylists,
       homeShowMixes,
       trackContextMenuStyle,
+      accentPlayingTrack,
     ],
     () => {
       applyToDocument();
@@ -758,6 +763,7 @@ export const useSettingsStore = defineStore("settings", () => {
     homeShowMoods.value = defaults.homeShowMoods;
     homeShowPlaylists.value = defaults.homeShowPlaylists;
     homeShowMixes.value = defaults.homeShowMixes;
+    accentPlayingTrack.value = defaults.accentPlayingTrack;
   }
 
   return {
@@ -833,5 +839,6 @@ export const useSettingsStore = defineStore("settings", () => {
     downloadPath,
     ignoredPaths,
     trackContextMenuStyle,
+    accentPlayingTrack,
   };
 });

@@ -130,6 +130,7 @@ function downloadSingleTrack() {
     :class="{
       'queue__row--current': current,
       'queue__row--playing': current && playing,
+      'queue__row--accent-title': settings.accentPlayingTrack,
     }"
     @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'edit_only')"
     @mouseenter="ui.hoveredTrackKey = trackKey"
@@ -250,6 +251,13 @@ function downloadSingleTrack() {
 }
 .queue__action--in-lib:hover {
   background: rgba(255, 94, 126, 0.12);
+}
+
+.queue__title {
+  transition: color var(--motion-duration-base) var(--motion-ease-out);
+}
+.queue__row--current.queue__row--accent-title .queue__title {
+  color: var(--accent-1);
 }
 
 .queue__download-spinner {

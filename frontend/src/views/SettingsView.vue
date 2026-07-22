@@ -62,6 +62,7 @@ const {
   homeCardsBrightnessTimeEnd,
   iconSet,
   trackContextMenuStyle,
+  accentPlayingTrack,
 } = storeToRefs(settings);
 
 const crossfade = computed({
@@ -672,17 +673,16 @@ function onAfterLeave(el: Element) {
                 <span>Цвет 2</span>
                 <input type="color" v-model="customAccentColor2" />
               </label>
-            
-          <div class="settings__row" style="align-items: flex-start; margin-top: 24px;">
-            <div>
-              <div class="settings__row-title">Иконка "Добавить в библиотеку"</div>
-              <div class="settings__row-sub">Выберите вид иконки добавления трека в библиотеку</div>
             </div>
-            <div class="settings__segmented">
-</div>
           </div>
-</div>
-          </div>
+          
+          <label class="settings__row" style="margin-top: 24px;">
+            <div>
+              <div class="settings__row-title">Выделять играющий трек</div>
+              <div class="settings__row-sub">Название играющего трека будет светиться акцентным цветом</div>
+            </div>
+            <input v-model="accentPlayingTrack" type="checkbox" class="settings__switch" />
+          </label>
         </article>
 
         <article class="settings__card">

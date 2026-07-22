@@ -2,6 +2,7 @@
 import { computed, toRef } from "vue";
 import { usePlayerStore } from "@/stores/player";
 import { useUIStore } from "@/stores/ui";
+import { useSettingsStore } from "@/stores/settings";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { useRouter } from "vue-router";
 import type { Track } from "@/api/types";
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 
 const player = usePlayerStore();
 const ui = useUIStore();
+const settings = useSettingsStore();
 const router = useRouter();
 
 const isCurrent = computed(
@@ -64,7 +66,7 @@ function goToArtist() {
 <template>
   <button
     class="slider-track"
-    :class="{ 'slider-track--playing': isCurrent, 'slider-track--disabled': unavailable }"
+    :class="{ 'slider-track--playing': isCurrent, 'slider-track--accent-title': settings.accentPlayingTrack, 'slider-track--disabled': unavailable }"
     @dblclick="playOne"
     @contextmenu.prevent.stop="ui.showTrackContextMenu($event, track, 'full')"
     @mouseenter="ui.hoveredTrackKey = trackKey"
@@ -185,8 +187,9 @@ function goToArtist() {
   align-items: center;
   width: 100%;
   min-width: 0;
+  transition: color var(--motion-duration-base) var(--motion-ease-out);
 }
-.slider-track--playing .slider-track__title {
+.slider-track--playing.slider-track--accent-title .slider-track__title {
   color: var(--accent-1);
 }
 .slider-track__title-text {

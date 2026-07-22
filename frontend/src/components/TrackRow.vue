@@ -7,6 +7,7 @@ import { useLibraryStore } from "@/stores/library";
 import { useDislikesStore } from "@/stores/dislikes";
 import { useUIStore } from "@/stores/ui";
 import { useAuthStore } from "@/stores/auth";
+import { useSettingsStore } from "@/stores/settings";
 import { useExternalArt } from "@/composables/useExternalArt";
 import { formatDuration } from "@/composables/useFormat";
 import type { Track } from "@/api/types";
@@ -35,6 +36,7 @@ const dislikes = useDislikesStore();
 const ui = useUIStore();
 const router = useRouter();
 const auth = useAuthStore();
+const settings = useSettingsStore();
 
 const isMyPlaylistMember = computed(() => {
   return library.activePlaylist && library.activePlaylist.owner_id === auth.status?.user_id;
@@ -219,10 +221,8 @@ async function toggleLibrary() {
     ui.notify((err as Error).message || "Не удалось", "error");
   }
 }
-import { useSettingsStore } from "@/stores/settings";
 import { useDownloadStore } from "@/stores/download";
 
-const settings = useSettingsStore();
 const downloadStore = useDownloadStore();
 
 const isDownloaded = computed(() => {
@@ -251,7 +251,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
 <template>
   <div
     class="row"
-    :class="{ 'row--playing': isCurrent, 'row--compact': variant === 'compact', 'row--off': unavailable, 'row--selected': isSelected }"
+    :class="{ 'row--playing': isCurrent, 'row--accent-title': settings.accentPlayingTrack, 'row--compact': variant === 'compact', 'row--off': unavailable, 'row--selected': isSelected }"
     @click="handleRowClick"
     @dblclick="playOne"
     @contextmenu.prevent.stop="handleContextMenu"
@@ -424,7 +424,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   background: linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 12%, transparent), color-mix(in srgb, var(--accent-3) 12%, transparent));
   color: var(--text-0);
 }
-.row--playing .row__title {
+.row--playing.row--accent-title .row__title {
   color: var(--accent-1);
 }
 .row--off {
@@ -510,6 +510,7 @@ const trackKey = computed(() => `${props.track.owner_id}_${props.track.id}`);
   align-items: center;
   width: 100%;
   min-width: 0;
+  transition: color var(--motion-duration-base) var(--motion-ease-out);
 }
 .row__title-text {
   overflow: hidden;
