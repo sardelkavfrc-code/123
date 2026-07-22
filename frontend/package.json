@@ -1,6 +1,6 @@
 {
   "name": "vk-music-player",
-  "version": "0.2.27",
+  "version": "1.0.0",
   "private": true,
   "main": "dist-electron/main.js",
   "description": "Desktop ВКонтакте music player built with Vue 3, Electron and a Python FastAPI backend.",
@@ -70,7 +70,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "VK Music"
+      "shortcutName": "VK Music",
+      "include": "build/installer.nsh"
     },
     "mac": {
       "target": [

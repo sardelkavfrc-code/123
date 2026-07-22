@@ -52,6 +52,9 @@ async function handleOpenPaths(paths: string[]) {
       player.playQueue(tracks, 0);
       void library.loadLocalTracks();
       ui.notify(`Воспроизведение: добавлено ${tracks.length} треков`, "success");
+      if (route.name !== "device") {
+        router.push({ name: "device" });
+      }
     } else {
       ui.notify("Не удалось прочитать аудиофайлы по указанным путям", "error");
     }
