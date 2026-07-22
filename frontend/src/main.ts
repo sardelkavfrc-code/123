@@ -72,6 +72,7 @@ async function bootstrap(): Promise<void> {
   app.use(MotionPlugin);
   app.directive("lazy-bg", vLazyBg);
 
+  await router.isReady();
   app.mount("#app");
 }
 

@@ -61,10 +61,12 @@ async function handleOpenPaths(paths: string[]) {
 }
 
 watch(
-  () => auth.isAuthenticated,
-  (isAuth) => {
+  [() => auth.isAuthenticated, () => route.name],
+  ([isAuth, routeName]) => {
     if (isAuth) {
-      void library.loadAllMyMusic();
+      if (routeName && routeName !== "device" && routeName !== "auth") {
+        void library.loadAllMyMusic();
+      }
     } else {
       library.reset();
     }
@@ -74,9 +76,10 @@ watch(
 
 watch(() => route.name, (name) => {
   if (name && typeof name === "string" && name !== "auth") {
-    localStorage.setItem("vkmp:active_tab", name);
+    const spawnTab = name === "device" ? "device" : "library";
+    localStorage.setItem("vkmp:active_tab", spawnTab);
   }
-});
+}, { immediate: true });
 
 let detachMediaKey: (() => void) | null = null;
 

@@ -94,8 +94,8 @@ router.beforeEach(async (to) => {
     const updateState = localStorage.getItem("vkmp:update_restore_state");
     if (!updateState && (to.name === "home" || to.path === "/")) {
       const savedTab = localStorage.getItem("vkmp:active_tab");
-      if (savedTab && savedTab !== "home") {
-        return { name: savedTab };
+      if (savedTab === "device") {
+        return { name: "device" };
       }
       return { name: "library" };
     }
@@ -106,12 +106,17 @@ router.beforeEach(async (to) => {
   if (vkRoutes.includes(to.name as string)) {
     if (!auth.vkApiAllowed) {
       auth.vkApiAllowed = true;
-      await auth.refresh();
+      // We do not await here if authenticated from cache, we let it happen below or in background
     }
   }
 
   if (to.name !== "device" && !auth.checked) {
-    await auth.refresh();
+    if (!auth.isAuthenticated) {
+      await auth.refresh();
+    } else {
+      // Authenticated from cache, refresh in background to avoid blocking UI
+      auth.refresh().catch(() => {});
+    }
   }
   if (to.name !== "device" && !to.meta.public && !auth.isAuthenticated) {
     return { name: "auth", query: { redirect: to.fullPath } };
@@ -120,4 +125,11 @@ router.beforeEach(async (to) => {
     return { path: "/" };
   }
   return true;
+});
+
+router.afterEach((to) => {
+  if (to.name && typeof to.name === "string" && to.name !== "auth") {
+    const spawnTab = to.name === "device" ? "device" : "library";
+    localStorage.setItem("vkmp:active_tab", spawnTab);
+  }
 });
