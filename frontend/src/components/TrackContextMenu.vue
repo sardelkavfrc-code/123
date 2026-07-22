@@ -10,6 +10,7 @@ import SvgIcon from "@/components/SvgIcon.vue";
 import { useSettingsStore } from "@/stores/settings";
 import { api } from "@/api/client";
 import { useDownloadStore } from "@/stores/download";
+import HeartIcon from "@/components/HeartIcon.vue";
 
 const ui = useUIStore();
 const library = useLibraryStore();
@@ -65,7 +66,7 @@ async function toggleLibrary() {
   try {
     if (inLibrary.value) {
       await library.removeFromLibrary(t);
-      ui.notify("Трек удален из библиотеки", "info");
+      // Removed duplicate notification since library store handles the undo notification
     } else {
       await library.addToLibrary(t);
       ui.notify("Трек добавлен в библиотеку", "success");
@@ -268,10 +269,10 @@ watch(
       <template v-else-if="ui.activeContextMenuType === 'full'">
         <template v-for="item in settings.trackItems" :key="item.id">
           <template v-if="item.visible">
-            <button v-if="item.id === 'library' && track.owner_id !== -999999" class="track-context-btn" @click="toggleLibrary">
-              <SvgIcon :name="inLibrary ? 'cross' : 'plus'" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
+            <div v-if="item.id === 'library' && track.owner_id !== -999999" class="track-context-btn" @click="toggleLibrary">
+              <HeartIcon :active="inLibrary" width="16" height="16" style="margin-right: 12px; opacity: 0.7; pointer-events: none;" />
               {{ inLibrary ? 'Удалить из библиотеки' : 'В библиотеку' }}
-            </button>
+            </div>
             <button v-else-if="item.id === 'queue'" class="track-context-btn" @click="addToQueue">
               <SvgIcon name="queue_add" width="16" height="16" style="margin-right: 12px; opacity: 0.7;" />
               Слушать далее
@@ -363,6 +364,10 @@ watch(
 }
 .track-context-btn:hover {
   background: var(--bg-3);
+}
+.track-context-btn:hover :deep(.heart-wrapper.is-active:not(.is-removing) .heart-crack) {
+  opacity: 1;
+  stroke-dashoffset: 0;
 }
 .context-menu-fade-enter-active,
 .context-menu-fade-leave-active {

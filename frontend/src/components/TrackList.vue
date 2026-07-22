@@ -31,6 +31,15 @@ const clientHeight = ref(window.innerHeight || 800); // fallback default height
 const rowHeight = computed(() => (props.variant === "compact" ? 48 : 60));
 const totalHeight = computed(() => props.tracks.length * rowHeight.value);
 
+const stableKeys = computed(() => {
+  const counts: Record<string, number> = {};
+  return props.tracks.map(track => {
+    const baseKey = `${track.owner_id}_${track.id}`;
+    counts[baseKey] = (counts[baseKey] || 0) + 1;
+    return counts[baseKey] === 1 ? baseKey : `${baseKey}_${counts[baseKey]}`;
+  });
+});
+
 const visibleItems = computed(() => {
   const h = rowHeight.value;
   const len = props.tracks.length;
@@ -41,19 +50,13 @@ const visibleItems = computed(() => {
   const endIdx = Math.min(len - 1, Math.ceil((scrollTop.value + clientHeight.value) / h) + 5);
   
   const result = [];
-  const counts: Record<string, number> = {};
   for (let i = startIdx; i <= endIdx; i++) {
     const track = props.tracks[i];
-    const baseKey = `${track.owner_id}_${track.id}`;
-    counts[baseKey] = (counts[baseKey] || 0) + 1;
-    // Add count suffix only for duplicates to ensure unique keys
-    const key = counts[baseKey] === 1 ? baseKey : `${baseKey}_${counts[baseKey]}`;
-    
     result.push({
       track,
       index: i,
       offsetTop: i * h,
-      key
+      key: stableKeys.value[i]
     });
   }
   return result;
@@ -175,10 +178,8 @@ watch(() => props.tracks, () => {
 </script>
 
 <template>
-  <TransitionGroup 
+  <div 
     v-if="tracks.length" 
-    name="track-list" 
-    tag="div" 
     ref="containerRef" 
     class="track-list" 
     :style="{ height: `${totalHeight}px` }"
@@ -198,7 +199,7 @@ watch(() => props.tracks, () => {
       @toggle-select="emit('toggle-select', item.track)"
       @context-menu-selected="emit('context-menu-selected', $event)"
     />
-  </TransitionGroup>
+  </div>
   <EmptyState
     v-else
     :title="emptyTitle ?? 'Пусто'"
@@ -216,17 +217,5 @@ watch(() => props.tracks, () => {
   top: 0;
   left: 0;
   right: 0;
-}
-.track-list-enter-active,
-.track-list-leave-active {
-  pointer-events: none;
-}
-.track-list-enter-from,
-.track-list-leave-to {
-  opacity: 0;
-  scale: 0.92;
-}
-.track-list-leave-active {
-  z-index: -1;
 }
 </style>

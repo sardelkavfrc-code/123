@@ -553,8 +553,11 @@ export const usePlayerStore = defineStore("player", () => {
         isPlaying.value = false;
         loadingTrack.value = false;
         import("@/stores/ui").then(({ useUIStore }) => {
-          useUIStore().notify("Трек недоступен в вашем регионе или удален", "error");
+          useUIStore().notify("Трек недоступен в вашем регионе или удален. Переключаем...", "error");
         });
+        if (index.value + 1 < queue.value.length) {
+            next();
+        }
         return;
       }
     }
@@ -578,15 +581,34 @@ export const usePlayerStore = defineStore("player", () => {
       },
       onLoadError: (errCode?: number) => {
         if (backend !== thisBackend) return;
-        if (errCode === 2) {
-            console.log("[Player] Network error, attempting to reconnect...");
-            const curTime = currentTime.value;
-            track.url = ""; // Force refresh
-            void loadCurrent(true, 0, curTime);
-            return;
+        
+        const retries = (track as any)._retries || 0;
+        
+        if (retries < 2) {
+          console.log(`[Player] Load error ${errCode} (retry ${retries + 1}/2), attempting to reconnect...`);
+          (track as any)._retries = retries + 1;
+          const curTime = currentTime.value;
+          track.url = ""; // Force refresh URL from API
+          void loadCurrent(true, undefined, curTime);
+          return;
         }
+
+        console.log(`[Player] Load error ${errCode} after ${retries} retries. Skipping to next.`);
+        (track as any)._retries = 0; // Reset for future plays
         loadingTrack.value = false;
         isPlaying.value = false;
+        
+        // Auto-skip to the next track on persistent failure
+        if (index.value + 1 < queue.value.length) {
+           import("@/stores/ui").then(({ useUIStore }) => {
+             useUIStore().notify(`Не удалось загрузить трек. Переключаем на следующий...`, "error");
+           });
+           next();
+        } else {
+           import("@/stores/ui").then(({ useUIStore }) => {
+             useUIStore().notify(`Не удалось загрузить трек`, "error");
+           });
+        }
       },
       onPlay: () => {
         if (backend !== thisBackend) return;
