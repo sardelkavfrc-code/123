@@ -115,9 +115,13 @@ router.beforeEach(async (to) => {
       await auth.refresh();
     } else {
       // Authenticated from cache, refresh in background to avoid blocking UI
-      auth.refresh().catch(() => {});
+      // But now we want the UI to wait for this check for the startup animation
+      await auth.refresh();
     }
+  } else if (to.name === "device" && !auth.checked) {
+    auth.checked = true;
   }
+  
   if (to.name !== "device" && !to.meta.public && !auth.isAuthenticated) {
     return { name: "auth", query: { redirect: to.fullPath } };
   }

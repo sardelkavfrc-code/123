@@ -242,25 +242,34 @@ watch(
   <div class="app-root" :class="{ blank: isBlank, 'app-root--collapsed': ui.sidebarCollapsed }">
     <DynamicBackground />
     <TitleBar />
-    <div v-if="isBlank" class="blank-host">
-      <router-view v-slot="{ Component }">
-        <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
-          <component :is="Component" />
-        </transition>
-      </router-view>
-    </div>
-    <div v-else class="app-grid">
-      <Sidebar class="app-grid__sidebar" />
-      <main class="app-grid__main">
-        <router-view v-slot="{ Component }">
-          <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
-            <component :is="Component" :key="$route.path" />
-          </transition>
-        </router-view>
-      </main>
-      <UpdateNotification class="app-grid__update" />
-      <PlayerBar class="app-grid__player" />
-    </div>
+
+    <transition name="app-reveal" mode="out-in" appear :duration="{ enter: 1100, leave: 300 }">
+      <div v-if="auth.checked" class="app-container" :key="isBlank ? 'blank' : 'main'">
+        
+        <div v-if="isBlank" class="blank-host">
+          <router-view v-slot="{ Component }">
+            <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </router-view>
+        </div>
+        
+        <div v-else class="app-grid">
+          <Sidebar class="app-grid__sidebar" />
+          <main class="app-grid__main">
+            <router-view v-slot="{ Component }">
+              <transition :name="settings.routerAnimation === 'none' ? '' : `page-${settings.routerAnimation}`" mode="out-in">
+                <component :is="Component" :key="$route.path" />
+              </transition>
+            </router-view>
+          </main>
+          <UpdateNotification class="app-grid__update" />
+          <PlayerBar class="app-grid__player" />
+        </div>
+
+      </div>
+    </transition>
+
     <ToastHost />
 
     <!-- Global Track Context Menu -->
@@ -292,6 +301,12 @@ watch(
   flex-direction: column;
   height: 100vh;
   overflow: hidden;
+}
+.app-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .blank-host {
   flex: 1 1 auto;
@@ -333,6 +348,48 @@ watch(
 }
 .app-grid__player {
   grid-area: player;
+}
+
+/* Startup Reveal Animation */
+.app-reveal-leave-active {
+  transition: opacity 0.3s ease;
+}
+.app-reveal-leave-to {
+  opacity: 0;
+}
+
+/* Staggered entrance for main grid elements */
+.app-reveal-enter-active .app-grid__sidebar {
+  animation: slideInLeft 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.app-reveal-enter-active .app-grid__player {
+  animation: slideInBottom 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.app-reveal-enter-active .app-grid__main {
+  animation: mainFadeIn 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 0.15s;
+}
+
+/* Entrance for blank views like Auth */
+.app-reveal-enter-active .blank-host {
+  animation: slideUpFade 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInBottom {
+  from { opacity: 0; transform: translateY(50px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mainFadeIn {
+  from { opacity: 0; transform: translateY(15px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(30px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .track-context-menu {
