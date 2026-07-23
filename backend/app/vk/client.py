@@ -288,6 +288,19 @@ class VKClient:
                         
                     storage.save(session)
                     logger.info("Successfully refreshed session token in background")
+                    
+                    # Bless the newly refreshed token via vkaudiotoken so that 
+                    # strict endpoints like catalog.getAudioExplore do not reject it!
+                    try:
+                        from app.vk.audio_token import refresh_to_audio_token
+                        bless_res = await refresh_to_audio_token(self)
+                        if bless_res.error:
+                            logger.warning("Failed to bless new token, using raw token: %s", bless_res.error)
+                        else:
+                            logger.info("Successfully blessed the refreshed token")
+                    except Exception as e:
+                        logger.error("Exception while blessing refreshed token: %s", e)
+                        
                     return True
                 else:
                     logger.error("Refresh response success list did not contain 'token' field: %s", token_data)
