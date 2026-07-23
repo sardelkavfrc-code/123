@@ -666,10 +666,13 @@ async def confirm_auth(payload: ConfirmRequest, vk: VKDep) -> AuthStatus:
             detail={"kind": "auth_error", "message": "Токен не был получен"}
         )
 
+    # Do NOT extract webview_refresh_token because it is identical to access_token
+    # and causes auth.refreshTokens to fail with 'Exchange token is invalid'.
+    # We must explicitly call auth.getExchangeToken to get a valid common_token.
     session = storage.Session(
         access_token=resp_json["access_token"],
         user_id=int(resp_json.get("user_id", 0)),
-        refresh_token=resp_json.get("webview_refresh_token") or resp_json.get("refresh_token")
+        refresh_token=resp_json.get("refresh_token")
     )
 
     has_audio = await _probe_audio(vk, session.access_token)
