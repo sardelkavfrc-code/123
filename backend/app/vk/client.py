@@ -29,6 +29,7 @@ class VKClient:
             timeout=httpx.Timeout(20.0, connect=10.0),
             headers={"User-Agent": self._settings.vk_user_agent},
         )
+        self._refresh_lock = asyncio.Lock()
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -38,7 +39,7 @@ class VKClient:
         except VKError as exc:
             if exc.code in (5, 1117):
                 logger.info("Token expired/invalid (code %d). Attempting background refresh...", exc.code)
-                if await self.refresh_session():
+                if await self.refresh_session(old_token=token):
                     from .. import storage
                     new_session = storage.load()
                     if new_session and new_session.access_token:
@@ -210,11 +211,19 @@ class VKClient:
             )
         return data.get("response")
 
-    async def refresh_session(self) -> bool:
+    async def refresh_session(self, old_token: str | None = None) -> bool:
+        async with self._refresh_lock:
+            return await self._do_refresh_session(old_token)
+
+    async def _do_refresh_session(self, old_token: str | None = None) -> bool:
         from .. import storage
         session = storage.load()
         if not session or not session.access_token:
             return False
+            
+        if old_token and session.access_token != old_token:
+            logger.info("Token was already refreshed by another concurrent request.")
+            return True
             
         device_id = storage.get_device_id()
         # Use refresh_token (which holds the exchange/common token) if available.

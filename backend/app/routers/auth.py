@@ -129,22 +129,28 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
     for attempt in range(3):
         try:
             has_audio = await _probe_audio(vk, session.access_token)
-            if not session.refresh_token:
+            
+            # Reload session because _probe_audio might have refreshed it
+            current_session = storage.load()
+            if not current_session:
+                return AuthStatus(authenticated=False)
+                
+            if not current_session.refresh_token:
                 try:
                     exchange_res = await vk.call(
                         "auth.getExchangeToken",
-                        session.access_token,
+                        current_session.access_token,
                         create_common_token=1,
                         create_tier_tokens=0,
                         api_id=2274003,
                     )
                     if exchange_res and "common_token" in exchange_res:
-                        session.refresh_token = exchange_res["common_token"]
-                        storage.save(session)
+                        current_session.refresh_token = exchange_res["common_token"]
+                        storage.save(current_session)
                         logger.info("Successfully populated missing refresh token on status check")
                 except Exception as exc:
                     logger.warning("Failed to populate missing refresh token: %s", exc)
-            return await _resolve_user(vk, session.access_token, has_audio=has_audio)
+            return await _resolve_user(vk, current_session.access_token, has_audio=has_audio)
         except HTTPException as exc:
             if exc.status_code == status.HTTP_502_BAD_GATEWAY and attempt < 2:
                 await asyncio.sleep(1.0)
