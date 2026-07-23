@@ -669,7 +669,7 @@ async def confirm_auth(payload: ConfirmRequest, vk: VKDep) -> AuthStatus:
     session = storage.Session(
         access_token=resp_json["access_token"],
         user_id=int(resp_json.get("user_id", 0)),
-        refresh_token=resp_json.get("refresh_token")
+        refresh_token=resp_json.get("webview_refresh_token") or resp_json.get("refresh_token")
     )
 
     has_audio = await _probe_audio(vk, session.access_token)

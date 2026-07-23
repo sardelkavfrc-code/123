@@ -259,22 +259,38 @@ class VKClient:
             success = response.get("success")
             if success and isinstance(success, list) and len(success) > 0:
                 token_data = success[0]
-                new_access_token = token_data.get("token")
+                
+                # Check for nested access_token dict or direct token field
+                new_access_token = None
+                expires_in = None
+                if "access_token" in token_data and isinstance(token_data["access_token"], dict):
+                    new_access_token = token_data["access_token"].get("token")
+                    expires_in = token_data["access_token"].get("expires_in")
+                elif "token" in token_data:
+                    new_access_token = token_data.get("token")
+                    expires_in = token_data.get("expires_in")
+                    
                 if new_access_token:
                     session.access_token = new_access_token
-                    expires_in = token_data.get("expires_in")
                     if expires_in:
                         import time
                         session.expires_at = int(time.time()) + int(expires_in)
-                    # If VK ID eventually returns a new refresh token, update it.
-                    new_refresh_token = token_data.get("refresh_token")
+                    
+                    # Update refresh token if VK returns one
+                    new_refresh_token = None
+                    if "webview_refresh_token" in token_data and isinstance(token_data["webview_refresh_token"], dict):
+                        new_refresh_token = token_data["webview_refresh_token"].get("token")
+                    elif "refresh_token" in token_data:
+                        new_refresh_token = token_data.get("refresh_token")
+                        
                     if new_refresh_token:
                         session.refresh_token = new_refresh_token
+                        
                     storage.save(session)
                     logger.info("Successfully refreshed session token in background")
                     return True
                 else:
-                    logger.error("Refresh response success list did not contain 'token' field")
+                    logger.error("Refresh response success list did not contain 'token' field: %s", token_data)
             else:
                 logger.error("Refresh response success list is empty or invalid: %s", response)
         except Exception as exc:
