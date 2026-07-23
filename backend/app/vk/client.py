@@ -226,9 +226,11 @@ class VKClient:
             return True
             
         device_id = storage.get_device_id()
-        # Use refresh_token (which holds the exchange/common token) if available.
-        # Fall back to access_token if refresh_token is missing.
-        exchange_token = session.refresh_token or session.access_token
+        if not session.refresh_token:
+            logger.error("Cannot refresh session: no refresh_token available in session")
+            return False
+            
+        exchange_token = session.refresh_token
         
         params = {
             "api_id": self._settings.vk_client_id,

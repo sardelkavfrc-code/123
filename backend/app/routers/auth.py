@@ -186,21 +186,6 @@ async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
 
     session = storage.Session(access_token=payload.access_token, user_id=user_id)
 
-    refresh_result = await refresh_to_audio_token(session.access_token)
-    if refresh_result.ok and refresh_result.refreshed_token:
-        logger.info("FCM receipt blessing succeeded")
-        session = storage.Session(
-            access_token=refresh_result.refreshed_token,
-            user_id=session.user_id,
-            expires_at=session.expires_at,
-        )
-    else:
-        logger.info("FCM receipt blessing skipped (%s)", refresh_result.error)
-
-    has_audio = await _probe_audio(vk, session.access_token)
-    if not has_audio:
-        logger.warning("audio.get probe failed on token — audio gated")
-
     if payload.remember:
         try:
             exchange_res = await vk.call(
@@ -212,10 +197,27 @@ async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
             )
             if exchange_res and "common_token" in exchange_res:
                 session.refresh_token = exchange_res["common_token"]
-                logger.info("Successfully obtained exchange token for background refresh")
+                logger.info("Successfully obtained exchange token before Kate blessing")
         except Exception as exc:
             logger.warning("Failed to obtain exchange token during login: %s", exc)
-        storage.save(session)
+
+    refresh_result = await refresh_to_audio_token(session.access_token)
+    if refresh_result.ok and refresh_result.refreshed_token:
+        logger.info("FCM receipt blessing succeeded")
+        session = storage.Session(
+            access_token=refresh_result.refreshed_token,
+            user_id=session.user_id,
+            expires_at=session.expires_at,
+            refresh_token=session.refresh_token,
+        )
+    else:
+        logger.info("FCM receipt blessing skipped (%s)", refresh_result.error)
+
+    has_audio = await _probe_audio(vk, session.access_token)
+    if not has_audio:
+        logger.warning("audio.get probe failed on token — audio gated")
+
+    storage.save(session)
     return await _resolve_user(vk, session.access_token, has_audio=has_audio)
 
 
