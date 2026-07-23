@@ -138,6 +138,10 @@ async def my_music_all(
 
     if total_count == 0:
         return parse_track_list({"count": 0, "items": []})
+        
+    all_items = list(first_items)
+    if len(all_items) >= total_count:
+        return parse_track_list({"count": total_count, "items": all_items})
 
     chunk_size = 200
     # Calculate how many more chunks we need beyond the first 200 items
