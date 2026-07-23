@@ -276,14 +276,14 @@ class VKClient:
                         import time
                         session.expires_at = int(time.time()) + int(expires_in)
                     
-                    # Update refresh token if VK returns one
-                    new_refresh_token = None
-                    if "webview_refresh_token" in token_data and isinstance(token_data["webview_refresh_token"], dict):
-                        new_refresh_token = token_data["webview_refresh_token"].get("token")
-                    elif "refresh_token" in token_data:
-                        new_refresh_token = token_data.get("refresh_token")
+                    # Update refresh token ONLY if VK returns a REAL 'refresh_token' field.
+                    # Do NOT extract 'webview_refresh_token' because it is a fake token identical to access_token
+                    # and will ruin our valid exchange token for future refreshes.
+                    new_refresh_token = token_data.get("refresh_token")
+                    if new_refresh_token and isinstance(new_refresh_token, dict):
+                        new_refresh_token = new_refresh_token.get("token")
                         
-                    if new_refresh_token:
+                    if new_refresh_token and isinstance(new_refresh_token, str):
                         session.refresh_token = new_refresh_token
                         
                     storage.save(session)
