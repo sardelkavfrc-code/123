@@ -144,10 +144,16 @@ async def status_endpoint(vk: VKDep) -> AuthStatus:
                         create_tier_tokens=0,
                         api_id=2274003,
                     )
-                    if exchange_res and "common_token" in exchange_res:
-                        current_session.refresh_token = exchange_res["common_token"]
-                        storage.save(current_session)
-                        logger.info("Successfully populated missing refresh token on status check")
+                    if exchange_res:
+                        new_token = exchange_res.get("common_token")
+                        if not new_token and "users_exchange_tokens" in exchange_res:
+                            tokens = exchange_res["users_exchange_tokens"]
+                            if tokens and isinstance(tokens, list):
+                                new_token = tokens[0].get("common_token")
+                        if new_token:
+                            current_session.refresh_token = new_token
+                            storage.save(current_session)
+                            logger.info("Successfully populated missing refresh token on status check")
                 except Exception as exc:
                     logger.warning("Failed to populate missing refresh token: %s", exc)
             return await _resolve_user(vk, current_session.access_token, has_audio=has_audio)
@@ -195,9 +201,15 @@ async def login_with_token(payload: TokenLoginRequest, vk: VKDep) -> AuthStatus:
                 create_tier_tokens=0,
                 api_id=2274003,
             )
-            if exchange_res and "common_token" in exchange_res:
-                session.refresh_token = exchange_res["common_token"]
-                logger.info("Successfully obtained exchange token before Kate blessing")
+            if exchange_res:
+                new_token = exchange_res.get("common_token")
+                if not new_token and "users_exchange_tokens" in exchange_res:
+                    tokens = exchange_res["users_exchange_tokens"]
+                    if tokens and isinstance(tokens, list):
+                        new_token = tokens[0].get("common_token")
+                if new_token:
+                    session.refresh_token = new_token
+                    logger.info("Successfully obtained exchange token before Kate blessing")
         except Exception as exc:
             logger.warning("Failed to obtain exchange token during login: %s", exc)
 
@@ -671,9 +683,15 @@ async def confirm_auth(payload: ConfirmRequest, vk: VKDep) -> AuthStatus:
                     create_tier_tokens=0,
                     api_id=2274003,
                 )
-                if exchange_res and "common_token" in exchange_res:
-                    session.refresh_token = exchange_res["common_token"]
-                    logger.info("Successfully obtained exchange token for background refresh")
+                if exchange_res:
+                    new_token = exchange_res.get("common_token")
+                    if not new_token and "users_exchange_tokens" in exchange_res:
+                        tokens = exchange_res["users_exchange_tokens"]
+                        if tokens and isinstance(tokens, list):
+                            new_token = tokens[0].get("common_token")
+                    if new_token:
+                        session.refresh_token = new_token
+                        logger.info("Successfully obtained exchange token for background refresh")
             except Exception as exc:
                 logger.warning("Failed to obtain exchange token: %s", exc)
         storage.save(session)
